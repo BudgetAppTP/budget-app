@@ -1,0 +1,38 @@
+# Virtual environment
+.venv/
+.env
+env/
+venv/
+
+# Python bytecode and cache files
+__pycache__/
+*.py[cod]
+
+# Flask/Django instance folder (e.g., local config, DB)
+instance/
+
+# Pytest cache and coverage reports
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build and distribution artifacts
+dist/
+build/
+*.egg-info/
+
+# Database files
+*.db
+*.sqlite3
+
+# VS Code settings and workspace files
+.vscode/
+*.code-workspace
+
+# PyCharm / IntelliJ IDEA project settings
+.idea/
+*.iml
+
+# Logs and Runtime Files
+*.log
+*.tmp
