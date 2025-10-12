@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <title>Transakcie</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul>
+      {% for cat,msg in messages %}
+        <li>{{ msg }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% endwith %}
+
+  <h1>Transakcie</h1>
+
+  <form method="get">
+    <label>Mesiac (YYYY-MM)</label>
+    {{ form.month(size=10, placeholder="2025-10") }}
+    <label>Typ</label>
+    {{ form.kind() }}
+    <label>Kategoria</label>
+    {{ form.category() }}
+    <label>Hladat</label>
+    {{ form.search(size=20, placeholder="text...") }}
+    {{ form.submit() }}
+    <a href="{{ url_for('transactions.new_income') }}">Novy prijem</a>
+    <a href="{{ url_for('transactions.new_expense') }}">Novy vydavok</a>
+  </form>
+
+  <table border="1" cellpadding="6" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Typ</th>
+        <th>Kategoria</th>
+        <th>Podkategoria</th>
+        <th>Polozka</th>
+        <th>Mnozstvo</th>
+        <th>Jednotka</th>
+        <th>Jednotkova cena</th>
+        <th>DPH</th>
+        <th>Predajca</th>
+        <th>Poznamka</th>
+        <th>Spolu s DPH</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in rows %}
+      <tr>
+        <td>{{ t.date }}</td>
+        <td>{{ t.kind.value }}</td>
+        <td>{{ t.category }}</td>
+        <td>{{ t.subcategory or "" }}</td>
+        <td>{{ t.item or "" }}</td>
+        <td>{{ t.qty }}</td>
+        <td>{{ t.unit or "" }}</td>
+        <td>{{ t.unit_price }}</td>
+        <td>{{ t.vat }}</td>
+        <td>{{ t.seller or "" }}</td>
+        <td>{{ t.note or "" }}</td>
+        <td>{{ t.total_with_vat() }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <th colspan="11" style="text-align:right">Spolu:</th>
+        <th>{{ total }}</th>
+      </tr>
+    </tfoot>
+  </table>
+</body>
+</html>
