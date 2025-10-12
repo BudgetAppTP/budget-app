@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <title>Prehlad rozpoctu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <h1>Prehlad rozpoctu</h1>
+
+  <form method="get">
+    <label>Mesiac (YYYY-MM)</label>
+    <input type="text" name="month" value="{{ month }}" placeholder="2025-10">
+    <button type="submit">Zobrazit</button>
+  </form>
+
+  <section>
+    <h2>Sucet za {{ month }}</h2>
+    <div>
+      <strong>Prijmy:</strong> {{ total_inc }} EUR
+    </div>
+    <div>
+      <strong>Vydavky:</strong> {{ total_exp }} EUR
+    </div>
+  </section>
+
+  <section>
+    <h2>Rychle akcie</h2>
+    <p>
+      <a href="{{ links.new_income }}">Novy prijem</a> |
+      <a href="{{ links.new_expense }}">Novy vydavok</a> |
+      <a href="{{ links.importqr }}">Import QR/eKasa</a> |
+      <a href="{{ links.export_csv }}">Export CSV</a> |
+      <a href="{{ links.export_pdf }}">Export PDF</a>
+    </p>
+    <p>
+      <a href="{{ links.tx }}">Transakcie</a> |
+      <a href="{{ links.budgets }}">Rozpocty</a> |
+      <a href="{{ links.goals }}">Ciele</a>
+    </p>
+  </section>
+
+  <section>
+    <h2>Grafy</h2>
+    <div style="max-width:900px">
+      <h3>Podiel vydavkov podla sekcie</h3>
+      <canvas id="pieSections" width="900" height="450"></canvas>
+    </div>
+    <div style="max-width:900px">
+      <h3>Vydavky podla kategorii</h3>
+      <canvas id="barCategories" width="900" height="450"></canvas>
+    </div>
+    <div style="max-width:900px">
+      <h3>Trend prijmov a vydavkov</h3>
+      <canvas id="lineTrend" width="900" height="450"></canvas>
+    </div>
+  </section>
+
+  <script id="charts-data" type="application/json">
+  {
+    "month": "{{ month }}",
+    "sections": {{ sections|tojson }},
+    "cats_exp": {{ cats_exp|tojson }},
+    "months": {{ months|tojson }},
+    "series_inc": {{ series_inc|tojson }},
+    "series_exp": {{ series_exp|tojson }}
+  }
+  </script>
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+</body>
+</html>
