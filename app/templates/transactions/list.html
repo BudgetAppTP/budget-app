@@ -17,7 +17,6 @@
   {% endwith %}
 
   <h1>Transakcie</h1>
-
   <form method="get">
     <label>Mesiac (YYYY-MM)</label>
     {{ form.month(size=10, placeholder="2025-10") }}
@@ -30,6 +29,8 @@
     {{ form.submit() }}
     <a href="{{ url_for('transactions.new_income') }}">Novy prijem</a>
     <a href="{{ url_for('transactions.new_expense') }}">Novy vydavok</a>
+    <a href="{{ url_for('export.csv') }}?month={{ form.month.data }}">Export CSV</a>
+    <a href="{{ url_for('export.pdf') }}?month={{ form.month.data }}">Export PDF</a>
   </form>
 
   <table border="1" cellpadding="6" cellspacing="0">

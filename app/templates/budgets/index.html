@@ -24,7 +24,12 @@
     {{ form.submit() }}
   </form>
 
-  <p><a href="{{ url_for('budgets.detail', month=month) }}">Upravit rozpocet pre {{ month }}</a></p>
+  <p>
+    <a href="{{ url_for('budgets.detail', month=month) }}">Upravit rozpocet pre {{ month }}</a>
+    <a href="{{ url_for('export.csv') }}?month={{ month }}">Export CSV</a>
+    <a href="{{ url_for('export.pdf') }}?month={{ month }}">Export PDF</a>
+  </p>
+
 
   <table border="1" cellpadding="6" cellspacing="0">
     <thead>
