@@ -2,6 +2,7 @@ from flask import Flask
 from flask_wtf import CSRFProtect
 from dotenv import load_dotenv
 import os
+from app.services import init_services
 
 csrf = CSRFProtect()
 
@@ -21,6 +22,7 @@ def create_app(config_object=None):
         app.config.from_object(Cfg)
 
     csrf.init_app(app)
+    init_services(app)
 
     from app.blueprints.dashboard import bp as dashboard_bp
     from app.blueprints.transactions import bp as transactions_bp
