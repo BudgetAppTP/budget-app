@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <title>Mesacne rozpocety</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul>
+      {% for cat,msg in messages %}
+        <li>{{ msg }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% endwith %}
+
+  <h1>Mesacne rozpocety</h1>
+
+  <form method="get">
+    <label>Mesiac (YYYY-MM)</label>
+    {{ form.month(size=10, placeholder="2025-10", value=month) }}
+    {{ form.submit() }}
+  </form>
+
+  <p>
+    <a href="{{ url_for('budgets.detail', month=month) }}">Upravit rozpocet pre {{ month }}</a>
+    <a href="{{ url_for('export.csv') }}?month={{ month }}">Export CSV</a>
+    <a href="{{ url_for('export.pdf') }}?month={{ month }}">Export PDF</a>
+  </p>
+
+
+  <table border="1" cellpadding="6" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Sekcia</th>
+        <th>Limit</th>
+        <th>Percento ciela</th>
+        <th>Utratene</th>
+        <th>Zostava</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in data %}
+        <tr>
+          <td>{{ row.b.section.value }}</td>
+          <td>{{ row.b.limit_amount }}</td>
+          <td>{{ row.b.percent_target }} %</td>
+          <td>{{ row.spent }}</td>
+          <td>{{ (row.b.limit_amount - row.spent) if row.b.limit_amount is not none else "" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <title>Novy prijem</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul>
+      {% for cat,msg in messages %}
+        <li>{{ msg }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% endwith %}
+
+  <h1>Novy prijem</h1>
+  <form method="post">
+    {{ form.hidden_tag() }}
+    <div>
+      <label for="{{ form.date.id }}">Datum</label>
+      {{ form.date() }} {% for e in form.date.errors %}<span>{{ e }}</span>{% endfor %}
+    </div>
+    <div>
+      <label for="{{ form.category.id }}">Kategoria</label>
+      {{ form.category() }} {% for e in form.category.errors %}<span>{{ e }}</span>{% endfor %}
+    </div>
+    <div>
+      <label for="{{ form.subcategory.id }}">Podkategoria</label>
+      {{ form.subcategory(size=24) }}
+    </div>
+    <div>
+      <label for="{{ form.item.id }}">Polozka</label>
+      {{ form.item(size=32) }}
+    </div>
+    <div>
+      <label for="{{ form.qty.id }}">Mnozstvo</label>
+      {{ form.qty(step="0.01") }} {% for e in form.qty.errors %}<span>{{ e }}</span>{% endfor %}
+    </div>
+    <div>
+      <label for="{{ form.unit_price.id }}">Jednotkova cena</label>
+      {{ form.unit_price(step="0.01") }} {% for e in form.unit_price.errors %}<span>{{ e }}</span>{% endfor %}
+    </div>
+    <div>
+      <label for="{{ form.vat.id }}">DPH</label>
+      {{ form.vat(step="0.01") }}
+    </div>
+    <div>
+      <label for="{{ form.seller.id }}">Predajca</label>
+      {{ form.seller(size=24) }}
+    </div>
+    <div>
+      <label for="{{ form.unit.id }}">Jednotka</label>
+      {{ form.unit(size=10) }}
+    </div>
+    <div>
+      <label for="{{ form.note.id }}">Poznamka</label>
+      {{ form.note(rows=3, cols=40) }}
+    </div>
+    <div>
+      {{ form.submit() }}
+      <a href="{{ url_for('transactions.list_view') }}">Spat</a>
+    </div>
+  </form>
+</body>
+</html>
