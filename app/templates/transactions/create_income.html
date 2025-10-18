@@ -1,68 +1,334 @@
-<!doctype html>
-<html lang="sk">
-<head>
-  <meta charset="utf-8">
-  <title>Novy prijem</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-  {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <ul>
-      {% for cat,msg in messages %}
-        <li>{{ msg }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-  {% endwith %}
+{% block head_extra %}
+<style>
+  :root {
+    --bg: #e6e7ea;
+    --text: #111;
+    --muted: #555;
+    --gold: #d4a017;
+    --grid: #b6b8be;
+    --white: #ffffff;
+  }
 
-  <h1>Novy prijem</h1>
-  <form method="post">
+  body {
+    background: var(--bg) !important;
+    color: var(--text) !important;
+    font-family: "Inter", sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+
+  .wrap {
+    max-width: 950px;
+    margin: 50px auto;
+    padding: 0 20px;
+  }
+
+  .page-title {
+    font-size: 34px;
+    font-weight: 800;
+    color: #000;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .page-title::after {
+    content: "";
+    flex-grow: 1;
+    height: 2px;
+    background: var(--gold);
+    margin-left: 10px;
+    border-radius: 2px;
+  }
+
+  .summary {
+    background: var(--white);
+    border: 2px solid var(--grid);
+    border-radius: 8px;
+    padding: 10px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    font-size: 16px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+
+  .summary .label { color: var(--muted); }
+  .summary .value {
+    background: #fff5d6;
+    border-radius: 6px;
+    padding: 3px 8px;
+    color: var(--gold);
+    font-weight: 700;
+  }
+
+  .table-wrap {
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--white);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15.5px;
+    color: #000;
+  }
+
+  th, td {
+    border: 1px solid var(--grid);
+    padding: 11px 14px;
+    vertical-align: middle;
+  }
+
+  th {
+    background: #dcdde1;
+    text-align: left;
+    font-weight: 700;
+    text-transform: uppercase;
+    position: relative;
+  }
+
+  th.sortable {
+    cursor: pointer;
+  }
+
+  th.sortable::after {
+    content: "";
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--muted);
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity 0.2s ease;
+  }
+
+  th.sortable:hover::after {
+    opacity: 0.8;
+  }
+
+  tbody tr:nth-child(odd) { background: #fff; }
+  tbody tr:nth-child(even) { background: #f5f6f7; }
+  tbody tr:hover { background: #eceef0; transition: background 0.2s; }
+
+  .amount { text-align: right; font-variant-numeric: tabular-nums; }
+  tfoot td { background: #dcdde1; font-weight: bold; }
+
+  .actions { text-align: center; }
+  .action-icons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .action-icons button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    transition: transform 0.15s ease;
+  }
+
+  .action-icons button:hover { transform: scale(1.1); }
+
+  .btn {
+    background: var(--gold);
+    border: 2px solid #b38a00;
+    color: #1a1200;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: 15px;
+  }
+
+  .btn:hover { background: #c49a0f; }
+
+  form.form-row {
+    display: grid;
+    grid-template-columns: 180px 1fr 160px 180px;
+    gap: 12px;
+    margin-top: 22px;
+    align-items: center;
+  }
+
+  input[type="date"], input[type="text"], input[type="number"] {
+    background: var(--white);
+    border: 1.8px solid var(--grid);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 15px;
+    color: #000;
+    width: 100%;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="page-title">📊 Príjmy</div>
+
+  <div class="summary">
+    <span class="label">Spolu tento mesiac:</span>
+    <span class="value" id="total-value">
+      {{ "{:,.2f}".format(total_amount|default(0)).replace(",", " ").replace(".", ",") }} €
+    </span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+      <tr>
+        <th class="sortable" data-field="date">Dátum</th>
+        <th>Popis</th>
+        <th class="sortable" data-field="amount" style="text-align:right;">Suma (€)</th>
+        <th style="text-align:center;">Akcie</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for inc in incomes %}
+      <tr data-id="{{ inc.id }}">
+        <td contenteditable="false">{{ inc.date }}</td>
+        <td contenteditable="false">{{ inc.description }}</td>
+        <td class="amount" contenteditable="false">{{ "%.2f"|format(inc.amount) }}</td>
+        <td class="actions">
+          <div class="action-icons">
+            <button class="edit">✏️</button>
+            <button class="delete">🗑️</button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+      <tr>
+        <td colspan="2">Spolu</td>
+        <td class="amount" id="total-footer">
+          {{ "%.2f"|format(total_amount|default(0)) }}
+        </td>
+        <td></td>
+      </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <form method="post" class="form-row">
     {{ form.hidden_tag() }}
-    <div>
-      <label for="{{ form.date.id }}">Datum</label>
-      {{ form.date() }} {% for e in form.date.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.category.id }}">Kategoria</label>
-      {{ form.category() }} {% for e in form.category.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.subcategory.id }}">Podkategoria</label>
-      {{ form.subcategory(size=24) }}
-    </div>
-    <div>
-      <label for="{{ form.item.id }}">Polozka</label>
-      {{ form.item(size=32) }}
-    </div>
-    <div>
-      <label for="{{ form.qty.id }}">Mnozstvo</label>
-      {{ form.qty(step="0.01") }} {% for e in form.qty.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.unit_price.id }}">Jednotkova cena</label>
-      {{ form.unit_price(step="0.01") }} {% for e in form.unit_price.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.vat.id }}">DPH</label>
-      {{ form.vat(step="0.01") }}
-    </div>
-    <div>
-      <label for="{{ form.seller.id }}">Predajca</label>
-      {{ form.seller(size=24) }}
-    </div>
-    <div>
-      <label for="{{ form.unit.id }}">Jednotka</label>
-      {{ form.unit(size=10) }}
-    </div>
-    <div>
-      <label for="{{ form.note.id }}">Poznamka</label>
-      {{ form.note(rows=3, cols=40) }}
-    </div>
-    <div>
-      {{ form.submit() }}
-      <a href="{{ url_for('transactions.list_view') }}">Spat</a>
-    </div>
+    {{ form.date(required=True) }}
+    {{ form.description(placeholder="Popis", required=True) }}
+    {{ form.amount(step="0.01", required=True) }}
+    <button class="btn" type="submit">+ Pridať záznam</button>
   </form>
-</body>
-</html>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const tbody = document.querySelector("tbody");
+
+    tbody.addEventListener("click", async (e) => {
+      const tr = e.target.closest("tr");
+      const id = tr.dataset.id;
+      if (!id) return;
+
+      if (e.target.classList.contains("delete")) {
+        await fetch(`/transactions/delete/${id}`, { method: "DELETE" });
+        tr.remove();
+        updateTotal();
+        return;
+      }
+
+      if (e.target.classList.contains("edit")) {
+        const isEditing = !tr.classList.contains("editing");
+        const tds = tr.querySelectorAll("td[contenteditable]");
+        const editBtn = e.target;
+
+        if (isEditing) {
+          tr.classList.add("editing");
+          tr.style.backgroundColor = "#fffef6";
+          tr.style.boxShadow = "inset 0 0 0 2px #d4a017";
+          editBtn.textContent = "✔";
+
+          tds.forEach(td => {
+            td.contentEditable = true;
+            td.style.outline = "none";
+          });
+        } else {
+
+          tr.classList.remove("editing");
+          tr.style.backgroundColor = "";
+          tr.style.boxShadow = "";
+          editBtn.textContent = "✏️";
+
+          tds.forEach(td => td.contentEditable = false);
+
+          const data = {
+            date: tds[0].textContent.trim(),
+            description: tds[1].textContent.trim(),
+            amount: parseFloat(tds[2].textContent),
+          };
+
+          await fetch(`/transactions/edit/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+
+          updateTotal();
+        }
+      }
+    });
+
+
+    document.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", async () => {
+        const field = th.dataset.field;
+        const current = th.dataset.order === "asc" ? "desc" : "asc";
+        th.dataset.order = current;
+        const res = await fetch(`/transactions/sort?field=${field}&order=${current}`);
+        const json = await res.json();
+        renderRows(json.incomes);
+        updateTotal();
+      });
+    });
+
+
+    function renderRows(incomes) {
+      tbody.innerHTML = "";
+      incomes.forEach(inc => {
+        const tr = document.createElement("tr");
+        tr.dataset.id = inc.id;
+        tr.innerHTML = `
+        <td contenteditable="false">${inc.date}</td>
+        <td contenteditable="false">${inc.description}</td>
+        <td class="amount" contenteditable="false">${inc.amount.toFixed(2)}</td>
+        <td class="actions">
+          <div class="action-icons">
+            <button class="edit">✏️</button>
+            <button class="delete">🗑️</button>
+          </div>
+        </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+
+    function updateTotal() {
+      let sum = 0;
+      tbody.querySelectorAll(".amount").forEach(td => sum += parseFloat(td.textContent) || 0);
+      document.getElementById("total-footer").textContent = sum.toFixed(2);
+      document.getElementById("total-value").textContent = sum.toFixed(2).replace(".", ",") + " €";
+    }
+  });
+</script>
+{% endblock %}
+

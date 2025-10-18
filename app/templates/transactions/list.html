@@ -1,79 +1,431 @@
-<!doctype html>
-<html lang="sk">
-<head>
-  <meta charset="utf-8">
-  <title>Transakcie</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-  {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <ul>
-      {% for cat,msg in messages %}
-        <li>{{ msg }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-  {% endwith %}
+{% block head_extra %}
+<style>
+  :root {
+    --bg: #e8eaed;
+    --white: #ffffff;
+    --grid: #c0c3c8;
+    --gold: #d4a017;
+    --gold-dark: #b38a00;
+    --text: #111;
+    --header-bg: #f4f5f7;
+  }
 
-  <h1>Transakcie</h1>
-  <form method="get">
-    <label>Mesiac (YYYY-MM)</label>
-    {{ form.month(size=10, placeholder="2025-10") }}
-    <label>Typ</label>
-    {{ form.kind() }}
-    <label>Kategoria</label>
-    {{ form.category() }}
-    <label>Hladat</label>
-    {{ form.search(size=20, placeholder="text...") }}
-    {{ form.submit() }}
-    <a href="{{ url_for('transactions.new_income') }}">Novy prijem</a>
-    <a href="{{ url_for('transactions.new_expense') }}">Novy vydavok</a>
-    <a href="{{ url_for('export.csv') }}?month={{ form.month.data }}">Export CSV</a>
-    <a href="{{ url_for('export.pdf') }}?month={{ form.month.data }}">Export PDF</a>
-  </form>
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", sans-serif;
+    margin: 0;
+  }
 
-  <table border="1" cellpadding="6" cellspacing="0">
-    <thead>
+  .wrap {
+    max-width: 1050px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+  }
+
+  .month-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .month-nav button {
+    background: var(--gold);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .month-nav button:hover {
+    background: var(--gold-dark);
+  }
+
+  .month-nav h2 {
+    background: #fff;
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .export-btns {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn {
+    background: var(--gold);
+    border: 1px solid var(--gold-dark);
+    color: #fff;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .btn:hover {
+    background: var(--gold-dark);
+  }
+
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    font-size: 22px;
+    font-weight: 700;
+    margin: 30px 0 15px;
+    position: relative;
+  }
+
+  .section-title::after {
+    content: "";
+    flex-grow: 1;
+    height: 3px;
+    background: var(--gold);
+    margin-left: 10px;
+    border-radius: 2px;
+  }
+
+  .section-title img {
+    width: 26px;
+    height: 26px;
+    margin-right: 8px;
+  }
+
+  .tables {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    position: relative;
+    width: 100%;
+    border: 1px solid var(--grid);
+    border-top: none;
+    background: var(--white);
+  }
+
+  .table-box {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--grid);
+    border-right: 1px solid var(--grid);
+  }
+
+  .table-box:first-child {
+    border-left: none;
+  }
+  .table-box:last-child {
+    border-right: none;
+  }
+
+  .table-box table {
+    flex-grow: 1;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--grid);
+  }
+
+  .table-header h3 {
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .table-header button {
+    background: var(--gold);
+    border: none;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.2s;
+  }
+
+  .table-header button:hover {
+    background: var(--gold-dark);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    border: 1px solid var(--grid);
+    padding: 8px 12px;
+    font-size: 15px;
+  }
+
+  th {
+    background: #ececec;
+    text-transform: uppercase;
+    font-size: 13px;
+  }
+
+  tfoot td {
+    font-weight: 700;
+    background: #f9f9f9;
+  }
+
+  .amount {
+    text-align: right;
+  }
+
+  .divider {
+    height: 3px;
+    background: var(--gold);
+    border-radius: 2px;
+    margin: 5px 0 15px 0;
+  }
+
+  .balance-box {
+    background: var(--white);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 12px;
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .balance-box strong {
+    color: var(--gold-dark);
+  }
+
+  .plan-box {
+    background: var(--white);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    margin-top: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  .plan-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--header-bg);
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--grid);
+  }
+
+  .plan-header h3 {
+    font-size: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .plan-header button {
+    background: var(--gold);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  .plan-header button:hover {
+    background: var(--gold-dark);
+  }
+
+  input.percent-input {
+    width: 60px;
+    text-align: center;
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 3px;
+  }
+
+  .plan-box table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .plan-box th,
+  .plan-box td {
+    border: 1px solid var(--grid);
+    padding: 10px 12px;
+  }
+
+  .plan-box th {
+    background: #ececec;
+    text-transform: uppercase;
+    font-size: 13px;
+  }
+
+  .plan-box td.amount {
+    text-align: right;
+  }
+</style>
+{% endblock %}
+
+{% block content %}<div class="wrap">
+  <div class="page-header">
+    <div class="month-nav">
+      <button id="prev-month">◀</button>
+      <h2>{{ month }}</h2>
+      <button id="next-month">▶</button>
+    </div>
+
+    <div class="export-btns">
+      <a class="btn" href="{{ url_for('export.pdf') }}?month={{ month_key }}">Export to PDF</a>
+      <a class="btn" href="{{ url_for('export.csv') }}?month={{ month_key }}">Export to CSV</a>
+    </div>
+  </div>
+
+  <div class="section-title">Príjmy a Výdavky</div>
+
+  <div class="tables">
+    <div class="table-box">
+      <div class="table-header">
+        <h3>📊 Príjmy</h3>
+        <a class="btn" href="{{ url_for('transactions.income_list') }}">+ Pridať príjem</a>
+      </div>
+      <table>
+        <thead>
+        <tr><th>Dátum</th><th>Popis</th><th>Suma (€)</th></tr>
+        </thead>
+        <tbody>
+        {% for i in incomes %}
+        <tr>
+          <td>{{ i.date }}</td>
+          <td>{{ i.description }}</td>
+          <td class="amount">+ {{ "%.2f"|format(i.amount) }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        <tr>
+          <td colspan="2"><strong>Spolu príjmy</strong></td>
+          <td class="amount"><strong>{{ "%.2f"|format(total_income) }}</strong></td>
+        </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="table-box">
+      <div class="table-header">
+        <h3>💸 Výdavky</h3>
+        <a class="btn" href="{{ url_for('transactions.new_expense') }}">+ Pridať výdavok</a>
+      </div>
+      <table>
+        <thead>
+        <tr><th>Suma (€)</th><th>Dátum</th><th>Kategória</th></tr>
+        </thead>
+        <tbody>
+        {% for e in expenses %}
+        <tr>
+          <td class="amount">- {{ "%.2f"|format(e.amount) }}</td>
+          <td>{{ e.date }}</td>
+          <td>{{ e.category }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        <tr>
+          <td class="amount"><strong>-{{ "%.2f"|format(total_expense) }}</strong></td>
+          <td colspan="2"><strong>Spolu výdavky</strong></td>
+        </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="balance-box">
+    Zostatok: <strong id="main-balance">{{ "%.2f"|format(balance) }}</strong> €
+  </div>
+
+  <div class="section-title">📋 Plánovanie rozpočtu</div>
+
+  <div class="plan-box">
+    <div class="plan-header">
+      <h3>Zostatok: <strong id="plan-balance">{{ "%.2f"|format(balance) }} €</strong></h3>
+      <button class="btn" type="button">+ Pridať kategóriu</button>
+    </div>
+
+    <table id="plan-table">
+      <thead>
+      <tr><th>Kategória</th><th>Percento</th><th>Čiastka (€)</th></tr>
+      </thead>
+      <tbody>
+      {% for p in planning %}
       <tr>
-        <th>Datum</th>
-        <th>Typ</th>
-        <th>Kategoria</th>
-        <th>Podkategoria</th>
-        <th>Polozka</th>
-        <th>Mnozstvo</th>
-        <th>Jednotka</th>
-        <th>Jednotkova cena</th>
-        <th>DPH</th>
-        <th>Predajca</th>
-        <th>Poznamka</th>
-        <th>Spolu s DPH</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for t in rows %}
-      <tr>
-        <td>{{ t.date }}</td>
-        <td>{{ t.kind.value }}</td>
-        <td>{{ t.category }}</td>
-        <td>{{ t.subcategory or "" }}</td>
-        <td>{{ t.item or "" }}</td>
-        <td>{{ t.qty }}</td>
-        <td>{{ t.unit or "" }}</td>
-        <td>{{ t.unit_price }}</td>
-        <td>{{ t.vat }}</td>
-        <td>{{ t.seller or "" }}</td>
-        <td>{{ t.note or "" }}</td>
-        <td>{{ t.total_with_vat() }}</td>
+        <td>{{ p.category }}</td>
+        <td>
+          <input type="number" class="percent-input" value="{{ p.percent }}" min="0" max="100" step="1"> %
+        </td>
+        <td class="amount plan-amount">{{ "%.2f"|format(balance * p.percent / 100) }}</td>
       </tr>
       {% endfor %}
-    </tbody>
-    <tfoot>
-      <tr>
-        <th colspan="11" style="text-align:right">Spolu:</th>
-        <th>{{ total }}</th>
-      </tr>
-    </tfoot>
-  </table>
-</body>
-</html>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.percent-input').forEach(input => {
+    input.addEventListener('input', () => {
+      const balance = parseFloat(document.getElementById('main-balance').textContent);
+      const percent = parseFloat(input.value) || 0;
+      const amount = (balance * percent / 100).toFixed(2);
+      input.closest('tr').querySelector('.plan-amount').textContent = amount;
+    });
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const prev = document.getElementById("prev-month");
+    const next = document.getElementById("next-month");
+
+    prev.addEventListener("click", () => {
+      window.location.href = `?month={{ prev_month }}`;
+    });
+
+    next.addEventListener("click", () => {
+      window.location.href = `?month={{ next_month }}`;
+    });
+
+    const balance = {{ balance|tojson }};
+    const inputs = document.querySelectorAll("#planning-table input");
+
+    inputs.forEach(input => {
+      input.addEventListener("input", () => {
+        const tr = input.closest("tr");
+        const amountTd = tr.querySelector(".auto-amount");
+        const percent = parseFloat(input.value) || 0;
+        const amount = (balance * percent / 100).toFixed(2);
+        amountTd.textContent = amount;
+      });
+    });
+  });
+</script>
+{% endblock %}

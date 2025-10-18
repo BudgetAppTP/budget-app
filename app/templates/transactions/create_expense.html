@@ -1,68 +1,403 @@
-<!doctype html>
-<html lang="sk">
-<head>
-  <meta charset="utf-8">
-  <title>Novy vydavok</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-  {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <ul>
-      {% for cat,msg in messages %}
-        <li>{{ msg }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-  {% endwith %}
 
-  <h1>Novy vydavok</h1>
-  <form method="post">
+{% block head_extra %}
+<style>
+  :root {
+    --bg: #e6e7ea;
+    --white: #fff;
+    --grid: #bfc2c7;
+    --gold: #d4a017;
+    --gold-dark: #b38a00;
+    --text: #111;
+    --muted: #555;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", sans-serif;
+  }
+
+  .wrap {
+    max-width: 950px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .page-title {
+    display: flex;
+    align-items: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 15px;
+  }
+
+  .gold-line {
+    flex-grow: 1;
+    height: 3px;
+    background: var(--gold);
+    margin-left: 12px;
+  }
+
+  .summary {
+    display: inline-block;
+    background: var(--white);
+    border: 1px solid var(--grid);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 10px 18px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+  }
+
+  .summary .label { color: var(--muted); font-size: 15px; }
+  .summary .value { color: var(--gold-dark); font-weight: 700; margin-left: 4px; }
+
+  .table-card {
+    background: var(--white);
+    border: 1px solid var(--grid);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+  }
+
+  th, td {
+    border: 1px solid var(--grid);
+    padding: 10px 14px;
+  }
+
+  th {
+    background: #dfe1e5;
+    text-transform: uppercase;
+    font-size: 13px;
+    color: #222;
+    position: relative;
+  }
+
+  th.sortable { cursor: pointer; }
+  th.sortable::after {
+    content: "▲▼";
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: transparent;
+    transition: color 0.2s;
+  }
+  th.sortable:hover::after { color: var(--gold-dark); }
+
+  tbody tr:nth-child(odd) { background: #f7f7f8; }
+  tbody tr:nth-child(even) { background: #ffffff; }
+  tbody tr:hover { background: #f1f1f2; }
+
+  .amount { text-align: right; }
+  tfoot td { font-weight: 700; background: #ececec; }
+
+  .actions {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+  }
+  .action-icon {
+    font-size: 20px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .action-icon.edit:hover { color: var(--gold-dark); transform: scale(1.15); }
+  .action-icon.delete:hover { color: #b00020; transform: scale(1.15); }
+
+  form.form-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 150px 150px;
+    gap: 10px;
+    margin-top: 20px;
+    align-items: center;
+  }
+
+  input, select {
+    background: var(--white);
+    border: 1px solid var(--grid);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .btn {
+    background: var(--gold);
+    border: 1px solid var(--gold-dark);
+    color: #fff;
+    font-weight: 600;
+    padding: 9px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .btn:hover { background: var(--gold-dark); }
+
+  .custom-cat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .check-btn {
+    background: var(--gold);
+    border: none;
+    color: #fff;
+    font-weight: bold;
+    padding: 6px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .check-btn:hover { background: var(--gold-dark); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="page-title">
+    💸 Výdavky
+    <div class="gold-line"></div>
+  </div>
+
+  <div class="summary">
+    <span class="label">Spolu tento mesiac:</span>
+    <span class="value" id="total-value">{{ "%.2f"|format(total_amount) }} €</span>
+  </div>
+
+  <div class="table-card">
+    <table>
+      <thead>
+      <tr>
+        <th>Dátum</th>
+        <th>Kategória</th>
+        <th style="text-align:right;">Suma (€)</th>
+        <th>Akcie</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for exp in expenses %}
+      <tr data-id="{{ exp.id }}">
+        <td contenteditable="false">{{ exp.date }}</td>
+        <td data-type="category">{{ exp.category }}</td>
+        <td class="amount" contenteditable="false">{{ "%.2f"|format(exp.amount) }}</td>
+        <td class="actions">
+          <span class="action-icon edit">✏️</span>
+          <span class="action-icon delete">🗑️</span>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+      <tr>
+        <td colspan="2">Spolu</td>
+        <td class="amount" id="total-footer">{{ "%.2f"|format(total_amount) }}</td>
+        <td></td>
+      </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <form class="form-row">
     {{ form.hidden_tag() }}
-    <div>
-      <label for="{{ form.date.id }}">Datum</label>
-      {{ form.date() }} {% for e in form.date.errors %}<span>{{ e }}</span>{% endfor %}
+    {{ form.date(required=True) }}
+
+    <div id="category-wrapper">
+      <select name="category" id="category-select" required>
+        {% for cat in categories %}
+        <option value="{{ cat }}">{{ cat }}</option>
+        {% endfor %}
+        <option value="add-new">➕ Pridať novú kategóriu</option>
+      </select>
     </div>
-    <div>
-      <label for="{{ form.category.id }}">Kategoria</label>
-      {{ form.category() }} {% for e in form.category.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.subcategory.id }}">Podkategoria</label>
-      {{ form.subcategory(size=24) }}
-    </div>
-    <div>
-      <label for="{{ form.item.id }}">Polozka</label>
-      {{ form.item(size=32) }}
-    </div>
-    <div>
-      <label for="{{ form.qty.id }}">Mnozstvo</label>
-      {{ form.qty(step="0.01") }} {% for e in form.qty.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.unit_price.id }}">Jednotkova cena</label>
-      {{ form.unit_price(step="0.01") }} {% for e in form.unit_price.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.vat.id }}">DPH</label>
-      {{ form.vat(step="0.01") }}
-    </div>
-    <div>
-      <label for="{{ form.seller.id }}">Predajca</label>
-      {{ form.seller(size=24) }}
-    </div>
-    <div>
-      <label for="{{ form.unit.id }}">Jednotka</label>
-      {{ form.unit(size=10) }}
-    </div>
-    <div>
-      <label for="{{ form.note.id }}">Poznamka</label>
-      {{ form.note(rows=3, cols=40) }}
-    </div>
-    <div>
-      {{ form.submit() }}
-      <a href="{{ url_for('transactions.list_view') }}">Spat</a>
-    </div>
+
+    {{ form.amount(step="0.01", inputmode="decimal", placeholder="Suma (€)", required=True) }}
+    <button class="btn" type="submit">+ Pridať výdavok</button>
   </form>
-</body>
-</html>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const tbody = document.querySelector("tbody");
+    const form = document.querySelector("form.form-row");
+    let categories = {{ categories | tojson }};
+
+    const wrapper = document.getElementById("category-wrapper");
+    const select = document.getElementById("category-select");
+    select.addEventListener("change", function() {
+      if (this.value === "add-new") {
+        wrapper.innerHTML = `
+          <div class="custom-cat">
+            <input type="text" id="new-cat" placeholder="Nová kategória" required>
+            <button type="button" id="confirm-cat" class="check-btn">✔</button>
+          </div>
+        `;
+        document.getElementById("confirm-cat").addEventListener("click", () => {
+          const val = document.getElementById("new-cat").value.trim();
+          if (val) {
+            categories.push(val);
+            wrapper.innerHTML = `
+              <select name="category" id="category-select" required>
+                ${categories.map(c => `<option ${c===val?"selected":""}>${c}</option>`).join("")}
+                <option value="add-new">➕ Pridať novú kategóriu</option>
+              </select>
+            `;
+          }
+        });
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const csrfInput = document.querySelector('input[name="csrf_token"]');
+      const csrfToken = csrfInput ? csrfInput.value : "";
+
+      const date = form.querySelector('input[name="date"]')?.value?.trim();
+      const catSelect = form.querySelector('#category-select');
+      const category = catSelect ? catSelect.value.trim() : '';
+      const amountValue = form.querySelector('input[name="amount"]')?.value?.trim();
+      const amount = parseFloat(amountValue.replace(",", "."));
+
+      if (!date || !category || isNaN(amount)) {
+        alert("Vyplňte všetky polia!");
+        return;
+      }
+
+      const payload = { date, category, amount };
+
+      try {
+        const res = await fetch("/transactions/expenses/add", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-CSRFToken": csrfToken
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          alert("Chyba pri ukladaní výdavku!\n" + text);
+          return;
+        }
+
+        const newExpense = await res.json();
+
+        const tr = document.createElement("tr");
+        tr.dataset.id = newExpense.id;
+        tr.innerHTML = `
+          <td contenteditable="false">${newExpense.date}</td>
+          <td data-type="category">${newExpense.category}</td>
+          <td class="amount" contenteditable="false">${newExpense.amount.toFixed(2)}</td>
+          <td class="actions">
+            <span class="action-icon edit">✏️</span>
+            <span class="action-icon delete">🗑️</span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+        updateTotal();
+
+        form.reset();
+      } catch (err) {
+        alert("Chyba spojenia so serverom!");
+      }
+    });
+
+    tbody.addEventListener("click", async (e) => {
+      const tr = e.target.closest("tr");
+      const id = tr?.dataset.id;
+      if (!id) return;
+
+      if (e.target.classList.contains("delete")) {
+        await fetch(`/transactions/expenses/delete/${id}`, { method: "DELETE" });
+        tr.remove();
+        updateTotal();
+        return;
+      }
+
+      if (e.target.classList.contains("edit")) {
+        const isEditing = !tr.classList.contains("editing");
+        const editBtn = e.target;
+        const tds = tr.querySelectorAll("td");
+
+        if (isEditing) {
+          tr.classList.add("editing");
+          tr.style.backgroundColor = "#fff8e1";
+          tr.style.boxShadow = "inset 0 0 0 2px #d4a017";
+          editBtn.textContent = "✔";
+
+          tds[0].contentEditable = true;
+          tds[2].contentEditable = true;
+
+          const catTd = tds[1];
+          const currentCat = catTd.textContent.trim();
+          const select = document.createElement("select");
+          select.innerHTML = categories.map(c =>
+                  `<option value="${c}" ${c === currentCat ? "selected" : ""}>${c}</option>`
+          ).join("") + '<option value="add-new">➕ Nová kategória</option>';
+          catTd.textContent = "";
+          catTd.appendChild(select);
+
+          select.addEventListener("change", () => {
+            if (select.value === "add-new") {
+              catTd.innerHTML = `
+                <div class="custom-cat">
+                  <input type="text" id="temp-cat" placeholder="Nová kategória" style="width:90px">
+                  <button type="button" class="check-btn">✔</button>
+                </div>
+              `;
+              const input = catTd.querySelector("#temp-cat");
+              const btn = catTd.querySelector(".check-btn");
+              btn.addEventListener("click", () => {
+                const val = input.value.trim();
+                if (val) {
+                  categories.push(val);
+                  catTd.textContent = val;
+                }
+              });
+            }
+          });
+        } else {
+          tr.classList.remove("editing");
+          tr.style.backgroundColor = "";
+          tr.style.boxShadow = "";
+          editBtn.textContent = "✏️";
+
+          const catTd = tds[1];
+          const newCat = catTd.querySelector("select")?.value || catTd.textContent.trim();
+          catTd.textContent = newCat;
+
+          const data = {
+            date: tds[0].textContent.trim(),
+            category: newCat,
+            amount: parseFloat(tds[2].textContent),
+          };
+
+          await fetch(`/transactions/expenses/edit/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+
+          updateTotal();
+        }
+      }
+    });
+
+    function updateTotal() {
+      let sum = 0;
+      tbody.querySelectorAll(".amount").forEach(td => sum += parseFloat(td.textContent) || 0);
+      document.getElementById("total-footer").textContent = sum.toFixed(2);
+      document.getElementById("total-value").textContent = sum.toFixed(2) + " €";
+    }
+  });
+</script>
+{% endblock %}

@@ -54,12 +54,12 @@ def index():
         series_inc=series_inc,
         series_exp=series_exp,
         links={
-            "new_income": url_for("transactions.new_income"),
+            "new_income": url_for("transactions.income_list"),
             "new_expense": url_for("transactions.new_expense"),
             "importqr": url_for("importqr.index"),
             "export_csv": url_for("export.csv") + f"?month={month}",
             "export_pdf": url_for("export.pdf") + f"?month={month}",
-            "tx": url_for("transactions.list_view"),
+            "tx": url_for("transactions.monthly_budget"),
             "budgets": url_for("budgets.index"),
             "goals": url_for("goals.index"),
         }
