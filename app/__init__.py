@@ -1,14 +1,19 @@
 from flask import Flask
+from flask_cors import CORS
 from flask_wtf import CSRFProtect
 from dotenv import load_dotenv
 import os
 from app.services import init_services
+from flask_swagger_ui import get_swaggerui_blueprint
 
 csrf = CSRFProtect()
 
 def create_app(config_object=None):
     load_dotenv()
     app = Flask(__name__, instance_relative_config=True)
+
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
+
     if config_object:
         app.config.from_object(config_object)
     else:
@@ -31,7 +36,9 @@ def create_app(config_object=None):
     from app.blueprints.importqr import bp as importqr_bp
     from app.blueprints.auth import bp as auth_bp
     from app.blueprints.export import bp as export_bp
-
+    from app.blueprints.receipts import bp as receipts_bp
+    from app.blueprints.incomes import bp as incomes_bp
+    
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(transactions_bp)
     app.register_blueprint(budgets_bp)
@@ -39,5 +46,18 @@ def create_app(config_object=None):
     app.register_blueprint(importqr_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(export_bp)
+    app.register_blueprint(receipts_bp)
+    app.register_blueprint(incomes_bp)
+
+    SWAGGER_URL = "/api/docs"
+    API_URL = "/static/swagger.json"
+
+    swaggerui_blueprint = get_swaggerui_blueprint(
+        SWAGGER_URL,
+        API_URL,
+        config={"app_name": "Receipts API"}
+    )
+
+    app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
 
     return app

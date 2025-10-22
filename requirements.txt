@@ -23,3 +23,5 @@ openpyxl>=3.1
 python-dateutil>=2.9
 reportlab>=4.2
 pytest>=8.0
+flask_swagger_ui>=5.21.0
+flask_cors>=5.0.0
