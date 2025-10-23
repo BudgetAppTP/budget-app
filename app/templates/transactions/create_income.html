@@ -1,68 +1,199 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="sk">
 <head>
-  <meta charset="utf-8">
-  <title>Novy prijem</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BudgetApp · Príjmy</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style_income.css') }}">
+
 </head>
 <body>
-  {% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <ul>
-      {% for cat,msg in messages %}
-        <li>{{ msg }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
-  {% endwith %}
+{% block head_extra %}
+{% endblock %}
 
-  <h1>Novy prijem</h1>
-  <form method="post">
+{% block content %}
+{% include "navbar.html" %}
+<div class="wrap">
+  <div class="page-title">📊 Príjmy</div>
+
+  <div class="summary">
+    <span class="label">Spolu tento mesiac:</span>
+    <span class="value" id="total-value">
+      {{ "{:,.2f}".format(total_amount|default(0)).replace(",", " ").replace(".", ",") }} €
+    </span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+      <tr>
+        <th class="sortable" data-field="date">Dátum</th>
+        <th>Popis</th>
+        <th class="sortable" data-field="amount" style="text-align:right;">Suma (€)</th>
+        <th style="text-align:center;">Akcie</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for inc in incomes %}
+      <tr data-id="{{ inc.id }}">
+        <td contenteditable="false">{{ inc.date }}</td>
+        <td contenteditable="false">{{ inc.description }}</td>
+        <td class="amount" contenteditable="false">{{ "%.2f"|format(inc.amount) }}</td>
+        <td class="actions">
+          <div class="action-icons">
+            <button class="edit">✏️</button>
+            <button class="delete">🗑️</button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+      <tfoot>
+      <tr>
+        <td colspan="2">Spolu</td>
+        <td class="amount" id="total-footer">
+          {{ "%.2f"|format(total_amount|default(0)) }}
+        </td>
+        <td></td>
+      </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <form method="post" class="form-row">
     {{ form.hidden_tag() }}
-    <div>
-      <label for="{{ form.date.id }}">Datum</label>
-      {{ form.date() }} {% for e in form.date.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.category.id }}">Kategoria</label>
-      {{ form.category() }} {% for e in form.category.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.subcategory.id }}">Podkategoria</label>
-      {{ form.subcategory(size=24) }}
-    </div>
-    <div>
-      <label for="{{ form.item.id }}">Polozka</label>
-      {{ form.item(size=32) }}
-    </div>
-    <div>
-      <label for="{{ form.qty.id }}">Mnozstvo</label>
-      {{ form.qty(step="0.01") }} {% for e in form.qty.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.unit_price.id }}">Jednotkova cena</label>
-      {{ form.unit_price(step="0.01") }} {% for e in form.unit_price.errors %}<span>{{ e }}</span>{% endfor %}
-    </div>
-    <div>
-      <label for="{{ form.vat.id }}">DPH</label>
-      {{ form.vat(step="0.01") }}
-    </div>
-    <div>
-      <label for="{{ form.seller.id }}">Predajca</label>
-      {{ form.seller(size=24) }}
-    </div>
-    <div>
-      <label for="{{ form.unit.id }}">Jednotka</label>
-      {{ form.unit(size=10) }}
-    </div>
-    <div>
-      <label for="{{ form.note.id }}">Poznamka</label>
-      {{ form.note(rows=3, cols=40) }}
-    </div>
-    <div>
-      {{ form.submit() }}
-      <a href="{{ url_for('transactions.list_view') }}">Spat</a>
-    </div>
+    {{ form.date(required=True) }}
+    {{ form.description(placeholder="Popis", required=True) }}
+    {{ form.amount(step="0.01", required=True) }}
+    <button class="btn" type="submit">+ Pridať záznam</button>
   </form>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+        const today = new Date();
+  const dateBadge = document.getElementById('dateBadge');
+
+  if (dateBadge) {
+    dateBadge.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+           xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 2v3M17 2v3M3.5 9.5h17M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 20 20.5H4A1.5 1.5 0 0 1 2.5 19V8A1.5 1.5 0 0 1 4 6.5Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>${today.toLocaleDateString('sk-SK', {
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit'
+      })}</span>
+    `;
+  }
+
+
+
+    const tbody = document.querySelector("tbody");
+
+    tbody.addEventListener("click", async (e) => {
+      const tr = e.target.closest("tr");
+      const id = tr.dataset.id;
+      if (!id) return;
+
+      if (e.target.classList.contains("delete")) {
+        await fetch(`/transactions/delete/${id}`, { method: "DELETE" });
+        tr.remove();
+        updateTotal();
+        return;
+      }
+
+      if (e.target.classList.contains("edit")) {
+        const isEditing = !tr.classList.contains("editing");
+        const tds = tr.querySelectorAll("td[contenteditable]");
+        const editBtn = e.target;
+
+        if (isEditing) {
+          tr.classList.add("editing");
+          tr.style.backgroundColor = "#fffef6";
+          tr.style.boxShadow = "inset 0 0 0 2px #d4a017";
+          editBtn.textContent = "✔";
+
+          tds.forEach(td => {
+            td.contentEditable = true;
+            td.style.outline = "none";
+          });
+        } else {
+
+          tr.classList.remove("editing");
+          tr.style.backgroundColor = "";
+          tr.style.boxShadow = "";
+          editBtn.textContent = "✏️";
+
+          tds.forEach(td => td.contentEditable = false);
+
+          const data = {
+            date: tds[0].textContent.trim(),
+            description: tds[1].textContent.trim(),
+            amount: parseFloat(tds[2].textContent),
+          };
+
+          await fetch(`/transactions/edit/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+
+          updateTotal();
+        }
+      }
+    });
+
+
+    document.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", async () => {
+        const field = th.dataset.field;
+        const current = th.dataset.order === "asc" ? "desc" : "asc";
+        th.dataset.order = current;
+        const res = await fetch(`/transactions/sort?field=${field}&order=${current}`);
+        const json = await res.json();
+        renderRows(json.incomes);
+        updateTotal();
+      });
+    });
+
+
+    function renderRows(incomes) {
+      tbody.innerHTML = "";
+      incomes.forEach(inc => {
+        const tr = document.createElement("tr");
+        tr.dataset.id = inc.id;
+        tr.innerHTML = `
+        <td contenteditable="false">${inc.date}</td>
+        <td contenteditable="false">${inc.description}</td>
+        <td class="amount" contenteditable="false">${inc.amount.toFixed(2)}</td>
+        <td class="actions">
+          <div class="action-icons">
+            <button class="edit">✏️</button>
+            <button class="delete">🗑️</button>
+          </div>
+        </td>`;
+        tbody.appendChild(tr);
+      });
+    }
+
+
+    function updateTotal() {
+      let sum = 0;
+      tbody.querySelectorAll(".amount").forEach(td => sum += parseFloat(td.textContent) || 0);
+      document.getElementById("total-footer").textContent = sum.toFixed(2);
+      document.getElementById("total-value").textContent = sum.toFixed(2).replace(".", ",") + " €";
+    }
+  });
+</script>
+{% endblock %}
 </body>
 </html>

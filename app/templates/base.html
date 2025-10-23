@@ -8,7 +8,7 @@
   <link href="{{ url_for('static', filename='css/app.css') }}" rel="stylesheet">
 </head>
 <body>
-  {% include "_navbar.html" %}
+  {% include "navbar.html" %}
   <main class="container py-4">
     {% include "_flash.html" %}
     {% block content %}{% endblock %}
