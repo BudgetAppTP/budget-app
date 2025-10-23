@@ -1,0 +1,20 @@
+<nav class="navbar" aria-label="Top Navigation">
+    <div class="nav-inner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"></div>
+
+        <span>BudgetApp</span>
+      </div>
+      <div class="nav-links" role="navigation">
+<a href="{{ url_for('dashboard.index') }}">Domov</a>
+<a href="{{ url_for('transactions.income_list') }}">Príjmy</a>
+<a href="{{ url_for('transactions.expense_list') }}">Výdavky</a>
+<a href="{{ url_for('transactions.monthly_budget') }}">Mesačný rozpočet</a>
+<a href="{{ url_for('budgets.index') }}">Planovanie</a>
+<a href="{{ url_for('needs.index') }}">Potreby</a>
+      </div>
+      <div class="date-badge" id="dateBadge" title="Dátum">
+        <span id="today"></span>
+      </div>
+    </div>
+  </nav>

@@ -31,6 +31,7 @@ def create_app(config_object=None):
     from app.blueprints.importqr import bp as importqr_bp
     from app.blueprints.auth import bp as auth_bp
     from app.blueprints.export import bp as export_bp
+    from app.blueprints.needs import bp as needs_bp
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(transactions_bp)
@@ -39,5 +40,6 @@ def create_app(config_object=None):
     app.register_blueprint(importqr_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(export_bp)
+    app.register_blueprint(needs_bp)
 
     return app

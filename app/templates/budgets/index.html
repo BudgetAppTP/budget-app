@@ -1,248 +1,24 @@
-{% block content %}
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BudgetApp · Plánovanie</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style_budget.css') }}">
+
+</head>
+<body>
 {% block head_extra %}
-<style>
-
-  .actions button {
-    border: none;
-    background: none;
-    font-size: 18px;
-    cursor: pointer;
-    transition: transform 0.2s ease, opacity 0.2s ease;
-  }
-
-  .actions button:hover {
-    transform: scale(1.2);
-    opacity: 0.7;
-  }
-
-  .add-form {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    justify-content: flex-start;
-    margin-top: 12px;
-    background: var(--white);
-    padding: 10px;
-    border-top: 2px solid var(--border);
-  }
-
-  .add-form input {
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 6px 8px;
-    flex: 1;
-  }
-
-  .add-btn {
-    background: var(--gold);
-    border: none;
-    border-radius: 6px;
-    color: #111;
-    font-weight: 600;
-    padding: 6px 14px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-  }
-
-  .add-btn:hover {
-    background: var(--gold-dark);
-  }
-
-
-
-  :root {
-    --bg: #ececec;
-    --white: #ffffff;
-    --border: #bfc2c7;
-    --text: #111;
-    --gold: #d4a017;
-    --pastel-1: #f0ebf4;
-    --pastel-2: #e7f1e8;
-    --pastel-3: #f5e6e8;
-    --pastel-4: #e4ecf5;
-    --pastel-5: #f8f3e6;
-    --pastel-6: #f1f4ec;
-  }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: "Inter", sans-serif;
-    margin: 0;
-    padding: 0;
-  }
-
-  .wrap {
-    max-width: 1100px;
-    margin: 40px auto;
-    padding: 0 20px;
-  }
-
-  .page-header h2 {
-    font-weight: 700;
-    font-size: 26px;
-    border-bottom: 3px solid var(--gold);
-    padding-bottom: 6px;
-    margin-bottom: 20px;
-  }
-
-  .summary-box {
-    background: var(--white);
-    padding: 12px 18px;
-    border-left: 5px solid var(--gold);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 18px;
-    margin-bottom: 30px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  }
-
-  .cards-grid {
-    display: flex;
-    justify-content: space-between;
-    gap: 25px;
-    flex-wrap: wrap;
-    margin-bottom: 40px;
-  }
-
-  .budget-card {
-    flex: 1 1 calc(25% - 25px);
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-    text-align: center;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .budget-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
-  }
-
-  .budget-card .header {
-    font-weight: 600;
-    font-size: 17px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .content-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 14px 10px;
-    font-size: 16px;
-    font-weight: 600;
-  }
-
-  .percent-input {
-    width: 55px;
-    padding: 4px;
-    text-align: right;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: #fff;
-  }
-
-  .amount {
-    border-left: 2px solid var(--border);
-    padding-left: 8px;
-    font-weight: 700;
-  }
-
-  tr.editing {
-    background-color: #fff3cd !important;
-  }
-
-  tr.updated {
-    background-color: #e7f6e7 !important;
-    transition: background-color 1s ease;
-  }
-
-  .actions button {
-    border: none;
-    background: none;
-    font-size: 18px;
-    cursor: pointer;
-    transition: transform 0.2s ease, opacity 0.2s ease;
-  }
-  .actions button:hover {
-    transform: scale(1.2);
-    opacity: 0.7;
-  }
-
-  .budget-card:nth-child(1),
-  .detail-table:nth-of-type(1) h3 { background: var(--pastel-1); }
-
-  .budget-card:nth-child(2),
-  .detail-table:nth-of-type(2) h3 { background: var(--pastel-2); }
-
-  .budget-card:nth-child(3),
-  .detail-table:nth-of-type(3) h3 { background: var(--pastel-3); }
-
-  .budget-card:nth-child(4),
-  .detail-table:nth-of-type(4) h3 { background: var(--pastel-4); }
-
-  .budget-card:nth-child(5),
-  .detail-table:nth-of-type(5) h3 { background: var(--pastel-5); }
-
-  .budget-card:nth-child(6),
-  .detail-table:nth-of-type(6) h3 { background: var(--pastel-6); }
-
-  .detail-table {
-    display: none;
-    margin-top: 40px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
-    overflow: hidden;
-  }
-
-  .detail-table h3 {
-    color: #111;
-    margin: 0;
-    padding: 12px 18px;
-    font-size: 18px;
-    font-weight: 600;
-  }
-
-  .detail-table table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .detail-table th, .detail-table td {
-    border: 1px solid var(--border);
-    padding: 8px 10px;
-    text-align: center;
-  }
-
-  .detail-table th {
-    background: #f5f5f5;
-    font-weight: 600;
-  }
-
-  .detail-table tr:nth-child(even) td {
-    background: #fafafa;
-  }
-
-  @media (max-width: 850px) {
-    .cards-grid {
-      flex-direction: column;
-      gap: 15px;
-    }
-    .budget-card {
-      flex: 1 1 100%;
-    }
-  }
-</style>
 {% endblock %}
 
+{% block content %}
+    {% include "navbar.html" %}
 <div class="wrap">
   <div class="page-header">
     <h2>💰 Plánovanie rozpočtu</h2>
@@ -291,9 +67,7 @@
             <form method="post" action="{{ url_for('budgets.delete_record', table=table.name, row_id=row.id) }}" style="display:inline;">
               <button type="submit" title="Odstrániť" class="delete-btn">🗑️</button>
             </form>
-            <form method="post" action="{{ url_for('budgets.edit_record', table=table.name, row_id=row.id) }}" style="display:inline;">
-              <button type="button" class="edit-btn" title="Upraviť">✏️</button>
-            </form>
+            <button type="button" class="edit-btn" title="Upraviť">✏️</button>
           </td>
         </tr>
         {% endfor %}
@@ -311,8 +85,30 @@
     {% endfor %}
   </div>
 </div>
+
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+        const today = new Date();
+  const dateBadge = document.getElementById('dateBadge');
+
+  if (dateBadge) {
+    dateBadge.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+           xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 2v3M17 2v3M3.5 9.5h17M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 20 20.5H4A1.5 1.5 0 0 1 2.5 19V8A1.5 1.5 0 0 1 4 6.5Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>${today.toLocaleDateString('sk-SK', {
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit'
+      })}</span>
+    `;
+  }
+
+
+
+
     const zostatokEl = document.getElementById("zostatok");
     const originalZostatok = parseFloat(zostatokEl.dataset.original);
     const cards = document.querySelectorAll(".budget-card");
@@ -454,3 +250,35 @@
   });
 </script>
 {% endblock %}
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
