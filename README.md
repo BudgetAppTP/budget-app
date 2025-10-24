@@ -60,6 +60,31 @@ It provides interactive documentation for REST endpoints (incomes, receipts).
 
 ### Notes
 
-* No real DB: all data is in-memory and resets on restart.
 * Optional import from Excel: set `IMPORT_XLSX_PATH` in `.env` (ignored if file not found).
-* UI is in Slovak by requirement; backend code has no comments by design.
+
+
+## Database
+### Overview
+
+This application uses **PostgreSQL** in production and **SQLite** in development and testing environments.
+
+> [!NOTE]
+> In development mode, the SQLite database file is located at: \
+> ```<project_root>/instance/dev.db``` \
+> *For more details, see `config.py`.*
+
+### Generate an Entity Relationship Diagram with ERAlchemy
+You can easily visualize the project's database schema using **ERAlchemy** directly from SQLite `.db` file
+#### Install ERAlchemy:
+
+``` bash
+pip install eralchemy
+```
+
+#### Generate an ER diagram from your SQLite database:
+``` bash
+eralchemy -i sqlite:///instance/dev.db -o db_schema.png
+```
+**Options:**
+- `-i` - input database URI (`sqlite:///path/to/db`)
+- `-o` - output image file (`.png`, `.pdf`, or `.svg`)

@@ -10,6 +10,28 @@ from app.utils.types import JSONType
 
 
 class Receipt(Base):
+    """Represents a purchase receipt.
+
+    Each receipt belongs to a user and may contain multiple receipt items.
+
+    Attributes:
+        id (uuid.UUID): Unique identifier for the receipt.
+        external_uid (str | None): Optional external identifier used by third-party systems.
+        user_id (uuid.UUID): Foreign key referencing the associated user's ID.
+        merchant (str): Name of the merchant who issued the receipt.
+        issue_date (date): The date the receipt was issued.
+        currency (str): The ISO currency code for the receipt amount (default: "EUR").
+        total_amount (float): The total monetary amount of the receipt.
+        extra_metadata (dict | None): Optional JSON field containing extra metadata.
+        created_at (datetime): Timestamp indicating when the record was created.
+
+    Relationships:
+        user (User): Many-to-One relationship.
+            The user who owns this receipt. Each user may have multiple receipts.
+        items (list[ReceiptItem]): One-to-Many relationship.
+            The list of receipt items associated with this receipt. Each item
+            belongs to exactly one receipt.
+    """
     __tablename__ = 'receipts'
 
     id: Mapped[uuid.UUID] = mapped_column(

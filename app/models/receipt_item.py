@@ -1,6 +1,5 @@
 import uuid
 from decimal import Decimal
-from typing import Optional
 
 from sqlalchemy import ForeignKey, Text, Numeric
 from sqlalchemy.dialects.postgresql import UUID
@@ -11,6 +10,30 @@ from app.utils.types import JSONType
 
 
 class ReceiptItem(Base):
+    """Represents an individual item listed on a purchase receipt.
+
+    Each receipt item belongs to a single receipt and may optionally
+    be categorized.
+
+    Attributes:
+        id (uuid.UUID): Unique identifier for the receipt item.
+        receipt_id (uuid.UUID): Foreign key referencing the associated receipt.
+        user_id (uuid.UUID): Foreign key referencing the associated user.
+        category_id (uuid.UUID | None): Optional foreign key referencing a category.
+        name (str): The name of the item.
+        quantity (Decimal): The quantity of the item purchased (default: 1).
+        unit_price (Decimal): The price per unit of the item.
+        total_price (Decimal): The total price for the item (quantity * unit price).
+        extra_metadata (dict | None): Optional JSON field for additional details.
+
+    Relationships:
+        user (User): Many-to-One relationship.
+            The user who owns this item. Each user can have multiple items across receipts.
+        category (Category | None): Many-to-One relationship (optional).
+            The category assigned to this item. May be null if uncategorized.
+        receipt (Receipt): Many-to-One relationship.
+            The receipt this item belongs to. Each receipt can contain multiple items.
+    """
     __tablename__ = 'receipt_items'
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -30,7 +53,7 @@ class ReceiptItem(Base):
         nullable=False,
         index=True
     )
-    category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    category_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey('categories.id'),
         index=True,
@@ -45,7 +68,7 @@ class ReceiptItem(Base):
 
     """ Relationships """
     user: Mapped["User"] = relationship('User')
-    category: Mapped[Optional["Category"]]= relationship('Category')
+    category: Mapped["Category | None"] = relationship('Category')
     receipt: Mapped["Receipt"] = relationship('Receipt', back_populates='items')
 
     def __repr__(self) -> str:

@@ -11,6 +11,20 @@ from app.utils.types import JSONType
 
 
 class Income(Base):
+    """Represents an income record associated with a user.
+
+    Attributes:
+        id (uuid.UUID): Unique identifier for the income record.
+        user_id (uuid.UUID): Foreign key referencing the user who owns this income.
+        amount (Decimal): The amount of income received.
+        income_date (date): The date the income was received.
+        source (str | None): Optional description or source of the income.
+        extra_metadata (dict | None): Optional JSON field containing additional metadata.
+
+    Relationships:
+        user (User): Many-to-One relationship.
+            The user associated with this income record. Each user can have multiple income entries.
+    """
     __tablename__ = 'incomes'
 
     id: Mapped[uuid.UUID] = mapped_column(
