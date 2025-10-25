@@ -49,15 +49,12 @@ def create_app(config_object=None):
     app.register_blueprint(receipts_bp)
     app.register_blueprint(incomes_bp)
 
-    SWAGGER_URL = "/api/docs"
-    API_URL = "/static/swagger.json"
-
     swaggerui_blueprint = get_swaggerui_blueprint(
-        SWAGGER_URL,
-        API_URL,
+        app.config["SWAGGER_URL"],
+        app.config["API_URL"],
         config={"app_name": "Receipts API"}
     )
 
-    app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+    app.register_blueprint(swaggerui_blueprint, url_prefix=app.config["SWAGGER_URL"])
 
     return app
