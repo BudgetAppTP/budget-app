@@ -39,6 +39,8 @@ def create_app(config_object=None):
     from app.blueprints.receipts import bp as receipts_bp
     from app.blueprints.incomes import bp as incomes_bp
     
+    from app.blueprints.needs import bp as needs_bp
+
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(transactions_bp)
     app.register_blueprint(budgets_bp)
@@ -56,5 +58,6 @@ def create_app(config_object=None):
     )
 
     app.register_blueprint(swaggerui_blueprint, url_prefix=app.config["SWAGGER_URL"])
+    app.register_blueprint(needs_bp)
 
     return app

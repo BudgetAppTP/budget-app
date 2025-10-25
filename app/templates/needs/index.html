@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BudgetApp · Potreby</title>
+
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style_needs.css') }}">
+</head>
+<body>
+{% include "navbar.html" %}
+  <div class="wrap">
+
+    <div class="needs">
+    <div class="page-title">📦 Potreby</div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>KATEGÓRIA</th>
+            <th style="text-align:center;">AKCIE</th>
+          </tr>
+        </thead>
+        <tbody id="category-table">
+          <tr>
+            <td>Jedlo</td>
+            <td class="actions">
+              <div class="action-icons">
+                <button class="pin" title="Pripnúť kategóriu">📌</button>
+                <button class="edit" title="Upraviť">✏️</button>
+                <button class="delete" title="Odstrániť">🗑️</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Bývanie</td>
+            <td class="actions">
+              <div class="action-icons">
+                <button class="pin">📌</button>
+                <button class="edit">✏️</button>
+                <button class="delete">🗑️</button>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Doprava</td>
+            <td class="actions">
+              <div class="action-icons">
+                <button class="pin">📌</button>
+                <button class="edit">✏️</button>
+                <button class="delete">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <form class="form-row" id="add-form">
+      <input type="text" id="new-category" placeholder="Nová kategória" required />
+      <button class="btn" type="submit">+ Pridať potreby</button>
+    </form>
+    </div>
+
+
+
+      <div class="statistic">
+   <div class="page-title">📊 Mesačná štatistika výdavkov</div>
+
+    <div class="chart-section">
+      <div class="chart-container">
+        <div class="month-nav">
+          <span class="arrow" id="prevMonth">◀</span>
+          <span id="monthLabel">Október 2025</span> :
+          <span class="gold" id="monthSum">924.20 €</span>
+          <span class="arrow" id="nextMonth">▶</span>
+        </div>
+
+        <div class="chart-canvas-wrapper">
+          <canvas id="donutChart"></canvas>
+        </div>
+      </div>
+
+      <div class="details-container" id="details">
+        <h3>Podiel potreb</h3>
+        <div class="details-total"></div>
+        <div class="transactions" id="transactions"></div>
+      </div>
+    </div>
+  </div>
+
+
+  </div>
+
+  <script>
+    const table = document.getElementById('category-table');
+    const form = document.getElementById('add-form');
+    const input = document.getElementById('new-category');
+
+    table.addEventListener('click', e => {
+      const tr = e.target.closest('tr');
+      if (!tr) return;
+
+      if (e.target.classList.contains('delete')) {
+        tr.remove();
+      }
+
+      if (e.target.classList.contains('edit')) {
+        const td = tr.querySelector('td');
+        if (!td.isContentEditable) {
+          td.contentEditable = true;
+          td.style.backgroundColor = '#fffef6';
+          td.focus();
+          e.target.textContent = '✔';
+        } else {
+          td.contentEditable = false;
+          td.style.backgroundColor = '';
+          e.target.textContent = '✏️';
+        }
+      }
+
+
+      if (e.target.classList.contains('pin')) {
+        tr.classList.toggle('pinned');
+        e.target.classList.toggle('active');
+
+
+        if (tr.classList.contains('pinned')) {
+          table.prepend(tr);
+        } else {
+          table.append(tr);
+        }
+      }
+    });
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const name = input.value.trim();
+      if (!name) return;
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${name}</td>
+        <td class="actions">
+          <div class="action-icons">
+            <button class="pin">📌</button>
+            <button class="edit">✏️</button>
+            <button class="delete">🗑️</button>
+          </div>
+        </td>
+      `;
+      table.appendChild(row);
+      input.value = '';
+    });
+
+    const ctx = document.getElementById('donutChart');
+
+    const monthlyData = {
+      "September 2025": { sum: 820.50, labels: ['Jedlo','Bývanie','Doprava','Voľný čas'], data: [35,30,15,20] },
+      "Október 2025": { sum: 924.20, labels: ['Jedlo','Bývanie','Doprava','Voľný čas'], data: [45,25,10,20] },
+      "November 2025": { sum: 1032.60, labels: ['Jedlo','Bývanie','Doprava','Voľný čas'], data: [40,28,18,14] }
+    };
+
+    const colors = ['#e6c975','#ccb8a3','#b1bfd0','#c0cfad'];
+
+    let monthKeys = Object.keys(monthlyData);
+    let currentMonthIndex = 1;
+
+    const monthLabel = document.getElementById("monthLabel");
+    const monthSum = document.getElementById("monthSum");
+    const detBox = document.getElementById("details");
+    const txBox = document.getElementById("transactions");
+
+    function updateChart(month) {
+      const monthInfo = monthlyData[month];
+      chart.data.labels = monthInfo.labels;
+      chart.data.datasets[0].data = monthInfo.data;
+      chart.update();
+
+      monthLabel.textContent = month;
+      monthSum.textContent = `${monthInfo.sum.toFixed(2)} €`;
+
+      detBox.querySelector("h3").textContent = `Podiel potreb za ${month}`;
+      detBox.querySelector(".details-total").textContent = "";
+      showCategoryShares(month);
+    }
+
+    document.getElementById("prevMonth").addEventListener("click", () => {
+      currentMonthIndex = (currentMonthIndex - 1 + monthKeys.length) % monthKeys.length;
+      updateChart(monthKeys[currentMonthIndex]);
+    });
+
+    document.getElementById("nextMonth").addEventListener("click", () => {
+      currentMonthIndex = (currentMonthIndex + 1) % monthKeys.length;
+      updateChart(monthKeys[currentMonthIndex]);
+    });
+
+    const data = {
+      labels: monthlyData[monthKeys[currentMonthIndex]].labels,
+      datasets: [{ data: monthlyData[monthKeys[currentMonthIndex]].data, backgroundColor: colors, hoverOffset: 15 }]
+    };
+
+    const config = {
+      type: 'doughnut',
+      data: data,
+      options: {
+        responsive: true,
+        cutout: '68%',
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#333', usePointStyle: true, boxWidth: 10, padding: 15 }
+          },
+          tooltip: {
+            backgroundColor: '#333',
+            titleColor: '#fff',
+            callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed}%` }
+          }
+        },
+        onClick: (evt, elements) => {
+          if (elements.length > 0) {
+            const i = elements[0].index;
+            const category = data.labels[i];
+            showDetails(category);
+          }
+        }
+      }
+    };
+
+    const chart = new Chart(ctx, config);
+
+    function showCategoryShares(month) {
+      const monthInfo = monthlyData[month];
+      const total = monthInfo.sum;
+      const categories = monthInfo.labels;
+      const values = monthInfo.data;
+
+      let html = categories.map((cat, i) => {
+        const percent = values[i];
+        const amount = total * (percent / 100);
+        return `
+          <div class="transaction-item">
+            <span><span class="color-dot" style="background:${colors[i]}"></span>${cat}</span>
+            <span>${percent.toFixed(1)}% | ${amount.toFixed(2)} €</span>
+          </div>`;
+      }).join("");
+
+      html += `<div class="summary-line">Celkovo: ${total.toFixed(2)} €</div>`;
+      txBox.innerHTML = html;
+    }
+
+    showCategoryShares("Október 2025");
+
+    const categoryData = {
+      "Jedlo": {
+        total: "415.90",
+        transactions: [
+          { name: "BILLA Bratislava", date: "22.10.2025", amount: -3.99 },
+          { name: "DELIKOMAT SK 12448", date: "22.10.2025", amount: -1.70 },
+          { name: "LIDL nákup", date: "15.10.2025", amount: -24.30 },
+        ]
+      },
+      "Bývanie": {
+        total: "230.50",
+        transactions: [
+          { name: "Nájom", date: "01.10.2025", amount: -200.00 },
+          { name: "Elektrina", date: "10.10.2025", amount: -30.50 },
+        ]
+      },
+      "Doprava": {
+        total: "92.80",
+        transactions: [
+          { name: "MHD karta", date: "05.10.2025", amount: -25.00 },
+          { name: "Taxi služba", date: "11.10.2025", amount: -15.00 },
+          { name: "Benzín", date: "20.10.2025", amount: -52.80 },
+        ]
+      },
+      "Voľný čas": {
+        total: "185.00",
+        transactions: [
+          { name: "Fitko", date: "03.10.2025", amount: -40.00 },
+          { name: "Kino", date: "08.10.2025", amount: -25.00 },
+          { name: "Výlet", date: "17.10.2025", amount: -120.00 },
+        ]
+      }
+    };
+
+    function showDetails(category) {
+      const data = categoryData[category];
+      if (!data) return;
+
+      detBox.querySelector("h3").textContent = category;
+      detBox.querySelector(".details-total").textContent = `${data.total} €`;
+
+      txBox.innerHTML = data.transactions.map(tx => `
+        <div class="transaction-item">
+          <div class="left">
+            <span>${tx.name}</span>
+            <small>${tx.date}</small>
+          </div>
+          <div class="right">${tx.amount.toFixed(2)} €</div>
+        </div>
+      `).join("");
+    }
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date();
+  const dateBadge = document.getElementById('dateBadge');
+
+  if (dateBadge) {
+    dateBadge.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+           xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 2v3M17 2v3M3.5 9.5h17M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 20 20.5H4A1.5 1.5 0 0 1 2.5 19V8A1.5 1.5 0 0 1 4 6.5Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>${today.toLocaleDateString('sk-SK', {
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit'
+      })}</span>
+    `;
+  }
+});
+
+  </script>
+</body>
+</html>
