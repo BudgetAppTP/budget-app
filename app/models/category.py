@@ -55,17 +55,21 @@ class Category(Base):
     )
 
     """ Relationships """
+    user: Mapped["User | None"] = relationship(
+        "User", back_populates="categories"
+    )
+
+    receipt_items: Mapped[list["ReceiptItem"]] = relationship(
+        "ReceiptItem", back_populates="category"
+    )
+
     # Self-referential relationship
     children: Mapped[List["Category"]] = relationship(
-        'Category',
-        back_populates='parent',
-        cascade='all, delete-orphan',
-        remote_side=[id]
+        'Category', back_populates='parent', cascade='all, delete-orphan'
     )
+
     parent: Mapped["Category | None"] = relationship(
-        'Category',
-        back_populates='children',
-        remote_side=[id]
+        'Category', back_populates='children', remote_side=[id]
     )
 
     def __repr__(self) -> str:

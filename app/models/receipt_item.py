@@ -67,9 +67,17 @@ class ReceiptItem(Base):
     extra_metadata: Mapped[dict | None] = mapped_column(JSONType(), nullable=True)
 
     """ Relationships """
-    user: Mapped["User"] = relationship('User')
-    category: Mapped["Category | None"] = relationship('Category')
-    receipt: Mapped["Receipt"] = relationship('Receipt', back_populates='items')
+    user: Mapped["User"] = relationship(
+        'User', back_populates="receipt_items"
+    )
+
+    category: Mapped["Category | None"] = relationship(
+        "Category", back_populates="receipt_items"
+    )
+
+    receipt: Mapped["Receipt"] = relationship(
+        'Receipt', back_populates='items'
+    )
 
     def __repr__(self) -> str:
         return f"<ReceiptItem {self.name} total_price={self.total_price} user_id={self.user_id}>"

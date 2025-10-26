@@ -77,13 +77,11 @@ class Receipt(Base):
 
     """ Relationships """
     user: Mapped["User"] = relationship(
-        'User',
-        back_populates='receipts'
+        'User', back_populates='receipts'
     )
+
     items: Mapped[list["ReceiptItem"]] = relationship(
-        'ReceiptItem',
-        back_populates='receipt',
-        cascade='all, delete-orphan'
+        'ReceiptItem', back_populates='receipt', cascade='all, delete-orphan'
     )
 
     def __repr__(self) -> str:

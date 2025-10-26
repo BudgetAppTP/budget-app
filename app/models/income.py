@@ -4,7 +4,7 @@ from datetime import date
 
 from sqlalchemy import ForeignKey, Text, Date, Numeric
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 from app.utils.types import JSONType
@@ -43,6 +43,9 @@ class Income(Base):
     income_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
     extra_metadata: Mapped[dict | None] = mapped_column(JSONType(), nullable=True)
+
+    """ Relationships """
+    user: Mapped["User"] = relationship("User", back_populates="incomes")
 
     def __repr__(self) -> str:
         return f"<Income {self.amount} user_id={self.user_id} from {self.source}>"
