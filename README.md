@@ -49,6 +49,15 @@ python run.py
 * `.env.example` — sample environment variables (copy to `.env`).
 * `requirements.txt` — Python dependencies.
 
+### API Documentation
+ The REST API endpoints are documented and can be explored via Swagger UI.
+
+After starting the app, open this URL in your browser: 
+
+http://127.0.0.1:5000/api/docs 
+
+It provides interactive documentation for REST endpoints (incomes, receipts).
+
 ### Notes
 
 * No real DB: all data is in-memory and resets on restart.

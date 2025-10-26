@@ -1,0 +1,367 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "API Dokumentácia – Príjmy a Výdavky",
+    "version": "1.0.0",
+    "description": "Rozhranie pre prácu s príjmami (Incomes) a výdavkami (Receipts & Receipt Items)."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000"
+    }
+  ],
+  "paths": {
+    "/api/receipts": {
+      "get": {
+        "summary": "Získanie zoznamu všetkých výdavkov",
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané",
+            "content": {
+              "application/json": {
+                "example": [
+                  {
+                    "receipt_id": 1,
+                    "user_id": 12,
+                    "seller_id": 3,
+                    "name": "Lidl - potraviny",
+                    "uid": "A1B2C3",
+                    "total": 45.20,
+                    "date": "2025-10-02"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Vytvorenie nového výdavku",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "user_id": 12,
+                "seller_id": 3,
+                "name": "Something",
+                "uid": "A1B2C3",
+                "total": 45.20,
+                "date": "2025-10-02"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Úspešne vytvorené",
+            "content": {
+              "application/json": {
+                "example": { "id": 123 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/receipts/{receipt_id}": {
+      "get": {
+        "summary": "Získanie detailu výdavku s položkami",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané",
+            "content": {
+              "application/json": {
+                "example": {
+                  "receipt_id": 1,
+                  "name": "Lidl - potraviny",
+                  "total": 45.20,
+                  "items": [
+                    { "item_id": 1, "name": "Mlieko", "quantity": 2, "unit_price": 1.2 },
+                    { "item_id": 2, "name": "Chlieb", "quantity": 1, "unit_price": 1.5 }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Aktualizácia výdavku",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "name": "Tesco - týždenný nákup",
+                "total": 60.50,
+                "date": "2025-10-03"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Úspešne aktualizované" }
+        }
+      },
+      "delete": {
+        "summary": "Odstránenie výdavku",
+        "responses": {
+          "200": { "description": "Úspešne odstránené" }
+        }
+      }
+    },
+    "/api/receipts/{receipt_id}/items": {
+      "get": {
+        "summary": "Získanie položiek výdavku",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané položky",
+            "content": {
+              "application/json": {
+                "example": [
+                  { "item_id": 1, "name": "Mlieko", "quantity": 2, "unit_price": 1.2 },
+                  { "item_id": 2, "name": "Chlieb", "quantity": 1, "unit_price": 1.5 }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Vytvorenie položky pre výdavok",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "category_id": 4,
+                "name": "Banány",
+                "quantity": 3,
+                "unit_price": 0.9
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Položka úspešne pridaná",
+            "content": {
+              "application/json": {
+                "example": { "item_id": 23 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/receipts/{receipt_id}/items/{item_id}": {
+      "put": {
+        "summary": "Aktualizácia položky",
+        "parameters": [
+          { "in": "path", "name": "receipt_id", "required": true, "schema": { "type": "integer" } },
+          { "in": "path", "name": "item_id", "required": true, "schema": { "type": "integer" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "name": "Maslo",
+                "quantity": 1,
+                "unit_price": 2.3
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Úspešne aktualizované" } }
+      },
+      "delete": {
+        "summary": "Odstránenie položky",
+        "responses": { "200": { "description": "Položka úspešne vymazaná" } }
+      }
+    },
+        "/api/incomes/": {
+      "get": {
+        "summary": "Získanie zoznamu všetkých príjmov",
+        "description": "Vráti zoznam všetkých príjmov vrátane celkovej sumy. Možno použiť voliteľné parametre na triedenie podľa dátumu alebo sumy.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sort_by",
+            "schema": { "type": "string", "enum": ["date", "amount"], "default": "date" },
+            "description": "Triedenie podľa poľa (date alebo amount)"
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" },
+            "description": "Poradie triedenia – vzostupne alebo zostupne"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "incomes": [
+                    { "id": 1, "date": "2025-10-01", "description": "Výplata", "amount": 1200.00 },
+                    { "id": 2, "date": "2025-10-05", "description": "Darček od babky", "amount": 200.00 }
+                  ],
+                  "total_amount": 1400.00
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Vytvorenie nového príjmu",
+        "description": "Pridá nový záznam o príjme s dátumom, popisom a sumou.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "date": "2025-10-15",
+                "description": "Freelance projekt",
+                "amount": 500.00
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Úspešne vytvorený príjem",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "income": {
+                    "id": 4,
+                    "date": "2025-10-15",
+                    "description": "Freelance projekt",
+                    "amount": 500.00
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Invalid input data" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incomes/{item_id}": {
+      "put": {
+        "summary": "Aktualizácia existujúceho príjmu",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "ID príjmu, ktorý sa má aktualizovať"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "date": "2025-10-16",
+                "description": "Zmenený popis",
+                "amount": 600.00
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Úspešne aktualizované",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "income": {
+                    "id": 2,
+                    "date": "2025-10-16",
+                    "description": "Zmenený popis",
+                    "amount": 600.00
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Príjem nebol nájdený",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Income not found" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Odstránenie existujúceho príjmu",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": { "type": "integer" },
+            "description": "ID príjmu, ktorý sa má odstrániť"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne odstránené",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "incomes": [
+                    { "id": 1, "date": "2025-10-01", "description": "Výplata", "amount": 1200.00 },
+                    { "id": 3, "date": "2025-10-10", "description": "Predaj starého bicykla", "amount": 350.00 }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Príjem nebol nájdený",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Income not found" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
