@@ -1,18 +1,60 @@
-# budget-app
+# Budget Tracker App
 Personal finance tracker for budgeting, expense tracking, and goal setting.
 
-## Quick Start (EN)
+## Run the App
+### Using the Makefile _(Simple)_
+This project includes a `Makefile` to simplify common tasks such as setting up
+a virtual environment, running the project, running tests, and cleaning up
+temporary files.
 
-### Run
+- Install `make` on Linux _(Ubuntu)_:
+``` bash
+sudo apt update
+sudo apt install build-essential
+```
+- Install `make` on Windows: [Link](https://stackoverflow.com/a/32127632)
+
+#### Available Targets
+| Target | Description |
+|--------|-------------|
+| `help` | Show the help message listing all targets. |
+| `venv` | Create a virtual environment (if it doesn't exist) and install dependencies from `requirements.txt`. |
+| `run`  | Run the project using the virtual environment Python interpreter. |
+| `test` | Run tests using `pytest` inside the virtual environment. |
+| `clean`| Remove the virtual environment and all `__pycache__` directories. |
+
+### Basic Usage
+1. Create virtual environment and install all required dependencies:
+``` bash
+make venv
+```
+2. Run the project:
+``` bash
+make run
+```
+> [!WARNING]
+> **For Windows users:**
+> - The Makefile works best in a **POSIX-compatible shell** such as **Git Bash** or **WSL**.
+> - If running from the default `cmd.exe` shell, some targets (like `venv` creation and cleanup) may not work correctly.
+
+
+### Custom Run
+1. Setup virtual environment:
 ```bash
-cd budget_app
 python -m venv .venv
 pip install -r requirements.txt
+```
+2. Create `.env` for custom configuration. _(Optional)_
+``` bash
 cp .env.example .env
-python run.py
-````
+```
 
-### What is what
+3. Run the app:
+``` bash
+python run.py
+```
+
+### Project Structure
 
 * `run.py` — app entry point (dev server).
 * `config.py` — app configuration (Dev/Test/Prod), reads `.env`.
@@ -49,18 +91,19 @@ python run.py
 * `.env.example` — sample environment variables (copy to `.env`).
 * `requirements.txt` — Python dependencies.
 
-### API Documentation
- The REST API endpoints are documented and can be explored via Swagger UI.
-
-After starting the app, open this URL in your browser: 
-
-http://127.0.0.1:5000/api/docs 
-
-It provides interactive documentation for REST endpoints (incomes, receipts).
 
 ### Notes
 
 * Optional import from Excel: set `IMPORT_XLSX_PATH` in `.env` (ignored if file not found).
+
+## API Documentation
+ The REST API endpoints are documented and can be explored via Swagger UI.
+
+After starting the app, open this URL in your browser:
+
+http://127.0.0.1:5000/api/docs
+
+It provides interactive documentation for REST endpoints (incomes, receipts).
 
 
 ## Database
