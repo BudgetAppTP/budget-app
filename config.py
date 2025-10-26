@@ -11,12 +11,24 @@ class BaseConfig:
     SWAGGER_URL = "/api/docs"
     API_URL = "/static/swagger.json"
 
+
 class DevConfig(BaseConfig):
     DEBUG = True
+
+    # Use a SQLite database stored inside the Flask instance directory.
+    # The file will be created at: <project_root>/instance/dev.db
+    SQLALCHEMY_DATABASE_URI = "sqlite:///dev.db"
+
 
 class TestConfig(BaseConfig):
     TESTING = True
     WTF_CSRF_ENABLED = False
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+
 
 class ProdConfig(BaseConfig):
     DEBUG = False
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "DATABASE_URL",
+        "postgresql+psycopg2://user:password@localhost/mydb"
+    )

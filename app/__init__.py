@@ -1,21 +1,57 @@
+import os
+
 from flask import Flask
 from flask_cors import CORS
 from flask_wtf import CSRFProtect
+from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
-import os
+
 from app.services import init_services
 from flask_swagger_ui import get_swaggerui_blueprint
 
+
+load_dotenv()
 csrf = CSRFProtect()
+db = SQLAlchemy()
+
+
+def register_blueprints(flask_app):
+    """Register all blueprints dynamically."""
+    from importlib import import_module
+
+    blueprint_modules = [
+        "app.blueprints.dashboard",
+        "app.blueprints.transactions",
+        "app.blueprints.budgets",
+        "app.blueprints.goals",
+        "app.blueprints.importqr",
+        "app.blueprints.auth",
+        "app.blueprints.export",
+        "app.blueprints.receipts",
+        "app.blueprints.incomes",
+        "app.blueprints.needs",
+    ]
+
+    for module_path in blueprint_modules:
+        module = import_module(module_path)
+        flask_app.register_blueprint(module.bp)
+
+    swaggerui_blueprint = get_swaggerui_blueprint(
+        flask_app.config["SWAGGER_URL"],
+        flask_app.config["API_URL"],
+        config={"app_name": "Receipts API"}
+    )
+
+    flask_app.register_blueprint(swaggerui_blueprint, url_prefix=flask_app.config["SWAGGER_URL"])
+
 
 def create_app(config_object=None):
-    load_dotenv()
-    app = Flask(__name__, instance_relative_config=True)
+    flask_app = Flask(__name__, instance_relative_config=True)
 
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    CORS(flask_app, resources={r"/api/*": {"origins": "*"}})
 
     if config_object:
-        app.config.from_object(config_object)
+        flask_app.config.from_object(config_object)
     else:
         app_env = os.getenv("APP_ENV", "development").lower()
         if app_env == "production":
@@ -24,40 +60,17 @@ def create_app(config_object=None):
             from config import TestConfig as Cfg
         else:
             from config import DevConfig as Cfg
-        app.config.from_object(Cfg)
+        flask_app.config.from_object(Cfg)
 
-    csrf.init_app(app)
-    init_services(app)
+    csrf.init_app(flask_app)
+    db.init_app(flask_app)
+    init_services(flask_app)
 
-    from app.blueprints.dashboard import bp as dashboard_bp
-    from app.blueprints.transactions import bp as transactions_bp
-    from app.blueprints.budgets import bp as budgets_bp
-    from app.blueprints.goals import bp as goals_bp
-    from app.blueprints.importqr import bp as importqr_bp
-    from app.blueprints.auth import bp as auth_bp
-    from app.blueprints.export import bp as export_bp
-    from app.blueprints.receipts import bp as receipts_bp
-    from app.blueprints.incomes import bp as incomes_bp
-    
-    from app.blueprints.needs import bp as needs_bp
+    with flask_app.app_context():
+        import app.models
 
-    app.register_blueprint(dashboard_bp)
-    app.register_blueprint(transactions_bp)
-    app.register_blueprint(budgets_bp)
-    app.register_blueprint(goals_bp)
-    app.register_blueprint(importqr_bp)
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(export_bp)
-    app.register_blueprint(receipts_bp)
-    app.register_blueprint(incomes_bp)
+        if flask_app.config.get("DEBUG") or flask_app.config.get("TESTING"):
+            app.models.Base.metadata.create_all(bind=db.engine)
 
-    swaggerui_blueprint = get_swaggerui_blueprint(
-        app.config["SWAGGER_URL"],
-        app.config["API_URL"],
-        config={"app_name": "Receipts API"}
-    )
-
-    app.register_blueprint(swaggerui_blueprint, url_prefix=app.config["SWAGGER_URL"])
-    app.register_blueprint(needs_bp)
-
-    return app
+    register_blueprints(flask_app)
+    return flask_app
