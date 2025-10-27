@@ -2,17 +2,14 @@ import os
 
 from flask import Flask
 from flask_cors import CORS
-from flask_wtf import CSRFProtect
-from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
+from app.extensions import db
 
 from app.services import init_services
 from flask_swagger_ui import get_swaggerui_blueprint
 
 
 load_dotenv()
-csrf = CSRFProtect()
-db = SQLAlchemy()
 
 
 def register_blueprints(flask_app):
@@ -30,6 +27,7 @@ def register_blueprints(flask_app):
         "app.blueprints.receipts",
         "app.blueprints.incomes",
         "app.blueprints.needs",
+        "app.blueprints.users",
     ]
 
     for module_path in blueprint_modules:
@@ -62,7 +60,6 @@ def create_app(config_object=None):
             from config import DevConfig as Cfg
         flask_app.config.from_object(Cfg)
 
-    csrf.init_app(flask_app)
     db.init_app(flask_app)
     init_services(flask_app)
 

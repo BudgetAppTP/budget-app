@@ -1,6 +1,5 @@
 from flask import jsonify, request
 from . import bp
-from app import csrf
 
 demo_incomes = [
     {"id": 1, "date": "2025-10-01", "description": "Výplata", "amount": 1200.00},
@@ -38,7 +37,6 @@ def list_incomes():
 
 # POST /incomes → create a new income
 @bp.route("/", methods=["POST"])
-@csrf.exempt
 def create_income():
     data = request.get_json(force=True)
     if not data or "amount" not in data or "date" not in data or "description" not in data:
@@ -56,7 +54,6 @@ def create_income():
 
 # PUT /incomes/<id> → update a specific income
 @bp.route("/<int:item_id>", methods=["PUT"])
-@csrf.exempt
 def update_income(item_id):
     income = next((i for i in demo_incomes if i["id"] == item_id), None)
     if not income:
@@ -71,7 +68,6 @@ def update_income(item_id):
 
 # DELETE /incomes/<id> → delete a specific income
 @bp.route("/<int:item_id>", methods=["DELETE"])
-@csrf.exempt
 def delete_income(item_id):
     income = next((i for i in demo_incomes if i["id"] == item_id), None)
     if not income:
