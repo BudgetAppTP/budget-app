@@ -6,28 +6,23 @@
     "description": "Rozhranie pre prácu s príjmami (Incomes) a výdavkami (Receipts & Receipt Items)."
   },
   "servers": [
-    {
-      "url": "http://localhost:5000"
-    }
+    { "url": "/" }
   ],
   "paths": {
-    "/api/receipts": {
+    "/api/users": {
       "get": {
-        "summary": "Získanie zoznamu všetkých výdavkov",
+        "summary": "Získanie zoznamu používateľov",
         "responses": {
           "200": {
-            "description": "Úspešne načítané",
+            "description": "Úspešne načítaní používatelia",
             "content": {
               "application/json": {
                 "example": [
                   {
-                    "receipt_id": 1,
-                    "user_id": 12,
-                    "seller_id": 3,
-                    "name": "Lidl - potraviny",
-                    "uid": "A1B2C3",
-                    "total": 45.20,
-                    "date": "2025-10-02"
+                    "id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                    "username": "anton",
+                    "email": "anton@example.com",
+                    "created_at": "2025-10-27T15:30:00Z"
                   }
                 ]
               }
@@ -36,28 +31,111 @@
         }
       },
       "post": {
-        "summary": "Vytvorenie nového výdavku",
+        "summary": "Vytvorenie nového používateľa",
+        "description": "Vytvorí nového používateľa systému.\n\n**Povinné polia:** `username`, `email`, `password_hash`\n\n**Nepovinné polia:** žiadne (všetky ostatné sú generované automaticky – `id`, `created_at`).",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "example": {
-                "user_id": 12,
-                "seller_id": 3,
-                "name": "Something",
-                "uid": "A1B2C3",
-                "total": 45.20,
-                "date": "2025-10-02"
+                "username": "anton",
+                "email": "anton@example.com",
+                "password_hash": "pbkdf2:sha256:260000$..."
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Úspešne vytvorené",
+            "description": "Používateľ úspešne vytvorený",
             "content": {
               "application/json": {
-                "example": { "id": 123 }
+                "example": {
+                  "id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                  "message": "User created successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné dáta – chýbajú povinné polia",
+            "content": {
+              "application/json": {
+                "example": { "error": "Missing required fields" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/receipts": {
+      "get": {
+        "summary": "Získanie zoznamu všetkých účteniek",
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané účtenky",
+            "content": {
+              "application/json": {
+                "example": [
+                  {
+                    "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
+                    "external_uid": "INV-2025-00012",
+                    "merchant": "Lidl - potraviny",
+                    "issue_date": "2025-10-27",
+                    "currency": "EUR",
+                    "total_amount": 45.20,
+                    "extra_metadata": { "payment_method": "card", "vat": 7.5 },
+                    "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                    "created_at": "2025-10-27T19:00:00Z"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Vytvorenie novej účtenky",
+        "description": "Vytvorí novú účtenku (receipt) priradenú k existujúcemu používateľovi.\n\n**Povinné polia:** `user_id`, `merchant`, `issue_date`, `total_amount`\n\n**Nepovinné polia:** `currency` (predvolené `EUR`), `external_uid`, `extra_metadata` (Ľubovoľné JSON údaje, napr. DPH, spôsob platby).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                "merchant": "Lidl - potraviny",
+                "issue_date": "2025-10-27",
+                "currency": "EUR",
+                "total_amount": 45.20,
+                "external_uid": "INV-2025-00012",
+                "extra_metadata": {
+                  "payment_method": "card",
+                  "vat": 7.5,
+                  "cashier": "Marek",
+                  "location": "Bratislava"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Úspešne vytvorená účtenka",
+            "content": {
+              "application/json": {
+                "example": {
+                  "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
+                  "message": "Receipt created successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Chybná požiadavka – chýbajú povinné polia alebo zlé formáty dát",
+            "content": {
+              "application/json": {
+                "example": { "error": "Missing required fields" }
               }
             }
           }

@@ -26,7 +26,6 @@ def create_user(data):
             return {"error": "Missing required fields"}, 400
 
         new_user = User(
-            id=uuid.uuid4(),
             username=username,
             email=email,
             password_hash=password_hash
