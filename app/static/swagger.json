@@ -265,17 +265,17 @@
           }
         }
       }
-    }
-    ,
+    },
     "/api/receipts/{receipt_id}/items": {
       "get": {
-        "summary": "Získanie položiek výdavku",
+        "summary": "Získanie všetkých položiek účtenky",
         "parameters": [
           {
             "in": "path",
             "name": "receipt_id",
             "required": true,
-            "schema": { "type": "integer" }
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID účtenky"
           }
         ],
         "responses": {
@@ -284,25 +284,46 @@
             "content": {
               "application/json": {
                 "example": [
-                  { "item_id": 1, "name": "Mlieko", "quantity": 2, "unit_price": 1.2 },
-                  { "item_id": 2, "name": "Chlieb", "quantity": 1, "unit_price": 1.5 }
+                  {
+                    "id": "dfcd4441-8a3a-4d62-bac9-2eb7a6dbb2e9",
+                    "name": "Mlieko",
+                    "quantity": 2,
+                    "unit_price": 1.2,
+                    "total_price": 2.4
+                  }
                 ]
               }
+            }
+          },
+          "404": {
+            "description": "Účtenka nebola nájdená",
+            "content": {
+              "application/json": { "example": { "error": "Receipt not found" } }
             }
           }
         }
       },
       "post": {
-        "summary": "Vytvorenie položky pre výdavok",
+        "summary": "Vytvorenie položky pre účtenku",
+        "description": "**Povinné polia:** `name`, `quantity`, `unit_price`.\n\n**Nepovinné:** `category_id`, `extra_metadata`.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "example": {
-                "category_id": 4,
+                "category_id": "a3f84b9a-42cc-4ef9-9f1d-84e7e3e2d56d",
                 "name": "Banány",
                 "quantity": 3,
-                "unit_price": 0.9
+                "unit_price": 0.9,
+                "extra_metadata": { "discount": 0.1 }
               }
             }
           }
@@ -312,7 +333,7 @@
             "description": "Položka úspešne pridaná",
             "content": {
               "application/json": {
-                "example": { "item_id": 23 }
+                "example": { "item_id": "7a05d2e9-2b9f-4f26-bb3b-6b0b6a6d2f98", "message": "Item created successfully" }
               }
             }
           }
@@ -321,10 +342,10 @@
     },
     "/api/receipts/{receipt_id}/items/{item_id}": {
       "put": {
-        "summary": "Aktualizácia položky",
+        "summary": "Aktualizácia položky účtenky",
         "parameters": [
-          { "in": "path", "name": "receipt_id", "required": true, "schema": { "type": "integer" } },
-          { "in": "path", "name": "item_id", "required": true, "schema": { "type": "integer" } }
+          { "in": "path", "name": "receipt_id", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "in": "path", "name": "item_id", "required": true, "schema": { "type": "string", "format": "uuid" } }
         ],
         "requestBody": {
           "required": true,
@@ -333,19 +354,33 @@
               "example": {
                 "name": "Maslo",
                 "quantity": 1,
-                "unit_price": 2.3
+                "unit_price": 2.3,
+                "extra_metadata": { "promo": true }
               }
             }
           }
         },
-        "responses": { "200": { "description": "Úspešne aktualizované" } }
+        "responses": {
+          "200": { "description": "Úspešne aktualizované" },
+          "404": { "description": "Položka nebola nájdená" }
+        }
       },
       "delete": {
-        "summary": "Odstránenie položky",
-        "responses": { "200": { "description": "Položka úspešne vymazaná" } }
+        "summary": "Odstránenie položky účtenky",
+        "parameters": [
+          { "in": "path", "name": "receipt_id", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "in": "path", "name": "item_id", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Položka úspešne vymazaná",
+            "content": { "application/json": { "example": { "message": "Item deleted successfully" } } }
+          },
+          "404": { "description": "Položka nebola nájdená" }
+        }
       }
     },
-        "/api/incomes/": {
+    "/api/incomes/": {
       "get": {
         "summary": "Získanie zoznamu všetkých príjmov",
         "description": "Vráti zoznam všetkých príjmov vrátane celkovej sumy. Možno použiť voliteľné parametre na triedenie podľa dátumu alebo sumy.",

@@ -28,6 +28,7 @@ def register_blueprints(flask_app):
         "app.blueprints.incomes",
         "app.blueprints.needs",
         "app.blueprints.users",
+        "app.blueprints.receipt_items",
     ]
 
     for module_path in blueprint_modules:
