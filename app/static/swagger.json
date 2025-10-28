@@ -387,14 +387,14 @@
         "parameters": [
           {
             "in": "query",
-            "name": "sort_by",
-            "schema": { "type": "string", "enum": ["date", "amount"], "default": "date" },
-            "description": "Triedenie podľa poľa (date alebo amount)"
+            "name": "sort",
+            "schema": { "type": "string", "enum": ["income_date", "amount"], "default": "income_date" },
+            "description": "Triedenie podľa poľa (income_date alebo amount)"
           },
           {
             "in": "query",
             "name": "order",
-            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" },
+            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" },
             "description": "Poradie triedenia – vzostupne alebo zostupne"
           }
         ],
@@ -406,8 +406,8 @@
                 "example": {
                   "success": true,
                   "incomes": [
-                    { "id": 1, "date": "2025-10-01", "description": "Výplata", "amount": 1200.00 },
-                    { "id": 2, "date": "2025-10-05", "description": "Darček od babky", "amount": 200.00 }
+                    { "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9", "income_date": "2025-10-01", "description": "Výplata", "amount": 1200.00 },
+                    { "id": "d4c2f11e-89ab-4cbb-9e12-1f2d6f8e1b2a", "income_date": "2025-10-05", "description": "Darček od babky", "amount": 200.00 }
                   ],
                   "total_amount": 1400.00
                 }
@@ -424,7 +424,8 @@
           "content": {
             "application/json": {
               "example": {
-                "date": "2025-10-15",
+                "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                "income_date": "2025-10-15",
                 "description": "Freelance projekt",
                 "amount": 500.00
               }
@@ -439,8 +440,8 @@
                 "example": {
                   "success": true,
                   "income": {
-                    "id": 4,
-                    "date": "2025-10-15",
+                    "id": "e7d4a5b2-3c1a-4d33-9182-0f3a9b1c2d4e",
+                    "income_date": "2025-10-15",
                     "description": "Freelance projekt",
                     "amount": 500.00
                   }
@@ -459,16 +460,54 @@
         }
       }
     },
-    "/api/incomes/{item_id}": {
+    "/api/incomes/{income_id}": {
+      "get": {
+        "summary": "Získanie detailu príjmu podľa ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "income_id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID príjmu"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítaný príjem",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "income": {
+                    "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
+                    "income_date": "2025-10-01",
+                    "description": "Výplata",
+                    "amount": 1200.00
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Príjem nebol nájdený",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "error": "Income not found" }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "summary": "Aktualizácia existujúceho príjmu",
         "parameters": [
           {
             "in": "path",
-            "name": "item_id",
+            "name": "income_id",
             "required": true,
-            "schema": { "type": "integer" },
-            "description": "ID príjmu, ktorý sa má aktualizovať"
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID príjmu, ktorý sa má aktualizovať"
           }
         ],
         "requestBody": {
@@ -476,7 +515,7 @@
           "content": {
             "application/json": {
               "example": {
-                "date": "2025-10-16",
+                "income_date": "2025-10-16",
                 "description": "Zmenený popis",
                 "amount": 600.00
               }
@@ -491,8 +530,8 @@
                 "example": {
                   "success": true,
                   "income": {
-                    "id": 2,
-                    "date": "2025-10-16",
+                    "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
+                    "income_date": "2025-10-16",
                     "description": "Zmenený popis",
                     "amount": 600.00
                   }
@@ -515,10 +554,10 @@
         "parameters": [
           {
             "in": "path",
-            "name": "item_id",
+            "name": "income_id",
             "required": true,
-            "schema": { "type": "integer" },
-            "description": "ID príjmu, ktorý sa má odstrániť"
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID príjmu, ktorý sa má odstrániť"
           }
         ],
         "responses": {
@@ -529,8 +568,7 @@
                 "example": {
                   "success": true,
                   "incomes": [
-                    { "id": 1, "date": "2025-10-01", "description": "Výplata", "amount": 1200.00 },
-                    { "id": 3, "date": "2025-10-10", "description": "Predaj starého bicykla", "amount": 350.00 }
+                    { "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9", "income_date": "2025-10-01", "description": "Výplata", "amount": 1200.00 }
                   ]
                 }
               }

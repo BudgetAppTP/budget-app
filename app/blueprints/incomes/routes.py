@@ -1,77 +1,46 @@
 from flask import jsonify, request
+from app.services import incomes_service
 from . import bp
-
-demo_incomes = [
-    {"id": 1, "date": "2025-10-01", "description": "Výplata", "amount": 1200.00},
-    {"id": 2, "date": "2025-10-05", "description": "Darček od babky", "amount": 200.00},
-    {"id": 3, "date": "2025-10-10", "description": "Predaj starého bicykla", "amount": 350.00},
-]
-
-demo_expenses = [
-    {"id": 1, "date": "2025-10-02", "category": "Jedlo", "amount": 45.20},
-    {"id": 2, "date": "2025-10-05", "category": "Doprava", "amount": 14.00},
-    {"id": 3, "date": "2025-10-07", "category": "Byvanie", "amount": 865.00},
-]
-
 
 # GET /incomes → list all incomes with optional sorting
 @bp.route("/", methods=["GET"])
 def list_incomes():
-    sort_by = request.args.get("sort_by", "date")
-    order = request.args.get("order", "asc")
-    reverse = order == "desc"
+    data, status = incomes_service.get_all_incomes()
+    incomes_list = data["incomes"]
+    sort_by = request.args.get("sort", "income_date")  # default sorting
+    order = request.args.get("order", "desc")          # ascending/descending
 
-    sorted_incomes = sorted(
-        demo_incomes,
-        key=lambda x: float(x["amount"]) if sort_by == "amount" else x["date"],
-        reverse=reverse,
-    )
-    total_amount = sum(i["amount"] for i in sorted_incomes)
-
-    return jsonify({
-        "success": True,
-        "incomes": sorted_incomes,
-        "total_amount": total_amount
-    }), 200
-
+    reverse = order.lower() == "desc"
+    incomes_list.sort(key=lambda i: i[sort_by], reverse=reverse)
+    data["incomes"] = incomes_list
+    return jsonify(data), status
 
 # POST /incomes → create a new income
 @bp.route("/", methods=["POST"])
 def create_income():
     data = request.get_json(force=True)
-    if not data or "amount" not in data or "date" not in data or "description" not in data:
-        return jsonify({"success": False, "error": "Invalid input data"}), 400
+    response, status = incomes_service.create_income(data)
+    return jsonify(response), status
 
-    new_id = demo_incomes[-1]["id"] + 1 if demo_incomes else 1
-    new_income = {
-        "id": new_id,
-        "date": data["date"],
-        "description": data["description"],
-        "amount": float(data["amount"]),
-    }
-    demo_incomes.append(new_income)
-    return jsonify({"success": True, "income": new_income}), 201
+# GET /incomes/<id> → get a specific income
+@bp.route("/<uuid:income_id>", methods=["GET"])
+def get_income(income_id):
+    response, status = incomes_service.get_income_by_id(income_id)
+    return jsonify(response), status
 
 # PUT /incomes/<id> → update a specific income
-@bp.route("/<int:item_id>", methods=["PUT"])
-def update_income(item_id):
-    income = next((i for i in demo_incomes if i["id"] == item_id), None)
-    if not income:
-        return jsonify({"success": False, "error": "Income not found"}), 404
+@bp.route("/<uuid:income_id>", methods=["PUT"])
+def update_income(income_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing JSON body"}), 400
 
-    data = request.get_json(force=True)
-    income["date"] = data.get("date", income["date"])
-    income["description"] = data.get("description", income["description"])
-    income["amount"] = float(data.get("amount", income["amount"]))
-    return jsonify({"success": True, "income": income}), 200
+    response, status = incomes_service.update_income(income_id, data)
+    return jsonify(response), status
 
 
 # DELETE /incomes/<id> → delete a specific income
-@bp.route("/<int:item_id>", methods=["DELETE"])
-def delete_income(item_id):
-    income = next((i for i in demo_incomes if i["id"] == item_id), None)
-    if not income:
-        return jsonify({"success": False, "error": "Income not found"}), 404
-
-    demo_incomes.remove(income)
-    return jsonify({"success": True, "incomes": demo_incomes}), 200
+@bp.route("/<uuid:income_id>", methods=["DELETE"])
+def delete_income(income_id):
+     response,status =  incomes_service.delete_income(income_id)
+     return jsonify(response), status
