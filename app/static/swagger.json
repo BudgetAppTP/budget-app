@@ -144,58 +144,129 @@
     },
     "/api/receipts/{receipt_id}": {
       "get": {
-        "summary": "Získanie detailu výdavku s položkami",
+        "summary": "Získanie detailu účtenky podľa ID",
         "parameters": [
           {
             "in": "path",
             "name": "receipt_id",
             "required": true,
-            "schema": { "type": "integer" }
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID účtenky"
           }
         ],
         "responses": {
           "200": {
-            "description": "Úspešne načítané",
+            "description": "Úspešne načítaná účtenka",
             "content": {
               "application/json": {
                 "example": {
-                  "receipt_id": 1,
-                  "name": "Lidl - potraviny",
-                  "total": 45.20,
-                  "items": [
-                    { "item_id": 1, "name": "Mlieko", "quantity": 2, "unit_price": 1.2 },
-                    { "item_id": 2, "name": "Chlieb", "quantity": 1, "unit_price": 1.5 }
-                  ]
+                  "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
+                  "external_uid": "INV-2025-00012",
+                  "merchant": "Lidl - potraviny",
+                  "issue_date": "2025-10-27",
+                  "currency": "EUR",
+                  "total_amount": 45.20,
+                  "extra_metadata": { "payment_method": "card", "vat": 7.5 },
+                  "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                  "created_at": "2025-10-27T19:00:00Z"
                 }
               }
+            }
+          },
+          "404": {
+            "description": "Účtenka nebola nájdená",
+            "content": {
+              "application/json": { "example": { "error": "Receipt not found" } }
             }
           }
         }
       },
       "put": {
-        "summary": "Aktualizácia výdavku",
+        "summary": "Aktualizácia existujúcej účtenky",
+        "description": "Aktualizuje záznam účtenky podľa ID.\n\n**Nepovinné polia:** `merchant`, `issue_date`, `currency`, `total_amount`, `external_uid`, `extra_metadata`.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "example": {
-                "name": "Tesco - týždenný nákup",
-                "total": 60.50,
-                "date": "2025-10-03"
+                "merchant": "Tesco - týždenný nákup",
+                "issue_date": "2025-10-29",
+                "currency": "EUR",
+                "total_amount": 60.50,
+                "extra_metadata": {
+                  "payment_method": "cash",
+                  "vat": 9.5,
+                  "cashier": "Mária"
+                }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Úspešne aktualizované" }
+          "200": {
+            "description": "Úspešne aktualizovaná účtenka",
+            "content": {
+              "application/json": {
+                "example": {
+                  "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
+                  "message": "Receipt updated successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné dáta alebo formát dátumu",
+            "content": {
+              "application/json": {
+                "example": { "error": "Invalid date format" }
+              }
+            }
+          },
+          "404": {
+            "description": "Účtenka nebola nájdená",
+            "content": {
+              "application/json": { "example": { "error": "Receipt not found" } }
+            }
+          }
         }
       },
       "delete": {
-        "summary": "Odstránenie výdavku",
+        "summary": "Odstránenie účtenky podľa ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
         "responses": {
-          "200": { "description": "Úspešne odstránené" }
+          "200": {
+            "description": "Účtenka bola úspešne odstránená",
+            "content": {
+              "application/json": {
+                "example": { "message": "Receipt deleted successfully" }
+              }
+            }
+          },
+          "404": {
+            "description": "Účtenka nebola nájdená",
+            "content": {
+              "application/json": { "example": { "error": "Receipt not found" } }
+            }
+          }
         }
       }
-    },
+    }
+    ,
     "/api/receipts/{receipt_id}/items": {
       "get": {
         "summary": "Získanie položiek výdavku",
