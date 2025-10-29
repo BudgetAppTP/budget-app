@@ -2,7 +2,7 @@ import os
 
 class BaseConfig:
     SECRET_KEY = os.getenv("SECRET_KEY", "change-me")
-    WTF_CSRF_ENABLED = os.getenv("WTF_CSRF_ENABLED", "true").lower() == "true"
+    WTF_CSRF_ENABLED = False
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     TESTING = False
     DEFAULT_CURRENCY = os.getenv("DEFAULT_CURRENCY", "EUR")
