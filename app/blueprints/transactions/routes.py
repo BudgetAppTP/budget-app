@@ -11,7 +11,7 @@ demo_incomes = [
 ]
 
 demo_expenses = [
-    {"id": 1, "date": "2025-10-02", "category": "Jedlo", "amount": 45.20},
+    {"id": 1, "date": "2025-10-02", "category": "TERNO real estate", "amount": 45.20},
     {"id": 2, "date": "2025-10-05", "category": "Doprava", "amount": 14.00},
     {"id": 3, "date": "2025-10-07", "category": "Byvanie", "amount": 865.00},
 ]
@@ -257,7 +257,7 @@ def monthly_budget():
                 {"id": 3, "date": "2025-10-15", "description": "Predaj bicykla", "amount": 350.00},
             ],
             "expenses": [
-                {"id": 1, "date": "2025-10-02", "category": "Jedlo", "amount": 45.20},
+                {"id": 1, "date": "2025-10-02", "category": "TERNO real estate", "amount": 45.20},
                 {"id": 2, "date": "2025-10-07", "category": "Byvanie", "amount": 865.00},
             ],
             "planning": [

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BudgetApp · Ekasa</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="{{ url_for('static', filename='../static/images/logo.png') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style_eKasa.css') }}">
+</head>
+<body>
+{% include "navbar.html" %}
+<div class="wrap">
+  <div class="page-title">🧾 eKasa<div class="gold-line"></div></div>
+  <div class="table-card">
+    <table id="data-table">
+      <thead>
+        <tr>
+          <th>OPD</th>
+          <th class="sortable">DÁTUM</th>
+          <th>KATEGÓRIA</th>
+          <th>ITEM</th>
+          <th>QNT</th>
+          <th class="sortable">PRICE (€)</th>
+          <th>VAT</th>
+          <th>SELLER</th>
+          <th>UNIT</th>
+          <th>SELLER-UNIT</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="page-title" style="margin-top: 30px;">📂 Import eKasa<div class="gold-line"></div></div>
+              <div class="panel">
+      <div class="import-boxes">
+        <div class="import-card" draggable="true">
+          <strong>Nahrať eKasa / PDF</strong>
+          <p>Podporované: .ekd, .json, .pdf</p>
+          <button>Vybrať súbor</button>
+        </div>
+      </div>
+    </div>
+</div>
+
+<script>
+// --- Demo Data ---
+const DATA = [
+  {
+    opd: "O-30D7CD84F6",
+    date: "27.09.2025",
+    items: [
+      {category:"Jedlo", item:"Rožok štandard", qnt:3, price:0.36, vat:"5%", seller:"TERNO real estate", unit:"Hálova", sellerUnit:"Hálova"},
+      {category:"Jedlo", item:"Kaiserka cereal", qnt:2, price:0.38, vat:"19%", seller:"TERNO real estate", unit:"Hálova", sellerUnit:"Hálova"},
+      {category:"Jedlo", item:"Hruštínske nite", qnt:1, price:4.79, vat:"19%", seller:"TERNO real estate", unit:"Hálova", sellerUnit:"Hálova"}
+    ]
+  },
+  {
+    opd: "O-4D55DB20D1",
+    date: "18.09.2025",
+    items: [
+      {category:"Jedlo", item:"#Lipánek MAXI", qnt:1, price:0.76, vat:"19%", seller:"TERNO real estate", unit:"Hálova", sellerUnit:"Hálova"},
+      {category:"Jedlo", item:"Uhorka šalátová", qnt:1, price:0.99, vat:"5%", seller:"TERNO real estate", unit:"Hálova", sellerUnit:"Hálova"}
+    ]
+  }
+];
+
+const CATEGORIES = ["📌 Bývanie","📌 Jedlo","Doprava","Lieky","Ostatné"];
+const tbody = document.querySelector("#data-table tbody");
+
+function renderCategorySelect(selected) {
+  return `<select class="category">
+    ${CATEGORIES.map(c =>
+      `<option${c.includes("📌")?' class="pinned"':''} ${c.replace("📌 ","")==selected?"selected":""}>${c}</option>`
+    ).join("")}
+  </select>`;
+}
+
+function renderTable() {
+  tbody.innerHTML = "";
+  let total = 0;
+  DATA.forEach(block=>{
+    block.items.forEach((it,i)=>{
+      const tr = document.createElement("tr");
+      total += it.price;
+      tr.innerHTML = `
+        <td>${block.opd}</td>
+        <td>${block.date}</td>
+        <td>${renderCategorySelect(it.category)}</td>
+        <td>${it.item}</td>
+        <td>${it.qnt}</td>
+        <td class="amount">${it.price.toFixed(2)}</td>
+        <td>${it.vat}</td>
+        <td>${it.seller}</td>
+        <td>${it.unit}</td>
+        <td>${it.sellerUnit}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+  document.getElementById("total-sum").textContent = total.toFixed(2).replace(".", ",") + " €";
+}
+
+let sortState = {};
+
+document.querySelectorAll("th.sortable").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const index = Array.from(th.parentNode.children).indexOf(th);
+    const type = th.textContent.toLowerCase().includes("price") ? "num" : "date";
+    const asc = sortState[index] !== "asc";
+    sortState = {[index]: asc ? "asc" : "desc"};
+    document.querySelectorAll("th").forEach(t=>t.classList.remove("sorted-asc","sorted-desc"));
+    th.classList.add(asc?"sorted-asc":"sorted-desc");
+    sortRows(index, type, asc);
+  });
+});
+
+function sortRows(index, type, asc){
+  const rows = Array.from(tbody.rows);
+  rows.sort((a,b)=>{
+    let av=a.cells[index].innerText.trim();
+    let bv=b.cells[index].innerText.trim();
+    if(type==="num"){
+      av=parseFloat(av.replace(/[^\d.,-]/g,"").replace(",","."));
+      bv=parseFloat(bv.replace(/[^\d.,-]/g,"").replace(",","."));
+      return asc?av-bv:bv-av;
+    } else {
+      const [da,ma,ya]=av.split(".");
+      const [db,mb,yb]=bv.split(".");
+      const d1=new Date(`${ya}-${ma}-${da}`);
+      const d2=new Date(`${yb}-${mb}-${db}`);
+      return asc?d1-d2:d2-d1;
+    }
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+}
+
+renderTable();
+</script>
+</body>
+</html>

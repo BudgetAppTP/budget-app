@@ -6,6 +6,7 @@
   <title>BudgetApp · Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='../static/images/logo.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -109,7 +110,7 @@
           <div class="panel" draggable="true" id="importSection">
             <div class="drag-handle" title="Presuň sekciu"></div>
       <header>
-        <h2>Import z QR kódu / eKasa</h2>
+        <h2>Import eKasa</h2>
       </header>
       <div class="import-boxes">
         <div class="import-card" draggable="true">
@@ -122,15 +123,9 @@
           <p>Podporované: .ekd, .json, .pdf</p>
           <button>Vybrať súbor</button>
         </div>
+           <a class="btn" style="  text-decoration: none;text-align: center; " href="{{ url_for('eKasa.index') }}">Porovnavat mesiace</a>
       </div>
     </div>
-
-
-
-
-
-
-
     </section>
 
 

@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BudgetApp · Porovnanie</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='../static/images/logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style_comparison.css') }}">
+
+</head>
+<body>
+{% include "navbar.html" %}
+  <div class="wrap">
+      <div class="page-title">📈 Porovnanie mesiacov</div>
+    <div class="main_box">
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="incomes">Príjmy</button>
+        <button class="tab" data-tab="expenses">Výdavky</button>
+        <button class="tab" data-tab="needs">Potreby</button>
+        <button class="tab" data-tab="goals">Ciele</button>
+        <button class="tab" data-tab="savings">Sporenie</button>
+      </div>
+
+    <div class="main_table">
+    <!-- Month pickers -->
+    <div class="controls">
+      <div class="month-picker" id="pickerLeft">
+        <button class="arrow-btn" data-side="left" data-dir="-1" aria-label="predchádzajúci mesiac">
+          <span class="arrow left"></span>
+        </button>
+        <div class="month-label" id="labelLeft">—</div>
+        <button class="arrow-btn" data-side="left" data-dir="1" aria-label="ďalší mesiac">
+          <span class="arrow right"></span>
+        </button>
+      </div>
+
+
+      <div class="month-picker" id="pickerRight">
+        <button class="arrow-btn" data-side="right" data-dir="-1" aria-label="predchádzajúci mesiac">
+          <span class="arrow left"></span>
+        </button>
+        <div class="month-label" id="labelRight">—</div>
+        <button class="arrow-btn" data-side="right" data-dir="1" aria-label="ďalší mesiac">
+          <span class="arrow right"></span>
+        </button>
+      </div>
+
+
+    </div>
+
+    <div class="grid">
+      <div class="panel" id="leftPanel">
+    <div class="chart-container" id="leftChartContainer" style="display:none;">
+      <canvas id="leftDonutChart"></canvas>
+        <div class="chart-details" id="leftChartDetails"></div>
+    </div>
+        <div class="card">
+          <div class="table-card">
+            <table id="leftTable">
+              <thead>
+                <tr><th>DÁTUM</th><th>POPIS</th><th class="right">SUMA (€)</th></tr>
+              </thead>
+              <tbody></tbody>
+              <tfoot><tr><td colspan="2">Spolu</td><td class="right" id="leftTotal">0</td></tr></tfoot>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="panel" id="rightPanel">
+
+          <div class="chart-container" id="rightChartContainer" style="display:none;">
+      <canvas id="rightDonutChart"></canvas>
+      <div class="chart-details" id="rightChartDetails"></div>
+    </div>
+
+        <div class="card">
+          <div class="table-card">
+            <table id="rightTable">
+              <thead>
+                <tr><th>DÁTUM</th><th>POPIS</th><th class="right">SUMA (€)</th></tr>
+              </thead>
+              <tbody></tbody>
+              <tfoot><tr><td colspan="2">Spolu</td><td class="right" id="rightTotal">0</td></tr></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    </div>
+    <div class="panel summary-card" id="summaryPanel">
+      <div class="section-title">Súhrn porovnania</div>
+      <div class="card table-card">
+        <table id="summaryTable">
+          <thead>
+            <tr>
+              <th id="thL">Ľavý mesiac (€)</th>
+              <th id="thR">Pravý mesiac (€)</th>
+              <th>Rozdiel (€)</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+ </div>
+</div>
+
+<script>
+/**
+ * DEMO DÁTA (v praxi prídu z API)
+ */const DATA = {
+  "2025-01": {
+    label: "Január 2025",
+    incomes: [
+      { date:"2025-01-01", desc:"Výplata", amount:1200, category:"Práca" },
+      { date:"2025-01-10", desc:"Darček od babky", amount:150, category:"Dar" },
+      { date:"2025-01-15", desc:"Predaj starého telefónu", amount:180, category:"Predaj" }
+    ],
+    expenses: [
+      { date:"2025-01-03", desc:"Nájom", amount:400, category:"Bývanie" },
+      { date:"2025-01-05", desc:"Potraviny", amount:220, category:"Jedlo" },
+      { date:"2025-01-11", desc:"MHD karta", amount:30, category:"Doprava" },
+      { date:"2025-01-14", desc:"Internet", amount:20, category:"Bývanie" },
+      { date:"2025-01-18", desc:"Kino", amount:18, category:"Voľný čas" },
+    ],
+    needs: [
+      { date:"2025-01-02", desc:"Nájom", amount:400, sub:"Bývanie" },
+      { date:"2025-01-05", desc:"Potraviny", amount:220, sub:"Jedlo" },
+      { date:"2025-01-11", desc:"MHD karta", amount:30,  sub:"Doprava" },
+      { date:"2025-01-20", desc:"Lekáreň", amount:25, sub:"Zdravie" },
+    ],
+    goals: [
+      { name:"Mesačný limit na jedlo", type:"monthly", target:250, actual:220 },
+      { name:"Ročné sporenie 2000 €", type:"yearly", target:2000, progressYTD:150 }
+    ],
+    savings: [
+      { date:"2025-01-07", desc:"Vklad na sporiaci účet", amount:150 },
+    ],
+    savingsAlloc: [
+      { label: "Núdzový fond", amount: 80 },
+      { label: "Investície",   amount: 50 },
+      { label: "Dovolenka",    amount: 20 },
+    ]
+  },
+
+  "2025-02": {
+    label: "Február 2025",
+    incomes: [
+      { date:"2025-02-01", desc:"Výplata", amount:1300, category:"Práca" },
+      { date:"2025-02-05", desc:"Darček od babky", amount:200, category:"Dar" },
+      { date:"2025-02-10", desc:"Predaj starého bicykla", amount:350, category:"Predaj" },
+    ],
+    expenses: [
+      { date:"2025-02-03", desc:"Nájom", amount:400, category:"Bývanie" },
+      { date:"2025-02-06", desc:"Potraviny", amount:260, category:"Jedlo" },
+      { date:"2025-02-10", desc:"Taxi", amount:20, category:"Doprava" },
+      { date:"2025-02-14", desc:"Internet", amount:20, category:"Bývanie" },
+      { date:"2025-02-17", desc:"Divadlo", amount:35, category:"Voľný čas" },
+    ],
+    needs: [
+      { date:"2025-02-03", desc:"Nájom", amount:400, sub:"Bývanie" },
+      { date:"2025-02-06", desc:"Potraviny", amount:260, sub:"Jedlo" },
+      { date:"2025-02-10", desc:"Taxi", amount:20,  sub:"Doprava" },
+    ],
+    goals: [
+      { name:"Mesačný limit na jedlo", type:"monthly", target:250, actual:260 },
+      { name:"Ročné sporenie 2000 €", type:"yearly", target:2000, progressYTD:350 }
+    ],
+    savings: [
+      { date:"2025-02-08", desc:"Vklad na sporiaci účet", amount:200 },
+    ],
+    savingsAlloc: [
+      { label: "Núdzový fond", amount: 100 },
+      { label: "Investície",   amount: 70 },
+      { label: "Dovolenka",    amount: 30 },
+    ]
+  },
+
+  "2025-03": {
+    label: "Marec 2025",
+    incomes: [
+      { date:"2025-03-01", desc:"Výplata", amount:1200, category:"Práca" }
+    ],
+    expenses: [
+      { date:"2025-03-05", desc:"Potraviny", amount:230, category:"Jedlo" }
+    ],
+    needs: [
+      { date:"2025-03-05", desc:"Potraviny", amount:230, sub:"Jedlo" }
+    ],
+    goals: [
+      { name:"Mesačný limit na jedlo", type:"monthly", target:250, actual:230 },
+      { name:"Ročné sporenie 2000 €", type:"yearly", target:2000, progressYTD:500 }
+    ],
+    savings: [
+      { date:"2025-03-12", desc:"Vklad na sporiaci účet", amount:150 }
+    ],
+    savingsAlloc: [
+      { label: "Núdzový fond", amount: 90 },
+      { label: "Investície",   amount: 40 },
+      { label: "Dovolenka",    amount: 20 },
+    ]
+  }
+};
+
+const MONTH_KEYS = Object.keys(DATA).sort();
+const fmt = n => n.toLocaleString('sk-SK', {minimumFractionDigits:2, maximumFractionDigits:2});
+const sum = arr => arr.reduce((a,b)=>a + (b.amount||0), 0);
+const groupSum = (arr, key) => {
+  const m = {};
+  for(const r of arr){ m[r[key]] = (m[r[key]]||0) + (r.amount||0); }
+  return m;
+};
+const byTab = (month, tab) => {
+  const d = DATA[month];
+  if(!d) return [];
+  if(tab==='incomes')  return d.incomes;
+  if(tab==='expenses') return d.expenses;
+  if(tab==='needs')    return d.needs;
+  if(tab==='goals')    return d.goals;
+  if(tab==='savings')  return d.savings;
+  return [];
+}
+
+let activeTab = 'incomes';
+let idxLeft  = Math.max(0, MONTH_KEYS.length-2);
+let idxRight = Math.max(1, MONTH_KEYS.length-1);
+
+const el = sel => document.querySelector(sel);
+const tbodySummary = el('#summaryTable tbody');
+const thL = el('#thL'), thR = el('#thR');
+const labelLeft = el('#labelLeft'), labelRight = el('#labelRight');
+const leftBody = el('#leftTable tbody'), rightBody = el('#rightTable tbody');
+const leftTotal = el('#leftTotal'), rightTotal = el('#rightTotal');
+
+let leftChart = null;
+let rightChart = null;
+const chartColors = ['#e6c975','#ccb8a3','#b1bfd0','#c0cfad'];
+
+function currentKeys(){
+  return { left: MONTH_KEYS[idxLeft], right: MONTH_KEYS[idxRight] };
+}
+
+function setMonthLabels(){
+  const {left,right} = currentKeys();
+  labelLeft.textContent = DATA[left].label;
+  labelRight.textContent = DATA[right].label;
+
+  thL.textContent = `${DATA[left].label} (€)`;
+  thR.textContent = `${DATA[right].label} (€)`;
+}
+
+function mapTabName(tab){
+  const map = {incomes:"Príjmy", expenses:"Výdavky", needs:"Potreby", goals:"Ciele",savings:"Sporenie"};
+  return map[tab] || "";
+}
+
+function renderSummary() {
+  const { left, right } = currentKeys();
+  tbodySummary.innerHTML = "";
+
+  if (activeTab === 'goals') {
+    const L = DATA[left].goals, R = DATA[right].goals;
+    const names = new Set([...L.map(g=>g.name), ...R.map(g=>g.name)]);
+    for (const name of names) {
+      const gL = L.find(g=>g.name===name);
+      const gR = R.find(g=>g.name===name);
+      const vL = gL ? (gL.type==='monthly' ? (gL.actual / gL.target * 100) : (gL.progressYTD / gL.target * 100)) : 0;
+      const vR = gR ? (gR.type==='monthly' ? (gR.actual / gR.target * 100) : (gR.progressYTD / gR.target * 100)) : 0;
+      const diff = vR - vL;
+      const trend = diff>1 ? `<span class="trend-up">🔼</span>` :
+                    diff<-1 ? `<span class="trend-down">🔽</span>` :
+                    `<span class="trend-flat">➖</span>`;
+      tbodySummary.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td>${vL.toFixed(0)} %</td>
+          <td>${vR.toFixed(0)} %</td>
+          <td>${diff>0?'+':''}${diff.toFixed(0)} %</td>
+          <td>${trend}</td>
+        </tr>
+      `);
+    }
+    return;
+  }
+
+  const L = byTab(left, activeTab);
+  const R = byTab(right, activeTab);
+  const totalL = sum(L), totalR = sum(R);
+  const diffT = totalR - totalL;
+  const tIcon = diffT > 1 ? `<span class="trend-up">🔼</span>` :
+                diffT < -1 ? `<span class="trend-down">🔽</span>` :
+                `<span class="trend-flat">➖</span>`;
+
+  const topRowName = mapTabName(activeTab);
+
+  tbodySummary.insertAdjacentHTML('beforeend', `
+    <tr>
+      <td>${fmt(totalL)}</td>
+      <td>${fmt(totalR)}</td>
+      <td>${diffT>0?'+':''}${fmt(diffT)}</td>
+      <td>${tIcon}</td>
+    </tr>
+  `);
+}
+
+function renderDetails(side) {
+  const { left, right } = currentKeys();
+  const key = side === 'left' ? left : right;
+  const data = byTab(key, activeTab);
+  const body = side === 'left' ? leftBody : rightBody;
+  const totalEl = side === 'left' ? leftTotal : rightTotal;
+
+  body.innerHTML = "";
+  let total = 0;
+
+  if (activeTab === 'goals') {
+    for (const g of data) {
+      const pct = g.type === 'monthly' ? (g.actual / g.target * 100) : (g.progressYTD / g.target * 100);
+      const desc = g.type === 'monthly'
+        ? `Mesačný cieľ: ${fmt(g.target)} • Skutočnosť: ${fmt(g.actual)}`
+        : `Ročný cieľ: ${fmt(g.target)} • YTD: ${fmt(g.progressYTD)}`;
+      body.insertAdjacentHTML('beforeend', `
+        <tr>
+          <td class="muted">—</td>
+          <td>
+            <div class="label">${g.name}</div>
+            <div class="muted">${desc}</div>
+          </td>
+          <td class="right">${pct.toFixed(0)} %</td>
+        </tr>
+      `);
+      total += pct;
+    }
+    totalEl.textContent = `${(data.length ? (total / data.length) : 0).toFixed(0)} % priemer`;
+    return;
+  }
+
+  for (const r of data) {
+    let prefix = '';
+    if (activeTab === 'incomes') prefix = '+ ';
+    else if (activeTab === 'expenses') prefix = '- ';
+
+    body.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${r.date || '—'}</td>
+        <td>${r.desc}</td>
+        <td class="right">${prefix}${fmt(r.amount)}</td>
+      </tr>
+    `);
+    total += r.amount || 0;
+  }
+  totalEl.textContent = fmt(total);
+}
+
+
+function renderNeedsCharts() {
+  const { left, right } = currentKeys();
+  const leftData = DATA[left].needs || [];
+  const rightData = DATA[right].needs || [];
+
+  const groupBySub = (arr) => {
+    const result = {};
+    for (const r of arr) {
+      if (!r.sub) continue;
+      result[r.sub] = (result[r.sub] || 0) + (r.amount || 0);
+    }
+    return result;
+  };
+
+  const leftGrouped = groupBySub(leftData);
+  const rightGrouped = groupBySub(rightData);
+
+  const labelsL = Object.keys(leftGrouped);
+  const labelsR = Object.keys(rightGrouped);
+  const dataL = Object.values(leftGrouped);
+  const dataR = Object.values(rightGrouped);
+
+  const ctxL = document.getElementById('leftDonutChart');
+  const ctxR = document.getElementById('rightDonutChart');
+
+  if (leftChart) leftChart.destroy();
+  if (rightChart) rightChart.destroy();
+
+  const makeChart = (ctx, labels, data) => new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: chartColors.slice(0, labels.length),
+        hoverOffset: 10
+      }]
+    },
+    options: {
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#333',
+          titleColor: '#fff',
+          callbacks: {
+            label: ctx => `${ctx.label}: ${fmt(ctx.parsed)} €`
+          }
+        }
+      }
+    }
+  });
+
+  leftChart = makeChart(ctxL, labelsL, dataL);
+  rightChart = makeChart(ctxR, labelsR, dataR);
+
+  const leftDetails = document.getElementById('leftChartDetails');
+  const rightDetails = document.getElementById('rightChartDetails');
+
+  function renderDetailsHTML(labels, data) {
+    const total = data.reduce((a, b) => a + b, 0);
+    let html = labels.map((label, i) => {
+      const percent = (data[i] / total * 100).toFixed(1);
+      return `
+        <div class="item">
+          <span><span class="color-dot" style="background:${chartColors[i]}"></span>${label}</span>
+          <span>${percent}% | ${fmt(data[i])} €</span>
+        </div>`;
+    }).join("");
+    html += `<div class="summary">Celkovo: ${fmt(total)} €</div>`;
+    return html;
+  }
+
+  leftDetails.innerHTML = renderDetailsHTML(labelsL, dataL);
+  rightDetails.innerHTML = renderDetailsHTML(labelsR, dataR);
+}
+
+
+function renderGoalsTable(side) {
+  const { left, right } = currentKeys();
+  const key = side === "left" ? left : right;
+  const month = DATA[key];
+  const container = document.getElementById(side === "left" ? "leftPanel" : "rightPanel");
+
+  const old = container.querySelector(".goals-table");
+  if (old) old.remove();
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "goals-table";
+  wrapper.innerHTML = `
+    <table class="goals-layout">
+      <thead>
+        <tr>
+          <th>Popis</th>
+          <th>Cieľ (€)</th>
+          <th>Realita (€)</th>
+          <th>Splnené (%)</th>
+          <th>Stav</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  `;
+  container.appendChild(wrapper);
+
+  const tbody = wrapper.querySelector("tbody");
+  const monthly = month.goals.filter(g => g.type === "monthly");
+  const yearly  = month.goals.filter(g => g.type === "yearly");
+
+  const fmt = n => n.toLocaleString('sk-SK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pct = (a, b) => b ? (a / b * 100).toFixed(0) : 0;
+
+  tbody.insertAdjacentHTML('beforeend', `<tr><td colspan="5" class="section-title">Mesačné ciele</td></tr>`);
+  for (const g of monthly) {
+    const p = pct(g.actual, g.target);
+    const icon = p >= 100 ? "✔" : "✖";
+    const iconClass = p >= 100 ? "done" : "fail";
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${g.name}</td>
+        <td>${fmt(g.target)}</td>
+        <td>${fmt(g.actual)}</td>
+        <td>${p} %</td>
+        <td><span class="status-icon ${iconClass}">${icon}</span></td>
+      </tr>
+    `);
+  }
+
+  tbody.insertAdjacentHTML('beforeend', `<tr><td colspan="5" class="section-title">Ročné ciele</td></tr>`);
+  for (const g of yearly) {
+    const p = pct(g.progressYTD, g.target);
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${g.name}</td>
+        <td>${fmt(g.target)}</td>
+        <td>${fmt(g.progressYTD)}</td>
+        <td>${p} %</td>
+        <td><span class="status-icon progress">⏳</span></td>
+      </tr>
+    `);
+  }
+}
+
+function computeSavings(monthKey){
+  const d = DATA[monthKey] || {};
+  const inc = (d.incomes || []).reduce((s,r)=>s+(r.amount||0),0);
+  const exp = (d.expenses|| []).reduce((s,r)=>s+(r.amount||0),0);
+  const fromList = (d.savings || []).reduce((s,r)=>s+(r.amount||0),0);
+
+  const saved = fromList > 0 ? fromList : Math.max(inc - exp, 0);
+  const savedPctOfIncome = inc > 0 ? (saved/inc*100) : 0;
+
+  const alloc = Array.isArray(d.savingsAlloc) ? d.savingsAlloc : [{label:"Sporenie", amount:saved}];
+  const labels = alloc.map(a=>a.label);
+  const data   = alloc.map(a=>a.amount);
+
+  return { saved, savedPctOfIncome, labels, data };
+}
+
+function renderSavingsCharts() {
+  const { left, right } = currentKeys();
+
+  const leftInfo  = computeSavings(left);
+  const rightInfo = computeSavings(right);
+
+  const ctxL = document.getElementById('leftDonutChart');
+  const ctxR = document.getElementById('rightDonutChart');
+
+  if (leftChart) leftChart.destroy();
+  if (rightChart) rightChart.destroy();
+
+  const makeChart = (ctx, labels, data, saved) => new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: chartColors.slice(0, labels.length),
+        hoverOffset: 10
+      }]
+    },
+    options: {
+      cutout: '70%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#333',
+          titleColor: '#fff',
+          callbacks: {
+            label: t => `${t.label}: ${fmt(t.parsed)} €`
+          }
+        },
+
+        beforeDraw(chart) {
+          const { ctx, chartArea } = chart;
+          const { top, bottom, left, right, width, height } = chartArea;
+          ctx.save();
+          ctx.font = '600 14px Inter, sans-serif';
+          ctx.fillStyle = '#555';
+          ctx.textAlign = 'center';
+          ctx.fillText('Ušetrené tento mesiac', width / 2 + left, height / 2 + top - 5);
+          ctx.font = '700 16px Inter, sans-serif';
+          ctx.fillStyle = '#000';
+          ctx.fillText(`${fmt(saved)} €`, width / 2 + left, height / 2 + top + 18);
+          ctx.restore();
+        }
+      }
+    }
+  });
+
+  leftChart  = makeChart(ctxL,  leftInfo.labels,  leftInfo.data,  leftInfo.saved);
+  rightChart = makeChart(ctxR, rightInfo.labels, rightInfo.data, rightInfo.saved);
+
+  const leftDetails  = document.getElementById('leftChartDetails');
+  const rightDetails = document.getElementById('rightChartDetails');
+
+  const renderDetailsHTML = (labels, data) => {
+    const total = data.reduce((a,b)=>a+b,0);
+    let html = labels.map((label, i) => {
+      const pct = total>0 ? (data[i]/total*100).toFixed(1) : 0;
+      return `<div class="item">
+                <span><span class="color-dot" style="background:${chartColors[i]}"></span>${label}</span>
+                <span>${pct}% | ${fmt(data[i])} €</span>
+              </div>`;
+    }).join('');
+    html += `<div class="summary">Celkovo: ${fmt(total)} €</div>`;
+    return html;
+  };
+
+  leftDetails.innerHTML  = renderDetailsHTML(leftInfo.labels,  leftInfo.data);
+  rightDetails.innerHTML = renderDetailsHTML(rightInfo.labels, rightInfo.data);
+}
+
+function renderAll(){
+
+  document.querySelectorAll('.goals-table').forEach(el => el.remove());
+
+
+  setMonthLabels();
+
+  const isNeeds   = activeTab === 'needs';
+  const isGoals   = activeTab === 'goals';
+  const isSavings = activeTab === 'savings';
+
+  document.getElementById('summaryPanel').style.display = (isNeeds || isGoals || isSavings) ? 'none' : 'block';
+
+  if (isNeeds){
+    document.getElementById('leftChartContainer').style.display  = 'flex';
+    document.getElementById('rightChartContainer').style.display = 'flex';
+    document.getElementById('leftTable').style.display  = 'none';
+    document.getElementById('rightTable').style.display = 'none';
+    renderNeedsCharts();
+    return;
+  }
+
+  if (isSavings){
+    document.getElementById('leftChartContainer').style.display  = 'flex';
+    document.getElementById('rightChartContainer').style.display = 'flex';
+    document.getElementById('leftTable').style.display  = 'none';
+    document.getElementById('rightTable').style.display = 'none';
+    renderSavingsCharts(); // #ДОБАВЛЕНИЕ
+    return;
+  }
+
+  if (isGoals){
+    document.getElementById('leftChartContainer').style.display  = 'none';
+    document.getElementById('rightChartContainer').style.display = 'none';
+    document.getElementById('leftTable').style.display  = 'none';
+    document.getElementById('rightTable').style.display = 'none';
+    renderGoalsTable('left');
+    renderGoalsTable('right');
+    document.querySelectorAll('.card').forEach(c => c.style.display = 'none');
+    return;
+  }
+
+  document.querySelectorAll('.card').forEach(c => c.style.display = 'block');
+  document.getElementById('leftChartContainer').style.display  = 'none';
+  document.getElementById('rightChartContainer').style.display = 'none';
+  document.getElementById('leftTable').style.display  = 'table';
+  document.getElementById('rightTable').style.display = 'table';
+  renderSummary();
+  renderDetails('left');
+  renderDetails('right');
+}
+
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.tab');
+  if(!btn) return;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  activeTab = btn.dataset.tab;
+  renderAll();
+});
+
+document.querySelectorAll('.arrow-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    const dir = parseInt(b.dataset.dir, 10);
+    const side = b.dataset.side;
+    if(side==='left'){
+      idxLeft = Math.min(Math.max(0, idxLeft+dir), MONTH_KEYS.length-1);
+      if(idxLeft===idxRight && dir>0 && idxRight<MONTH_KEYS.length-1) idxRight++;
+      if(idxLeft===idxRight && dir<0 && idxRight>0) idxRight--;
+    }else{
+      idxRight = Math.min(Math.max(0, idxRight+dir), MONTH_KEYS.length-1);
+      if(idxRight===idxLeft && dir>0 && idxLeft<MONTH_KEYS.length-1) idxLeft++;
+      if(idxRight===idxLeft && dir<0 && idxLeft>0) idxLeft--;
+    }
+    renderAll();
+  });
+});
+
+renderAll();
+</script>
+</body>
+</html>

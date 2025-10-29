@@ -32,6 +32,8 @@ def create_app(config_object=None):
     from app.blueprints.auth import bp as auth_bp
     from app.blueprints.export import bp as export_bp
     from app.blueprints.needs import bp as needs_bp
+    from app.blueprints.eKasa import bp as eKasa_bp
+    from app.blueprints.comparison import bp as comparison_bp
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(transactions_bp)
@@ -41,5 +43,7 @@ def create_app(config_object=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(export_bp)
     app.register_blueprint(needs_bp)
+    app.register_blueprint(eKasa_bp)
+    app.register_blueprint(comparison_bp)
 
     return app

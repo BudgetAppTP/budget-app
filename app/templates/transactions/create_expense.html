@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='../static/images/logo.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style_expense.css') }}">
 
@@ -35,7 +35,7 @@
       <thead>
       <tr>
         <th>Dátum</th>
-        <th>Kategória</th>
+        <th>Popis</th>
         <th style="text-align:right;">Suma (€)</th>
         <th>Akcie</th>
       </tr>
@@ -276,6 +276,61 @@
       document.getElementById("total-footer").textContent = sum.toFixed(2);
       document.getElementById("total-value").textContent = sum.toFixed(2) + " €";
     }
+function enableEkasaLink() {
+  const firstRow = document.querySelector('.table-card table tbody tr');
+  if (!firstRow) return;
+
+  const cell = firstRow.querySelector('td:nth-child(2)');
+  if (!cell) return;
+
+  const lastCell = firstRow.querySelector('td:last-child');
+
+  cell.title = "Zobraziť tento účet na eKasa";
+  cell.style.cursor = "pointer";
+  cell.style.color = "var(--text)";
+  cell.style.fontWeight = "400";
+
+  cell.addEventListener("mouseenter", () => {
+    cell.style.fontWeight = "700";
+    cell.style.textDecoration = "underline";
+    cell.style.textDecorationColor = "black";
+  });
+  cell.addEventListener("mouseleave", () => {
+    cell.style.fontWeight = "400";
+    cell.style.textDecoration = "none";
+  });
+
+  cell.addEventListener("click", () => {
+    window.location.href = "{{ url_for('eKasa.index') }}";
+  });
+
+  if (lastCell) {
+    const span = document.createElement("span");
+    span.className = "action-icon redirect";
+    span.textContent = "➜";
+    span.title = "Zobraziť tento účet na eKasa";
+    span.style.cursor = "pointer";
+    span.style.fontSize = "18px";
+    span.style.marginLeft = "8px";
+    span.style.color = "#000";
+
+    span.addEventListener("mouseenter", () => {
+      span.style.color = "#d4a017";
+    });
+    span.addEventListener("mouseleave", () => {
+      span.style.color = "#000";
+    });
+
+    span.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.location.href ="{{ url_for('eKasa.index') }}";
+    });
+
+    lastCell.appendChild(span);
+  }
+}
+enableEkasaLink();
+
   });
 </script>
 {% endblock %}

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='../static/images/logo.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style_list.css') }}">
 
@@ -28,6 +28,7 @@
     </div>
 
     <div class="export-btns">
+        <a class="btn" href="{{ url_for('comparison.index') }}">Porovnavat mesiace</a>
       <a class="btn" href="{{ url_for('export.pdf') }}?month={{ month_key }}">Export to PDF</a>
       <a class="btn" href="{{ url_for('export.csv') }}?month={{ month_key }}">Export to CSV</a>
     </div>

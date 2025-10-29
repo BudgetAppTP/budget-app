@@ -123,12 +123,12 @@
     .progress{height:8px;background:#eee;border-radius:999px;overflow:hidden;}
     .progress span{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#f5e6a8,var(--gold));}
 
-    .import-boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;}
+    .import-boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:40px;}
     .import-card{border:2px dashed #e4d5a3;border-radius:var(--radius-lg);padding:24px;text-align:center;transition:background .3s ease;cursor:grab;}
     .import-card:hover{background:#fffaf0;}
     .import-card strong{display:block;font-weight:700;margin-bottom:8px;}
-    .import-card button{background:var(--gold);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;}
-    .import-card button:hover{background:#b08c2a;}
+    .import-card button,.import-boxes .btn{background:var(--gold);color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;}
+    .import-card button:hover, .import-boxes .btn:hover {background:#b08c2a;}
 
 
 
