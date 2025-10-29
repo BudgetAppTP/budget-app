@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <title>Rozpocet {{ month }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul>
+      {% for cat,msg in messages %}
+        <li>{{ msg }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% endwith %}
+
+  <h1>Rozpocet pre {{ month }}</h1>
+  <form method="post">
+    <table border="1" cellpadding="6" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Sekcia</th>
+          <th>Limit</th>
+          <th>Percento ciela</th>
+          <th>Utratene</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{{ r.b.section.value }}</td>
+            <td>
+              <input type="hidden" name="id_{{ r.b.section.value }}" value="{{ r.b.id }}">
+              <input type="text" name="limit_{{ r.b.section.value }}" value="{{ r.b.limit_amount }}">
+            </td>
+            <td>
+              <input type="text" name="pct_{{ r.b.section.value }}" value="{{ r.b.percent_target }}">
+            </td>
+            <td>{{ r.spent }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p>
+      <button type="submit">Ulozit</button>
+      <a href="{{ url_for('budgets.index') }}">Spat</a>
+    </p>
+  </form>
+</body>
+</html>

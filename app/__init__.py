@@ -1,26 +1,74 @@
+import os
+
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
+from flask_cors import CORS
+from dotenv import load_dotenv
+from app.extensions import db
+
+from app.services import init_services
+from flask_swagger_ui import get_swaggerui_blueprint
 
 
-db = SQLAlchemy()
+load_dotenv()
 
 
-def create_app():
-    app = Flask(
-        __name__,
-        template_folder='templates',
-        static_folder='static',
-        static_url_path='/'
+def register_blueprints(flask_app):
+    """Register all blueprints dynamically."""
+    from importlib import import_module
+
+    blueprint_modules = [
+        "app.blueprints.dashboard",
+        "app.blueprints.transactions",
+        "app.blueprints.budgets",
+        "app.blueprints.goals",
+        "app.blueprints.importqr",
+        "app.blueprints.auth",
+        "app.blueprints.export",
+        "app.blueprints.receipts",
+        "app.blueprints.incomes",
+        "app.blueprints.needs",
+        "app.blueprints.users",
+        "app.blueprints.receipt_items",
+    ]
+
+    for module_path in blueprint_modules:
+        module = import_module(module_path)
+        flask_app.register_blueprint(module.bp)
+
+    swaggerui_blueprint = get_swaggerui_blueprint(
+        flask_app.config["SWAGGER_URL"],
+        flask_app.config["API_URL"],
+        config={"app_name": "Receipts API"}
     )
 
-    # Sqlite used only for testing purposes. For production PostgreSQL or MySQL will be used.
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
-    db.init_app(app)
+    flask_app.register_blueprint(swaggerui_blueprint, url_prefix=flask_app.config["SWAGGER_URL"])
 
-    from . import routes
-    app.register_blueprint(routes.bp)
 
-    migrate = Migrate(app, db)
+def create_app(config_object=None):
+    flask_app = Flask(__name__, instance_relative_config=True)
 
-    return app
+    CORS(flask_app, resources={r"/api/*": {"origins": "*"}})
+
+    if config_object:
+        flask_app.config.from_object(config_object)
+    else:
+        app_env = os.getenv("APP_ENV", "development").lower()
+        if app_env == "production":
+            from config import ProdConfig as Cfg
+        elif app_env == "test":
+            from config import TestConfig as Cfg
+        else:
+            from config import DevConfig as Cfg
+        flask_app.config.from_object(Cfg)
+
+    db.init_app(flask_app)
+    init_services(flask_app)
+
+    with flask_app.app_context():
+        import app.models
+
+        if flask_app.config.get("DEBUG") or flask_app.config.get("TESTING"):
+            app.models.Base.metadata.create_all(bind=db.engine)
+
+    register_blueprints(flask_app)
+    return flask_app

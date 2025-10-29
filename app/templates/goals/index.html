@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <title>Ciele</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul>
+      {% for cat,msg in messages %}
+        <li>{{ msg }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% endwith %}
+
+  <h1>Ciele</h1>
+
+  <form method="get">
+    <label for="{{ form.section.id }}">Sekcia</label>
+    {{ form.section() }}
+    {{ form.submit() }}
+    <a href="{{ url_for('goals.edit') }}">Novy ciel</a>
+  </form>
+
+  <table border="1" cellpadding="6" cellspacing="0">
+    <thead>
+      <tr>
+        <th>Nazov</th>
+        <th>Typ</th>
+        <th>Sekcia</th>
+        <th>Cielova suma</th>
+        <th>Obdobie</th>
+        <th>Stav</th>
+        <th>Akcie</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in rows %}
+      <tr>
+        <td>{{ g.name }}</td>
+        <td>{{ g.type }}</td>
+        <td>{{ g.section.value if g.section else "" }}</td>
+        <td>{{ g.target_amount }}</td>
+        <td>
+          {% if g.month_from or g.month_to %}
+            {{ g.month_from or "" }} – {{ g.month_to or "" }}
+          {% endif %}
+        </td>
+        <td>{{ "Splnene" if g.is_done else "Nesplnene" }}</td>
+        <td><a href="{{ url_for('goals.edit', id=g.id) }}">Upravit</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
