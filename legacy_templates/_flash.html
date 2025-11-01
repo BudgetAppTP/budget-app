@@ -1,0 +1,11 @@
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-stack">
+      {% for cat,msg in messages %}
+        <div class="alert alert-{{ 'secondary' if cat not in ['success','danger','warning','info'] else cat }} mb-2" role="alert">
+          {{ msg }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}

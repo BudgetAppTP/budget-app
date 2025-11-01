@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BudgetApp · Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  {% include "navbar.html" %}
+
+  <main class="page">
+    <div class="section-title"><span class="marker"></span><div>Mesačný prehľad · <span id="monthTitle">Október 2025</span></div></div>
+    <section class="summary" aria-label="Monthly KPIs">
+      <!-- Incomes -->
+      <article class="card compact" aria-label="Celkové príjmy">
+        <div class="kpi">
+          <div class="icon" aria-hidden="true">💶</div>
+          <div>
+            <small>Celkové príjmy</small>
+            <div class="value" id="kpiIncome">€ 2 350</div>
+          </div>
+        </div>
+      </article>
+      <!-- Expenses -->
+      <article class="card compact" aria-label="Celkové výdavky">
+        <div class="kpi">
+          <div class="icon" aria-hidden="true">💳</div>
+          <div>
+            <small>Celkové výdavky</small>
+            <div class="value" id="kpiExpense">€ 1 840</div>
+          </div>
+        </div>
+      </article>
+      <!-- Balance -->
+      <article class="card compact" aria-label="Zostatok">
+        <div class="kpi">
+          <div class="icon" aria-hidden="true">🧾</div>
+          <div>
+            <small>Zostatok</small>
+            <div class="value" id="kpiBalance">€ 510</div>
+          </div>
+        </div>
+      </article>
+      <article class="card compact" aria-label="Plnenie cieľov">
+        <div class="kpi">
+          <div class="icon" aria-hidden="true">🎯</div>
+          <div>
+            <small>Plnenie cieľov</small>
+            <div class="value" id="kpiGoals">73%</div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+
+    <section class="grid" aria-label="Detail & rýchly prístup">
+      <div>
+        <div class="panel" draggable="true">
+          <div class="drag-handle" title="Presuň sekciu"></div>
+          <header>
+            <h3>Rozdelenie výdavkov tento mesiac</h3>
+          </header>
+          <div class="donut-wrap">
+            <div class="donut" role="img" aria-label="Donut chart: Bývanie 45%, Jedlo 25%, Lieky 20%, Oblečenie 10%">
+              <div class="donut-center">€ 1 840</div>
+            </div>
+            <div class="legend" aria-label="Legenda rozdelenia">
+              <div class="row"><div class="dot" style="background:var(--gold)"></div><div class="label">Bývanie</div><strong>45%</strong></div>
+              <div class="row"><div class="dot" style="background:#9ca3af"></div><div class="label">Jedlo</div><strong>25%</strong></div>
+              <div class="row"><div class="dot" style="background:#60a5fa"></div><div class="label">Lieky</div><strong>20%</strong></div>
+              <div class="row"><div class="dot" style="background:#34d399"></div><div class="label">Oblečenie</div><strong>10%</strong></div>
+            </div>
+          </div>
+        </div>
+
+           <div id="goals" class="panel" draggable="true"   style="margin-top:16px">
+             <div class="drag-handle" title="Presuň sekciu"></div>
+      <header>
+        <h2>Finančné ciele</h2>
+      </header>
+      <div class="goals-container" id="goalList">
+        <div class="goal-box" draggable="true">
+          <div class="goal-title">Šporiť 300 € mesačne</div>
+          <div class="goal-info">Ušetrené: <b>220 €</b> / 300 €</div>
+          <div class="progress"><span style="width:73%"></span></div>
+        </div>
+        <div class="goal-box" draggable="true">
+          <div class="goal-title">Jedlo: limit 250 €</div>
+          <div class="goal-info">Vynaložené: <b>190 €</b> / 250 €</div>
+          <div class="progress"><span style="width:76%"></span></div>
+        </div>
+        <div class="goal-box" draggable="true">
+          <div class="goal-title">Investície 100 €</div>
+          <div class="goal-info">Investované: <b>60 €</b> / 100 €</div>
+          <div class="progress"><span style="width:60%"></span></div>
+        </div>
+      </div>
+    </div>
+
+
+
+      </div>
+
+          <div class="panel" draggable="true" id="importSection">
+            <div class="drag-handle" title="Presuň sekciu"></div>
+      <header>
+        <h2>Import z QR kódu / eKasa</h2>
+      </header>
+      <div class="import-boxes">
+        <div class="import-card" draggable="true">
+          <strong>Naskenovať QR</strong>
+          <p>Otvoriť kameru a naskenovať kód z účtenky</p>
+          <button>Spustiť skener</button>
+        </div>
+        <div class="import-card" draggable="true">
+          <strong>Nahrať eKasa / PDF</strong>
+          <p>Podporované: .ekd, .json, .pdf</p>
+          <button>Vybrať súbor</button>
+        </div>
+      </div>
+    </div>
+
+
+
+
+
+
+
+    </section>
+
+
+
+
+    <footer>
+      <div class="foot-inner">
+        <span>© BudgetApp</span>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date();
+  const dateBadge = document.getElementById('dateBadge');
+
+  if (dateBadge) {
+    dateBadge.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+           xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 2v3M17 2v3M3.5 9.5h17M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 20 20.5H4A1.5 1.5 0 0 1 2.5 19V8A1.5 1.5 0 0 1 4 6.5Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>${today.toLocaleDateString('sk-SK', {
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit'
+      })}</span>
+    `;
+  }
+});
+
+
+(() => {
+  const grid = document.querySelector('.grid');
+  if (!grid) return;
+
+  let dragged = null;
+
+  grid.querySelectorAll('.panel').forEach(panel => {
+    const handle = panel.querySelector('.drag-handle');
+    if (!handle) return;
+
+
+    handle.addEventListener('mousedown', () => panel.setAttribute('draggable', 'true'));
+    handle.addEventListener('mouseup', () => panel.removeAttribute('draggable'));
+
+    panel.addEventListener('dragstart', e => {
+      dragged = panel;
+      panel.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', 'panel');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    panel.addEventListener('dragend', e => {
+      panel.classList.remove('dragging');
+      dragged = null;
+    });
+
+
+    panel.addEventListener('dragover', e => e.preventDefault());
+
+
+    panel.addEventListener('dragenter', e => {
+      e.preventDefault();
+      if (panel !== dragged) panel.classList.add('drop-target');
+    });
+    panel.addEventListener('dragleave', () => {
+      panel.classList.remove('drop-target');
+    });
+
+
+    panel.addEventListener('drop', e => {
+      e.preventDefault();
+      const target = panel;
+      if (!dragged || dragged === target) return;
+
+      const temp = dragged.innerHTML;
+      dragged.innerHTML = target.innerHTML;
+      target.innerHTML = temp;
+
+      restoreDragHandles(grid);
+
+      target.classList.remove('drop-target');
+      dragged.classList.remove('dragging');
+      dragged = null;
+    });
+  });
+
+  function restoreDragHandles(grid) {
+    grid.querySelectorAll('.panel').forEach(p => {
+      const handle = p.querySelector('.drag-handle');
+      if (!handle) return;
+      handle.setAttribute('title', 'Presuň sekciu');
+    });
+  }
+})();
+
+
+
+  </script>
+</body>
+</html>

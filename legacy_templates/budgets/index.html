@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BudgetApp · Plánovanie</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style_budget.css') }}">
+
+</head>
+<body>
+{% block head_extra %}
+{% endblock %}
+
+{% block content %}
+    {% include "navbar.html" %}
+<div class="wrap">
+  <div class="page-header">
+    <h2>💰 Plánovanie rozpočtu</h2>
+  </div>
+
+  <div class="summary-box">
+    <span>Zostatok celkom:</span>
+    <strong id="zostatok" data-original="{{ zostatok }}">{{ "%.2f"|format(zostatok) }} €</strong>
+  </div>
+
+  <div class="cards-grid" id="budget-cards">
+    {% for item in data %}
+    {% set name = item.b.section.value %}
+    {% set percent = item.b.percent_target %}
+    <div class="budget-card {{ name }}" data-name="{{ name }}">
+      <div class="header">{{ name|replace('_',' ')|capitalize }}</div>
+      <div class="content-row">
+        <input type="number" class="percent-input" value="{{ "%.0f"|format(percent) }}" min="0" max="100">
+        <span class="percent-symbol">%</span>
+        <span class="amount" data-percent="{{ percent }}">0.00 €</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="detail-tables">
+    {% for table in table_meta %}
+    <div class="detail-table" id="table-{{ table.name }}">
+      <h3>{{ table.name|replace('_',' ')|capitalize }}</h3>
+      <table>
+        <thead>
+        <tr>
+          {% for col in table.columns if col != 'id' %}
+          <th>{{ col|capitalize }}</th>
+          {% endfor %}
+          <th>Akcie</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in table.rows %}
+        <tr data-id="{{ row.id }}">
+          {% for col in table.columns if col != 'id' %}
+          <td>{{ row[col] }}</td>
+          {% endfor %}
+          <td class="actions">
+            <form method="post" action="{{ url_for('budgets.delete_record', table=table.name, row_id=row.id) }}" style="display:inline;">
+              <button type="submit" title="Odstrániť" class="delete-btn">🗑️</button>
+            </form>
+            <button type="button" class="edit-btn" title="Upraviť">✏️</button>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+
+      <form method="post" action="{{ url_for('budgets.add_record') }}" class="add-form">
+        <input type="hidden" name="table" value="{{ table.name }}">
+        {% for col in table.columns if col not in ['id'] %}
+        <input type="text" name="{{ col }}" placeholder="{{ col|capitalize }}" required>
+        {% endfor %}
+        <button type="submit" class="add-btn">+ Pridať záznam</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+        const today = new Date();
+  const dateBadge = document.getElementById('dateBadge');
+
+  if (dateBadge) {
+    dateBadge.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+           xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M7 2v3M17 2v3M3.5 9.5h17M4 6.5h16a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 20 20.5H4A1.5 1.5 0 0 1 2.5 19V8A1.5 1.5 0 0 1 4 6.5Z"
+              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>${today.toLocaleDateString('sk-SK', {
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit'
+      })}</span>
+    `;
+  }
+
+
+
+
+    const zostatokEl = document.getElementById("zostatok");
+    const originalZostatok = parseFloat(zostatokEl.dataset.original);
+    const cards = document.querySelectorAll(".budget-card");
+    const tables = document.querySelectorAll(".detail-table");
+
+    function recalc() {
+      let remaining = originalZostatok;
+      cards.forEach(card => {
+        const percentInput = card.querySelector(".percent-input");
+        const percent = parseFloat(percentInput.value) || 0;
+        const amountEl = card.querySelector(".amount");
+        const amount = (originalZostatok * percent / 100).toFixed(2);
+        amountEl.textContent = `${amount} €`;
+        remaining -= amount;
+      });
+      zostatokEl.textContent = `${remaining.toFixed(2)} €`;
+    }
+
+
+    function showTable(card) {
+      const name = card.dataset.name;
+      const color = window.getComputedStyle(card).backgroundColor;
+
+      tables.forEach(t => {
+        t.style.display = "none";
+        t.style.opacity = 0;
+      });
+
+      cards.forEach(c => c.style.outline = "none");
+
+      const selected = document.getElementById("table-" + name.toLowerCase());
+      if (selected) {
+        const header = selected.querySelector("h3");
+        if (header) header.style.backgroundColor = color;
+
+        selected.style.display = "block";
+        selected.style.transition = "opacity 0.4s ease";
+        requestAnimationFrame(() => selected.style.opacity = 1);
+
+        card.style.outline = `3px solid ${color}`;
+        card.style.outlineOffset = "2px";
+
+        window.scrollTo({ top: selected.offsetTop - 60, behavior: "smooth" });
+      }
+    }
+
+    cards.forEach(card => {
+      const input = card.querySelector(".percent-input");
+      input.addEventListener("input", recalc);
+
+      card.addEventListener("click", () => showTable(card));
+    });
+
+    recalc();
+
+
+    document.body.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("delete-btn")) {
+        e.preventDefault();
+        const form = e.target.closest("form");
+        const row = form.closest("tr");
+        const url = form.action;
+
+        if (!confirm("Odstrániť záznam?")) return;
+
+        const res = await fetch(url, { method: "POST" });
+        const data = await res.json();
+        if (data.success) {
+          row.style.transition = "opacity 0.3s ease";
+          row.style.opacity = "0";
+          setTimeout(() => row.remove(), 300);
+        }
+      }
+    });
+
+    document.body.addEventListener("click", (e) => {
+      if (e.target.classList.contains("edit-btn")) {
+        const row = e.target.closest("tr");
+        const cells = row.querySelectorAll("td:not(.actions)");
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "💾";
+        saveBtn.classList.add("save-btn");
+
+        if (row.classList.contains("editing")) return;
+        row.classList.add("editing");
+        row.style.backgroundColor = "#fff3cd";
+
+        cells.forEach(td => {
+          const oldText = td.textContent.trim();
+          td.innerHTML = `<input type="text" value="${oldText}" style="width:90%">`;
+        });
+
+        const actionsCell = row.querySelector(".actions");
+        actionsCell.innerHTML = "";
+        actionsCell.appendChild(saveBtn);
+      }
+    });
+
+
+    document.body.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("save-btn")) {
+        const row = e.target.closest("tr");
+        const tableDiv = e.target.closest(".detail-table");
+        const tableName = tableDiv.id.replace("table-", "");
+        const rowId = row.dataset.id;
+
+        const inputs = row.querySelectorAll("td:not(.actions) input");
+        const payload = {};
+        inputs.forEach((input, idx) => {
+          const colName = tableDiv.querySelectorAll("th")[idx].textContent.toLowerCase();
+          payload[colName] = input.value;
+        });
+
+        const res = await fetch(`/budgets/edit/${tableName}/${rowId}`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          row.classList.remove("editing");
+          row.style.backgroundColor = "#e7f6e7";
+          row.innerHTML = "";
+          Object.values(payload).forEach(val => {
+            const td = document.createElement("td");
+            td.textContent = val;
+            row.appendChild(td);
+          });
+          const actions = document.createElement("td");
+          actions.classList.add("actions");
+          actions.innerHTML = `
+          <button class="edit-btn" title="Upraviť">✏️</button>
+          <button class="delete-btn" title="Odstrániť">🗑️</button>`;
+          row.appendChild(actions);
+        }
+      }
+    });
+
+  });
+</script>
+{% endblock %}
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
