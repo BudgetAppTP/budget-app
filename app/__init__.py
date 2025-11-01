@@ -3,6 +3,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 from werkzeug.exceptions import HTTPException
+from .legacy_guard import register_legacy_guard
 
 load_dotenv()
 
@@ -22,6 +23,7 @@ def create_app(config_object=None):
         app.config.from_object(Cfg)
     register_error_handlers(app)
     register_blueprints(app)
+    register_legacy_guard(app)
     return app
 
 def register_error_handlers(app):
