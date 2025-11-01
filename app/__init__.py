@@ -1,74 +1,47 @@
 import os
-
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
-from app.extensions import db
-
-from app.services import init_services
-from flask_swagger_ui import get_swaggerui_blueprint
-
+from werkzeug.exceptions import HTTPException
 
 load_dotenv()
 
-
-def register_blueprints(flask_app):
-    """Register all blueprints dynamically."""
-    from importlib import import_module
-
-    blueprint_modules = [
-        "app.blueprints.dashboard",
-        "app.blueprints.transactions",
-        "app.blueprints.budgets",
-        "app.blueprints.goals",
-        "app.blueprints.importqr",
-        "app.blueprints.auth",
-        "app.blueprints.export",
-        "app.blueprints.receipts",
-        "app.blueprints.incomes",
-        "app.blueprints.needs",
-        "app.blueprints.users",
-        "app.blueprints.receipt_items",
-    ]
-
-    for module_path in blueprint_modules:
-        module = import_module(module_path)
-        flask_app.register_blueprint(module.bp)
-
-    swaggerui_blueprint = get_swaggerui_blueprint(
-        flask_app.config["SWAGGER_URL"],
-        flask_app.config["API_URL"],
-        config={"app_name": "Receipts API"}
-    )
-
-    flask_app.register_blueprint(swaggerui_blueprint, url_prefix=flask_app.config["SWAGGER_URL"])
-
-
 def create_app(config_object=None):
-    flask_app = Flask(__name__, instance_relative_config=True)
+    app = Flask(__name__, instance_relative_config=True)
 
-    CORS(flask_app, resources={r"/api/*": {"origins": "*"}})
+    CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173"]}}, supports_credentials=True)
 
     if config_object:
-        flask_app.config.from_object(config_object)
+        app.config.from_object(config_object)
     else:
-        app_env = os.getenv("APP_ENV", "development").lower()
-        if app_env == "production":
+        env = os.getenv("APP_ENV", "development").lower()
+        if env == "production":
             from config import ProdConfig as Cfg
-        elif app_env == "test":
+        elif env == "test":
             from config import TestConfig as Cfg
         else:
             from config import DevConfig as Cfg
-        flask_app.config.from_object(Cfg)
+        app.config.from_object(Cfg)
 
-    db.init_app(flask_app)
-    init_services(flask_app)
+    register_error_handlers(app)
+    register_blueprints(app)
+    return app
 
-    with flask_app.app_context():
-        import app.models
+def register_error_handlers(app):
+    @app.errorhandler(HTTPException)
+    def handle_http_error(e):
+        return jsonify({"data": None, "error": {"code": str(e.code), "message": e.description}}), e.code
 
-        if flask_app.config.get("DEBUG") or flask_app.config.get("TESTING"):
-            app.models.Base.metadata.create_all(bind=db.engine)
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(e):
+        app.logger.exception(e)
+        return jsonify({"data": None, "error": {"code": "internal_error", "message": "Internal Server Error"}}), 500
 
-    register_blueprints(flask_app)
-    return flask_app
+def register_blueprints(app):
+    from app.api import bp as api_bp
+    import app.api.auth      # noqa
+    import app.api.transactions  # noqa
+    import app.api.budgets       # noqa
+    import app.api.goals         # noqa
+    import app.api.importqr      # noqa
+    app.register_blueprint(api_bp)
