@@ -1,10 +1,11 @@
+import enum
+
 from sqlalchemy.types import TypeDecorator, JSON as SA_JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 
 class JSONType(TypeDecorator):
-    """
-    Choose the appropriate JSON column type for the database.
+    """ Choose the appropriate JSON column type for the database.
 
     Uses PostgreSQL's JSONB type if available, otherwise falls back to
     the generic JSON type. This allows models to work across different
@@ -29,3 +30,19 @@ class JSONType(TypeDecorator):
         if dialect.name == "postgresql":
             return dialect.type_descriptor(JSONB())
         return dialect.type_descriptor(SA_JSON())
+
+
+@enum.unique
+class OrganizationType(str, enum.Enum):
+    """ Enum representing the types of organizations in the system.
+
+    Attributes:
+        NONE: Undefined or not yet assigned organization type.
+        MERCHANT: Organization that provides goods or services (receipts).
+        INCOME_SOURCE: Organization that provides income (salary, payments).
+        BOTH: Organization that serves as both merchant and income source.
+    """
+    NONE = "none"
+    MERCHANT = "merchant"
+    INCOME_SOURCE = "income_source"
+    BOTH = "both"

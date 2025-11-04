@@ -3,7 +3,7 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
-from app.extensions import db
+from app.extensions import db, migrate
 
 from app.services import init_services
 from flask_swagger_ui import get_swaggerui_blueprint
@@ -62,6 +62,7 @@ def create_app(config_object=None):
         flask_app.config.from_object(Cfg)
 
     db.init_app(flask_app)
+    migrate.init_app(flask_app, db)
     init_services(flask_app)
 
     with flask_app.app_context():

@@ -13,7 +13,9 @@ from app.utils.types import JSONType
 
 if TYPE_CHECKING:
     from .user import User
+    from .organization import Organization
     from .receipt_item import ReceiptItem
+
 
 class Receipt(Base):
     """Represents a purchase receipt.
@@ -24,7 +26,7 @@ class Receipt(Base):
         id (uuid.UUID): Unique identifier for the receipt.
         external_uid (str | None): Optional external identifier used by third-party systems.
         user_id (uuid.UUID): Foreign key referencing the associated user's ID.
-        merchant (str): Name of the merchant who issued the receipt.
+        organization_id (uuid.UUID | None): Optional foreign key referencing the organization (merchant).
         issue_date (date): The date the receipt was issued.
         currency (str): The ISO currency code for the receipt amount (default: "EUR").
         total_amount (float): The total monetary amount of the receipt.
@@ -34,6 +36,8 @@ class Receipt(Base):
     Relationships:
         user (User): Many-to-One relationship.
             The user who owns this receipt. Each user may have multiple receipts.
+        organization (Organization | None): Many-to-One relationship.
+            Optional merchant organization associated with this receipt.
         items (list[ReceiptItem]): One-to-Many relationship.
             The list of receipt items associated with this receipt. Each item
             belongs to exactly one receipt.
@@ -56,8 +60,13 @@ class Receipt(Base):
         nullable=False,
         index=True
     )
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey('organizations.id'),
+        nullable=True,
+        index=True
+    )
 
-    merchant: Mapped[str] = mapped_column(Text)
     issue_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
@@ -86,10 +95,14 @@ class Receipt(Base):
         'User', back_populates='receipts'
     )
 
+    organization: Mapped["Organization | None"] = relationship(
+        'Organization', back_populates='receipts'
+    )
+
     items: Mapped[list["ReceiptItem"]] = relationship(
         'ReceiptItem', back_populates='receipt', cascade='all, delete-orphan'
     )
 
     def __repr__(self) -> str:
-        return f"<Receipt {self.merchant} total_amount={self.total_amount} user_id={self.user_id}>"
+        return f"<Receipt organization_id={self.organization_id} total_amount={self.total_amount} user_id={self.user_id}>"
 
