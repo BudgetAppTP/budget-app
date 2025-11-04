@@ -1,10 +1,20 @@
+from __future__ import annotations
+
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .income import Income
+    from .receipt import Receipt
+    from .financial_target import FinancialTarget
+    from .category import Category
+    from .receipt_item import ReceiptItem
 
 
 class User(Base):

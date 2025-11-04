@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Text, Date, DateTime, Numeric, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,6 +11,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 from app.utils.types import JSONType
 
+if TYPE_CHECKING:
+    from .user import User
+    from .receipt_item import ReceiptItem
 
 class Receipt(Base):
     """Represents a purchase receipt.
