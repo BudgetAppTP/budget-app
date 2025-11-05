@@ -1,13 +1,37 @@
+"""
+Goals API
+
+Paths:
+  - GET  /api/goals            (?section=SectionName)
+  - POST /api/goals
+  - PUT  /api/goals/{id}
+"""
+
 import uuid
 from flask import current_app, request
 from app.api import bp, make_response
 from app.core.domain import Goal, Section
 
+
 def _services():
     return current_app.extensions["services"]
 
-@bp.get("/goals")
+
+@bp.get("/goals", strict_slashes=False)
 def api_goals_list():
+    """
+    GET /api/goals
+    Summary: List goals (optionally by section)
+
+    Query:
+      - section: string (optional)
+
+    Responses:
+      200:
+        data:
+          {"items":[{...}], "count": n}
+        error: null
+    """
     section = (request.args.get("section") or "").strip()
     if section:
         rows = _services().goals.by_section(Section(section))
@@ -27,8 +51,24 @@ def api_goals_list():
         })
     return make_response({"items": items, "count": len(items)})
 
-@bp.post("/goals")
+
+@bp.post("/goals", strict_slashes=False)
 def api_goals_create():
+    """
+    POST /api/goals
+    Summary: Create goal
+
+    Request:
+      {
+        "name":"...", "type":"...", "target_amount":number,
+        "section":"Food" | null, "month_from":"YYYY-MM"|null, "month_to":"YYYY-MM"|null, "is_done":bool
+      }
+
+    Responses:
+      201:
+        data: {"id":"<uuid>"}
+        error: null
+    """
     p = request.get_json(silent=True) or {}
     gid = str(uuid.uuid4())
     section_val = p.get("section") or None
@@ -46,8 +86,20 @@ def api_goals_create():
     _services().goals.upsert(g)
     return make_response({"id": gid}, None, 201)
 
-@bp.put("/goals/<id>")
+
+@bp.put("/goals/<id>", strict_slashes=False)
 def api_goals_update(id):
+    """
+    PUT /api/goals/{id}
+    Summary: Update goal
+
+    Request: same fields as create (any subset)
+
+    Responses:
+      200:
+        data: {"ok": true}
+        error: null
+    """
     p = request.get_json(silent=True) or {}
     section_val = p.get("section") or None
     section = Section(section_val) if section_val else None

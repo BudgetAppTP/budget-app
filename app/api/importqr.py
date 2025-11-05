@@ -1,3 +1,11 @@
+"""
+Import QR / eKasa API
+
+Paths:
+  - POST /api/import-qr/preview
+  - POST /api/import-qr/confirm
+"""
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -5,8 +13,10 @@ from flask import current_app, request
 from app.api import bp, make_response
 from app.core.domain import Transaction, TransactionKind
 
+
 def _services():
     return current_app.extensions["services"]
+
 
 def _parse_date_any(s):
     s = (s or "").strip()
@@ -23,8 +33,23 @@ def _parse_date_any(s):
             except Exception:
                 return None
 
-@bp.post("/import-qr/preview")
+
+@bp.post("/import-qr/preview", strict_slashes=False)
 def api_importqr_preview():
+    """
+    POST /api/import-qr/preview
+    Summary: Parse and validate QR/eKasa payload
+
+    Request:
+      {
+        "payload": "<raw string>" | [ { "OPD":"...", "date":"YYYY-MM-DD", "item":"...", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks" }, ... ]
+      }
+
+    Responses:
+      200:
+        data: { "items":[{ "valid": true|false, "opd":"...", "date":"YYYY-MM-DD", "category":"...", "item":"...", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks" }], "count": n }
+        error: null
+    """
     body = request.get_json(silent=True) or {}
     payload = body.get("payload")
     items = []
@@ -50,8 +75,21 @@ def api_importqr_preview():
         })
     return make_response({"items": parsed, "count": len(parsed)})
 
-@bp.post("/import-qr/confirm")
+
+@bp.post("/import-qr/confirm", strict_slashes=False)
 def api_importqr_confirm():
+    """
+    POST /api/import-qr/confirm
+    Summary: Create expense transactions from previewed items
+
+    Request:
+      { "items": [ { "date":"YYYY-MM-DD", "category":"Jedlo", "item":"Mlieko", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks", "opd":"..." }, ... ] }
+
+    Responses:
+      200:
+        data: {"created": n}
+        error: null
+    """
     body = request.get_json(silent=True) or {}
     items = body.get("items") or []
     created = 0

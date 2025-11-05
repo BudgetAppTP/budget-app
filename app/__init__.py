@@ -66,11 +66,11 @@ def _register_api(flask_app: Flask):
 
 
 def _register_swagger(flask_app: Flask):
-    swagger_url = flask_app.config.get("SWAGGER_URL", "/api/docs")
-    api_url = flask_app.config.get("API_URL", "/static/swagger.json")
+    swagger_url = flask_app.config["SWAGGER_URL"]
+    api_url = flask_app.config["API_URL"]
     swaggerui_bp = get_swaggerui_blueprint(
         swagger_url,
-        api_url,           
+        api_url,             
         config={"app_name": "Budget API"},
     )
     flask_app.register_blueprint(swaggerui_bp, url_prefix=swagger_url)

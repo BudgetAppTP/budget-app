@@ -1,3 +1,20 @@
+"""
+Transactions API
+
+Paths:
+  - GET  /api/transactions/      List with filters
+  - POST /api/transactions/      Create income or expense
+
+Filters:
+  - month=YYYY-MM
+  - kind=income|expense
+  - category=string
+  - search=text (matches description)
+
+Notes:
+- Демоданные используются как заглушка. Ответ в конверте {data,error}.
+"""
+
 from flask import request
 from app.api import bp, make_response
 
@@ -13,11 +30,28 @@ demo_expenses = [
     {"id": 3, "date": "2025-10-07", "category": "Byvanie", "amount": 865.00, "kind": "expense"},
 ]
 
+
 def _all_tx():
     return demo_incomes + demo_expenses
 
-@bp.get("/transactions")
+
+@bp.get("/transactions", strict_slashes=False)
 def api_transactions_list():
+    """
+    GET /api/transactions/
+    Summary: List transactions
+
+    Query:
+      - month: "YYYY-MM"
+      - kind: "income" | "expense"
+      - category: string
+      - search: substring in description (case-insensitive)
+
+    Responses:
+      200:
+        data: {"items":[{...}], "count": n}
+        error: null
+    """
     month = (request.args.get("month") or "").strip()
     kind = (request.args.get("kind") or "").strip()
     category = (request.args.get("category") or "").strip()
@@ -33,8 +67,27 @@ def api_transactions_list():
         rows = [r for r in rows if search in str(r.get("description", "")).lower()]
     return make_response({"items": rows, "count": len(rows)})
 
-@bp.post("/transactions")
+
+@bp.post("/transactions", strict_slashes=False)
 def api_transactions_create():
+    """
+    POST /api/transactions/
+    Summary: Create transaction (income or expense)
+
+    Request (JSON):
+      Income:
+        {"kind":"income","date":"YYYY-MM-DD","description":"...","amount":120.0}
+      Expense:
+        {"kind":"expense","date":"YYYY-MM-DD","category":"Jedlo","amount":14.5}
+
+    Responses:
+      201:
+        data: {"id": <int>, "...": "...", "kind":"income|expense"}
+        error: null
+      400:
+        data: null
+        error: {"code":"bad_request","message":"kind must be income or expense"}
+    """
     p = request.get_json(silent=True) or {}
     k = p.get("kind")
     if k == "income":
