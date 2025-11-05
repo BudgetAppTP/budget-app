@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
 from datetime import date
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Text, Date, Numeric
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,6 +11,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 from app.utils.types import JSONType
+
+if TYPE_CHECKING:
+    from .user import User
 
 
 class Income(Base):

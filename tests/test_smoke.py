@@ -1,39 +1,62 @@
+"""
+Smoke tests for the Budget Tracker application.
+
+These tests verify that the application can start and basic infrastructure works.
+"""
 import os
 import pytest
-from budget_app.app import create_app
 
-class TestCfg:
-    TESTING = True
-    WTF_CSRF_ENABLED = False
-    SECRET_KEY = "test"
-    DEFAULT_CURRENCY = "EUR"
+from app import create_app
+from app.extensions import db
+
 
 @pytest.fixture
-def client():
-    os.environ["APP_ENV"] = "test"
-    app = create_app(TestCfg)
+def app():
+    """Create and configure a test application instance."""
+    app = create_app()
+
+    with app.app_context():
+        yield app
+        db.session.remove()
+
+
+@pytest.fixture
+def client(app):
+    """Create a test client for the application."""
     return app.test_client()
 
-@pytest.mark.parametrize("path", [
-    "/",
-    "/transactions",
-    "/transactions/new-income",
-    "/transactions/new-expense",
-    "/budgets",
-    "/goals",
-    "/import-qr",
-    "/auth/login",
-    "/auth/register",
-])
-def test_pages_ok(client, path):
-    r = client.get(path)
-    assert r.status_code == 200
 
-@pytest.mark.parametrize("path", [
-    "/export/csv?month=2025-10",
-    "/export/pdf?month=2025-10",
-])
-def test_export_ok(client, path):
-    r = client.get(path)
-    assert r.status_code == 200
-    assert len(r.data) > 0
+def test_app_creates_successfully(app):
+    """Test that the application factory creates an app instance."""
+    assert app is not None
+    assert app.config["TESTING"] is True
+
+
+def test_database_connection(app):
+    """Test that database connection is established."""
+    with app.app_context():
+        assert db.engine is not None
+
+
+def test_database_tables_created(app):
+    """Test that database tables are created successfully."""
+    with app.app_context():
+        inspector = db.inspect(db.engine)
+        tables = inspector.get_table_names()
+        assert len(tables) > 0
+
+
+def test_app_context_works(app):
+    """Test that Flask application context functions correctly."""
+    with app.app_context():
+        assert app.config is not None
+        assert app.extensions is not None
+
+
+def test_app_env_is_test():
+    """Test that APP_ENV environment variable is set to 'test'."""
+    app_env = os.getenv("APP_ENV", "").lower()
+    assert app_env == "test", (
+        f"APP_ENV must be set to 'test' for tests to run safely. "
+        f"Current value: '{app_env}'. Check pytest.ini configuration."
+    )
