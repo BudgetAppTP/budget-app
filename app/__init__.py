@@ -42,8 +42,8 @@ def create_app(config_object=None):
             app.models.Base.metadata.create_all(bind=db.engine)
 
     _register_error_handlers(flask_app)
-    _register_api(flask_app)
     _register_swagger(flask_app)
+    _register_api(flask_app)
     _register_legacy_guard(flask_app)
 
     return flask_app
@@ -66,14 +66,13 @@ def _register_api(flask_app: Flask):
 
 
 def _register_swagger(flask_app: Flask):
-    swagger_url = flask_app.config["SWAGGER_URL"]
-    api_url = flask_app.config["API_URL"]
     swaggerui_bp = get_swaggerui_blueprint(
-        swagger_url,
-        api_url,             
+        flask_app.config["SWAGGER_URL"],
+        flask_app.config["API_URL"],
         config={"app_name": "Budget API"},
     )
-    flask_app.register_blueprint(swaggerui_bp, url_prefix=swagger_url)
+    flask_app.register_blueprint(swaggerui_bp, url_prefix=flask_app.config["SWAGGER_URL"])
+
 
 
 def _register_error_handlers(flask_app: Flask):
