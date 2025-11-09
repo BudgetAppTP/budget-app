@@ -39,3 +39,14 @@ def update_receipt(receipt_id):
 def delete_receipt(receipt_id):
     response, status = receipts_service.delete_receipt(receipt_id)
     return jsonify(response), status
+
+@bp.route("/import-ekasa", methods=["POST"])
+def import_receipt_from_ekasa():
+    data = request.get_json()
+    if not data or "receiptId" not in data or "user_id" not in data:
+        return jsonify({"error": "Missing receiptId or user_id"}), 400
+
+    receipt_id = data["receiptId"]
+    user_id = data["user_id"]
+    response, status = receipts_service.import_receipt_from_ekasa(receipt_id, user_id)
+    return jsonify(response), status

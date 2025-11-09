@@ -1,8 +1,12 @@
 import uuid
+from decimal import Decimal
 
 from app.extensions import db
-from app.models import Receipt
-from datetime import date
+from app.models import Receipt, ReceiptItem
+from datetime import date, datetime
+
+from app.services import ekasa_service
+
 
 def get_all_receipts():
     receipts = db.session.query(Receipt).all()
@@ -109,3 +113,63 @@ def delete_receipt(receipt_id: uuid.UUID):
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
+
+def import_receipt_from_ekasa(receipt_id: str, user_id: str):
+    """Fetch receipt data from eKasa API and store it in local DB."""
+    try:
+        ekasa_data = ekasa_service.fetch_receipt_data(receipt_id)
+        if "error" in ekasa_data:
+            return ekasa_data, 400
+
+        r = ekasa_data["receipt"]
+
+        issue_date = datetime.strptime(r["issueDate"], "%d.%m.%Y %H:%M:%S").date()
+        merchant_name = r["organization"]["name"] if r.get("organization") else "Unknown Merchant"
+        total_price = float(r.get("totalPrice", 0))
+
+        receipt = Receipt(
+            user_id=uuid.UUID(user_id),
+            merchant=merchant_name,
+            issue_date=issue_date,
+            currency="EUR",
+            total_amount=total_price,
+            external_uid=r.get("receiptId"),
+            extra_metadata={
+                "ico": r.get("ico"),
+                "dic": r.get("dic"),
+                "okp": r.get("okp"),
+                "unit": r.get("unit", {}),
+                "organization": r.get("organization", {}),
+            },
+        )
+
+        db.session.add(receipt)
+        db.session.flush()
+
+        for i in r.get("items", []):
+            item = ReceiptItem(
+                receipt_id=receipt.id,
+                user_id=uuid.UUID(user_id),
+                name=i.get("name").strip(),
+                quantity=Decimal(str(i.get("quantity", 1))),
+                unit_price=Decimal(str(i.get("price", 0))),
+                total_price=Decimal(str(i.get("price", 0))),
+                extra_metadata={
+                    "vatRate": i.get("vatRate"),
+                    "itemType": i.get("itemType"),
+                    "specialRegulation": i.get("specialRegulation"),
+                },
+            )
+            db.session.add(item)
+
+        db.session.commit()
+
+        return {
+            "message": "Receipt imported successfully",
+            "receipt_id": str(receipt.id),
+            "total_items": len(r.get("items", []))
+        }, 201
+
+    except Exception as e:
+        db.session.rollback()
+        return {"error": f"Import failed: {str(e)}"}, 400
