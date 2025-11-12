@@ -1,0 +1,296 @@
+.incomes{
+  --bg: #e6e7ea;
+  --text: #111;
+  --muted: #555;
+  --gold: #d4a017;
+  --gold-dark: #b38a00;
+  --grid: #bfc2c7;
+  --white: #ffffff;
+}
+
+.incomes body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.incomes.wrap {
+  max-width: 950px;
+  margin: 50px auto;
+  padding: 0 20px;
+}
+
+.incomes .page-title {
+  font-size: 34px;
+  font-weight: 800;
+  color: #000;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.incomes .page-title::after {
+  content: "";
+  flex-grow: 1;
+  height: 2px;
+  background: var(--gold);
+  margin-left: 10px;
+  border-radius: 2px;
+}
+
+.incomes .summary {
+  background: var(--white);
+  border: 2px solid var(--grid);
+  border-radius: 8px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 16px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.incomes .summary .label {
+  color: var(--muted);
+}
+
+.incomes .summary .value {
+  color: var(--gold-dark);
+  font-weight: 700;
+  margin-left: 4px;
+      background: #fff5d6;
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+.incomes .table-card {
+  background: var(--white);
+  border: 1px solid var(--grid);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.incomes table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15.5px;
+    table-layout: fixed;
+}
+
+
+.incomes th:nth-child(1),
+.incomes td:nth-child(1) { width: 20%; }
+
+.incomes th:nth-child(2),
+.incomes td:nth-child(2) { width: 40%; }
+
+.incomes th:nth-child(3),
+.incomes td:nth-child(3) { width: 20%; }
+
+.incomes th:nth-child(4),
+.incomes td:nth-child(4) { width: 20%; }
+
+
+
+
+.incomes th,
+.incomes td {
+  border: 1px solid var(--grid);
+  padding: 10px 14px;
+}
+
+.incomes th {
+  text-align: left;
+  background: #dfe1e5;
+  text-transform: uppercase;
+  font-size: 13px;
+  color: #222;
+  position: relative;
+}
+
+.incomes th.sortable {
+  cursor: pointer;
+}
+
+.incomes th.sortable::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--muted);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.2s ease;
+}
+
+.incomes th.sortable:hover::after {
+  opacity: 0.8;
+}
+
+.incomes tbody tr:nth-child(odd) {
+  background: #fff;
+}
+
+.incomes tbody tr:nth-child(even) {
+  background: #f5f6f7;
+}
+
+.incomes tbody tr:hover {
+  background: #eceef0;
+  transition: background 0.2s;
+}
+
+.incomes .amount {
+  text-align: right;
+}
+
+.incomes tfoot td {
+  font-weight: 700;
+  background: #dfe1e5;;
+}
+
+.incomes .actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px; height: 100%;
+  align-items: center;
+}
+
+.incomes .action-icon {
+  font-size: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.incomes .action-icon.edit:hover, .incomes .action-icon.delete:hover{
+  color: var(--gold-dark);
+  transform: scale(1.15);
+}
+
+.incomes .btn {
+  background: #ebb72e;
+  border: 2px solid #b38a00;
+  color: #1a1200;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+  font-size: 15px;
+}
+
+.incomes .btn:hover {
+  background: #c49a0f;
+}
+
+.incomes form.form-row
+ {
+    display: grid;
+    grid-template-columns: 180px 1fr 160px 180px;
+    gap: 12px;
+    margin-top: 22px;
+    align-items: center;
+}
+
+.incomes .form-row input {
+  background: var(--white);
+  border: 1.8px solid var(--grid);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.incomes tr.editing td {
+  padding: 0 !important;
+
+}
+
+
+.incomes td input[type="number"] {
+ text-align: right;
+}
+.incomes td input[type="number"]::-webkit-inner-spin-button,
+.incomes td input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+
+.incomes td input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+
+
+.incomes td input[type="date"],
+.incomes td textarea,
+.incomes td input[type="number"] {
+   background-color: #fff8e1;
+    border: none;
+   width: 100%;
+  height:100%; ;
+   box-sizing: border-box;
+   padding: 10px 14px;
+
+   font-size: inherit;
+  font-family: inherit;
+}
+
+
+.incomes td textarea {
+  display: block;
+  resize: none;
+  line-height: 1.4;
+    white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+
+
+.incomes tr.editing .actions {
+  padding: 10px 14px;
+}
+
+.incomes td input:focus,.incomes td textarea:focus {
+  outline: none;
+}
+
+.incomes tr.editing td {
+  border-top: 2px solid #d4a017;
+  border-bottom: 2px solid #d4a017;
+}
+
+
+.incomes tr.editing td:first-child {
+  border-left: 2px solid #d4a017;
+}
+
+
+.incomes tr.editing td:last-child {
+  border-right: 2px solid #d4a017;
+}
+
+
+
+.incomes td:focus-within {
+    outline-offset: -1px;
+  outline: 2px solid #000;
+  border-radius: 3px;
+}
+
+
+.incomes  .error-text {
+  width: 100%;
+  margin-top: 6px;
+  color: #d32f2f;
+  font-size: 14px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}

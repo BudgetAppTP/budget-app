@@ -1,0 +1,74 @@
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .04);
+}
+
+.navbar .gold-line {
+  height: 3px;
+  background: linear-gradient(90deg, #d4af37, #f4e3a3, #d4af37);
+}
+
+.navbar .nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.navbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
+.navbar .logo img {
+  width: 28px;
+  height: 28px;
+}
+
+.navbar .brand span {
+  font-family: "DM Sans", Inter, sans-serif;
+}
+
+.navbar .nav-links {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.navbar .nav-links a {
+  text-decoration: none;
+  color: #1f2937;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.navbar .nav-links a:hover {
+  background: #f3f4f6;
+}
+
+.navbar .date-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #6b7280;
+  font-weight: 600;
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.navbar .date-badge svg {
+  opacity: .65;
+}
