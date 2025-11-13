@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from werkzeug.exceptions import HTTPException
 from flask_swagger_ui import get_swaggerui_blueprint
 
-from app.extensions import db
+from app.extensions import db, migrate
 from app.services import init_services
 
 load_dotenv()
