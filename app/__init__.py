@@ -1,53 +1,25 @@
 import os
-
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
-from app.extensions import db, migrate
-
-from app.services import init_services
+from werkzeug.exceptions import HTTPException
 from flask_swagger_ui import get_swaggerui_blueprint
 
+from app.extensions import db, migrate
+from app.services import init_services
 
 load_dotenv()
 
 
-def register_blueprints(flask_app):
-    """Register all blueprints dynamically."""
-    from importlib import import_module
-
-    blueprint_modules = [
-        "app.blueprints.dashboard",
-        "app.blueprints.transactions",
-        "app.blueprints.budgets",
-        "app.blueprints.goals",
-        "app.blueprints.importqr",
-        "app.blueprints.auth",
-        "app.blueprints.export",
-        "app.blueprints.receipts",
-        "app.blueprints.incomes",
-        "app.blueprints.needs",
-        "app.blueprints.users",
-        "app.blueprints.receipt_items",
-    ]
-
-    for module_path in blueprint_modules:
-        module = import_module(module_path)
-        flask_app.register_blueprint(module.bp)
-
-    swaggerui_blueprint = get_swaggerui_blueprint(
-        flask_app.config["SWAGGER_URL"],
-        flask_app.config["API_URL"],
-        config={"app_name": "Receipts API"}
+def create_app(config_object=None):
+    flask_app = Flask(
+        __name__,
+        instance_relative_config=True,
+        static_folder="static",
+        template_folder=None,
     )
 
-    flask_app.register_blueprint(swaggerui_blueprint, url_prefix=flask_app.config["SWAGGER_URL"])
-
-
-def create_app(config_object=None):
-    flask_app = Flask(__name__, instance_relative_config=True)
-
-    CORS(flask_app, resources={r"/api/*": {"origins": "*"}})
+    CORS(flask_app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
     if config_object:
         flask_app.config.from_object(config_object)
@@ -67,9 +39,57 @@ def create_app(config_object=None):
 
     with flask_app.app_context():
         import app.models
-
         if flask_app.config.get("DEBUG") or flask_app.config.get("TESTING"):
             app.models.Base.metadata.create_all(bind=db.engine)
 
-    register_blueprints(flask_app)
+    _register_error_handlers(flask_app)
+    _register_swagger(flask_app)
+    _register_api(flask_app)
+    _register_legacy_guard(flask_app)
+
     return flask_app
+
+
+def _register_api(flask_app: Flask):
+    from app.api import bp as api_bp
+    import app.api.auth          # noqa: F401
+    import app.api.transactions  # noqa: F401
+    import app.api.budgets       # noqa: F401
+    import app.api.goals         # noqa: F401
+    import app.api.importqr      # noqa: F401
+    import app.api.export        # noqa: F401
+    import app.api.dashboard     # noqa: F401
+    import app.api.incomes       # noqa: F401
+    import app.api.receipts      # noqa: F401
+    import app.api.receipt_items # noqa: F401
+    import app.api.users         # noqa: F401
+    flask_app.register_blueprint(api_bp)
+
+
+def _register_swagger(flask_app: Flask):
+    swaggerui_bp = get_swaggerui_blueprint(
+        flask_app.config["SWAGGER_URL"],
+        flask_app.config["API_URL"],
+        config={"app_name": "Budget API"},
+    )
+    flask_app.register_blueprint(swaggerui_bp, url_prefix=flask_app.config["SWAGGER_URL"])
+
+
+
+def _register_error_handlers(flask_app: Flask):
+    @flask_app.errorhandler(HTTPException)
+    def handle_http_error(e):
+        return jsonify({"data": None, "error": {"code": str(e.code), "message": e.description}}), e.code
+
+    @flask_app.errorhandler(Exception)
+    def handle_unexpected_error(e):
+        flask_app.logger.exception(e)
+        return jsonify({"data": None, "error": {"code": "internal_error", "message": "Internal Server Error"}}), 500
+
+
+def _register_legacy_guard(flask_app: Flask):
+    try:
+        from .legacy_guard import register_legacy_guard as _rg
+        _rg(flask_app)
+    except Exception:
+        pass
