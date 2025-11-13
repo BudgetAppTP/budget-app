@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from typing import List
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Text, DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,9 +11,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
+if TYPE_CHECKING:
+    from .user import User
+    from .receipt_item import ReceiptItem
+
 
 class Category(Base):
-    """Represents a category used to organize expences represented by receipt items.
+    """Represents a category used to organize expenses represented by receipt items.
 
     Categories can be user-specific or shared (if `user_id` is null). They may also
     be hierarchical, allowing categories to have parent and child categories.

@@ -253,14 +253,37 @@ Smoke tests assert:
 
 ## Database
 
-This application uses **PostgreSQL** in production and **SQLite** in development/testing (see `config.py`).
-In development mode, the SQLite database file is typically located at:
+This application uses **PostgreSQL** in production and **SQLite** in development and testing environments.
 
-```
-<project_root>/instance/dev.db
-```
+> [!NOTE]
+> In development mode, the SQLite database file is located at: \
+> ```<project_root>/instance/dev.db``` \
+> *For more details, see `config.py`.*
 
-### Optional: Generate an ER Diagram with ERAlchemy
+
+### Database Setup (Current Development Stage)
+
+At this stage of the project, **Flask-Migrate** and **Alembic** migrations are disabled.
+Because the database schema is still evolving rapidly, it’s simpler and faster to recreate the database from the models whenever the schema changes.
+
+Once the data model stabilizes, migrations will be re-enabled to manage schema updates safely in production environments.
+
+
+### How to Create or Recreate the Database (SQLite)
+
+1. Remove the existing database file:
+``` bash
+rm instance/dev.db
+```
+2. Restart the application.
+
+The app will automatically recreate all database tables defined in models.
+After the first startup, you’ll have a new, clean database ready to use.
+
+
+### Generate an Entity Relationship Diagram with ERAlchemy
+You can easily visualize the project's database schema using **ERAlchemy** directly from SQLite `.db` file
+#### Install ERAlchemy:
 
 ```bash
 pip install eralchemy

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Text, Numeric
 from sqlalchemy.dialects.postgresql import UUID
@@ -7,6 +10,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 from app.utils.types import JSONType
+
+if TYPE_CHECKING:
+    from .user import User
+    from .category import Category
+    from .receipt import Receipt
 
 
 class ReceiptItem(Base):

@@ -34,6 +34,7 @@ def create_app(config_object=None):
         flask_app.config.from_object(Cfg)
 
     db.init_app(flask_app)
+    migrate.init_app(flask_app, db)
     init_services(flask_app)
 
     with flask_app.app_context():

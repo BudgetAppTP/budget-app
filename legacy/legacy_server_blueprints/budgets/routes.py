@@ -84,7 +84,6 @@ def index():
 
 @bp.route("/add", methods=["POST"])
 def add_record():
-    global tables
     table_name = request.form.get("table")
 
     if table_name not in tables:
@@ -103,7 +102,6 @@ def add_record():
 
 @bp.route("/delete/<table>/<int:row_id>", methods=["POST"])
 def delete_record(table, row_id):
-    global tables
     if table in tables:
         tables[table] = [r for r in tables[table] if r["id"] != row_id]
         return jsonify({"success": True})
@@ -112,7 +110,6 @@ def delete_record(table, row_id):
 
 @bp.route("/edit/<table>/<int:row_id>", methods=["POST"])
 def edit_record(table, row_id):
-    global tables
     if table not in tables:
         return jsonify({"error": "unknown table"}), 400
 
