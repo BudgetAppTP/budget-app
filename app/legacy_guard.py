@@ -8,12 +8,12 @@ def register_legacy_guard(app):
 
     @app.before_request
     def _block_legacy_paths():
-        # Всегда пропускаем раздачу статики напрямую
+        # We always skip the distribution of static directly
         if request.endpoint == "static":
             return None
 
         p = (request.path or "")
-        # Нормализуем, чтобы /foo и /foo/ обрабатывались одинаково
+        # Normalize so that /foo and /foo/ are treated the same
         if p != "/":
             p = p.rstrip("/")
 
