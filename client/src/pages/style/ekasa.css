@@ -1,0 +1,186 @@
+.ekasa{
+  --bg: #e6e7ea;
+  --white: #fff;
+  --grid: #bfc2c7;
+  --gold: #d4a017;
+  --gold-dark: #b38a00;
+  --text: #111;
+  --muted: #555;
+}
+
+.ekasa.wrap {
+  max-width: 1100px;
+  margin: 50px auto;
+  padding: 0 20px;
+}
+
+.ekasa .page-title {
+  display: flex;
+  align-items: center;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 15px;
+}
+
+.ekasa .gold-line {
+  flex-grow: 1;
+  height: 3px;
+  background: var(--gold);
+  margin-left: 12px;
+}
+
+.ekasa .upload-box strong {
+  color: var(--gold-dark);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.ekasa .upload-box small {
+  color: var(--muted);
+  display: block;
+  margin-bottom: 5px;
+}
+
+.ekasa .upload-box button {
+  background: var(--gold);
+  border: 1px solid var(--gold-dark);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.ekasa .upload-box button:hover {
+  background: var(--gold-dark);
+}
+
+.ekasa .table-card {
+  background: var(--white);
+  border: 1px solid var(--grid);
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.ekasa table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ekasa th,
+.ekasa td {
+  border: 1px solid var(--grid);
+  padding: 8px 12px;
+}
+
+.ekasa th {
+  background: #dfe1e5;
+  text-transform: uppercase;
+  font-size: 13px;
+  color: #222;
+  position: relative;
+}
+
+.ekasa th.sortable {
+  cursor: pointer;
+}
+
+.ekasa th.sortable::after {
+  content: "▲▼";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: transparent;
+  transition: color 0.2s;
+}
+
+.ekasa th.sortable:hover::after {
+  color: var(--gold-dark);
+}
+
+.ekasa th.sorted-asc::after {
+  content: "▲";
+  color: var(--gold-dark);
+}
+
+.ekasa th.sorted-desc::after {
+  content: "▼";
+  color: var(--gold-dark);
+}
+
+.ekasa tbody tr:nth-child(odd) {
+  background: #f7f7f8;
+}
+
+.ekasa tbody tr:nth-child(even) {
+  background: #ffffff;
+}
+
+.ekasa tbody tr:hover {
+  background: #f1f1f2;
+}
+
+.ekasa select.category {
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  background: var(--white);
+  padding: 5px 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+}
+
+.ekasa .pinned::before {
+  content: "📌 ";
+}
+
+.ekasa .amount {
+  text-align: right;
+}
+
+.ekasa .import-boxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.ekasa .import-card {
+  border: 2px dashed #e4d5a3;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  transition: background 0.3s ease;
+  background-color: white;
+}
+
+.ekasa .import-card:hover {
+  background: #fffaf0;
+}
+
+.ekasa .import-card strong {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.ekasa .import-card button {
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ekasa .import-card button:hover {
+  background: #b08c2a;
+}
+
+.ekasa .panel {
+  padding-top: 20px;
+}
