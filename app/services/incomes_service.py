@@ -13,9 +13,10 @@ def get_all_incomes():
         result.append({
             "id": str(inc.id),
             "user_id": str(inc.user_id),
+            # "description": str(inc.description) if inc.amount is not None else None,
             "amount": float(inc.amount) if inc.amount is not None else None,
             "income_date": inc.income_date.isoformat() if inc.income_date else None,
-            "source": inc.source,
+            "organization_id": str(inc.organization_id) if inc.organization_id else None,
             "extra_metadata": inc.extra_metadata
         })
 
@@ -38,7 +39,7 @@ def create_income(data: dict):
             user_id=user_id,
             amount=Decimal(str(data.get("amount", 0))),
             income_date=date.fromisoformat(data["income_date"]) if data.get("income_date") else None,
-            source=data.get("source"),
+            organization_id=data.get("organization_id"),
             extra_metadata=data.get("extra_metadata")
         )
 
@@ -62,7 +63,7 @@ def get_income_by_id(income_id: uuid.UUID):
         "user_id": str(income.user_id),
         "amount": float(income.amount) if income.amount is not None else None,
         "income_date": income.income_date.isoformat() if income.income_date else None,
-        "source": income.source,
+        "organization_id": income.organization_id,
         "extra_metadata": income.extra_metadata
     }, 200
 
@@ -77,8 +78,8 @@ def update_income(income_id: uuid.UUID, data: dict):
             income.amount = Decimal(str(data["amount"]))
         if "income_date" in data:
             income.income_date = date.fromisoformat(data["income_date"])
-        if "source" in data:
-            income.source = data["source"]
+        if "organization_id" in data:
+            income.organization_id = data["organization_id"]
         if "extra_metadata" in data:
             income.extra_metadata = data["extra_metadata"]
 
