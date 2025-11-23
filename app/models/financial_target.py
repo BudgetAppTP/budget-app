@@ -76,7 +76,8 @@ class FinancialTarget(Base):
         nullable=False
     )
     deadline_date: Mapped[date | None] = mapped_column(
-        Date,nullable=True
+        Date,
+        nullable=True
     )
     is_completed: Mapped[bool] = mapped_column(
         Boolean,

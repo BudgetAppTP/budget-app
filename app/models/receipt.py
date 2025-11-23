@@ -105,4 +105,3 @@ class Receipt(Base):
 
     def __repr__(self) -> str:
         return f"<Receipt organization_id={self.organization_id} total_amount={self.total_amount} user_id={self.user_id}>"
-
