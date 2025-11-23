@@ -29,7 +29,7 @@ from app.models import (
     User,
 )
 from app.models.base import Base
-from app.models.organization import OrganizationType
+from app.utils.types import OrganizationType
 
 
 def check_environment():

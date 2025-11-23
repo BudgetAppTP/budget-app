@@ -8,6 +8,7 @@ import pytest
 
 from app import create_app
 from app.extensions import db
+from scripts.seed import main as seed_main
 
 
 @pytest.fixture
@@ -25,6 +26,7 @@ def client(app):
     """Create a test client for the application."""
     return app.test_client()
 
+
 def assert_json_ok(resp):
     assert resp.status_code == 200
     assert resp.is_json
@@ -33,10 +35,12 @@ def assert_json_ok(resp):
     assert "error" in body and body["error"] is None
     return body["data"]
 
+
 def test_health_ok(client):
     r = client.get("/api/health")
     data = assert_json_ok(r)
     assert data.get("status") == "ok"
+
 
 def test_transactions_list_ok(client):
     r = client.get("/api/transactions")
@@ -45,6 +49,7 @@ def test_transactions_list_ok(client):
     assert "count" in data
     assert isinstance(data["items"], list)
 
+
 def test_budgets_get_ok(client):
     r = client.get("/api/budgets?month=2025-10")
     data = assert_json_ok(r)
@@ -52,11 +57,13 @@ def test_budgets_get_ok(client):
     assert "items" in data
     assert "left" in data
 
+
 def test_goals_list_ok(client):
     r = client.get("/api/goals")
     data = assert_json_ok(r)
     assert "items" in data
     assert "count" in data
+
 
 def test_dashboard_ok(client):
     r = client.get("/api/dashboard?month=2025-10")
@@ -65,6 +72,7 @@ def test_dashboard_ok(client):
     for k in ["total_exp", "total_inc", "sections", "cats_exp", "months", "series_inc", "series_exp"]:
         assert k in data
 
+
 def test_import_qr_preview_ok(client):
     payload = {"payload": [{"OPD": "sample", "date": "2025-10-10", "item": "Mlieko", "qnt": "1", "price": "1.20"}]}
     r = client.post("/api/import-qr/preview", json=payload)
@@ -72,6 +80,7 @@ def test_import_qr_preview_ok(client):
     assert "items" in data
     assert "count" in data
     assert data["count"] == len(data["items"])
+
 
 def test_auth_flow_ok(client):
     reg = client.post("/api/auth/register", json={"email": "u@test.local", "password": "pass"})
@@ -85,6 +94,7 @@ def test_auth_flow_ok(client):
     logout = client.post("/api/auth/logout")
     assert_json_ok(logout)
 
+
 @pytest.mark.parametrize("path", [
     "/api/export/csv?month=2025-10",
     "/api/export/pdf?month=2025-10",
@@ -93,6 +103,7 @@ def test_export_ok(client, path):
     r = client.get(path)
     assert r.status_code == 200
     assert len(r.data) > 0
+
 
 def test_app_creates_successfully(app):
     """Test that the application factory creates an app instance."""
@@ -112,6 +123,15 @@ def test_database_tables_created(app):
         inspector = db.inspect(db.engine)
         tables = inspector.get_table_names()
         assert len(tables) > 0
+
+
+def test_database_seeder_compatibility():
+    """Ensure the database seeder matches the current schema.
+
+    This test fails when the schema changes without a corresponding update to
+    the seeder, signaling that the seeding logic must be revised.
+    """
+    seed_main()
 
 
 def test_app_context_works(app):
