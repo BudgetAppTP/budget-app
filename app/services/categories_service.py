@@ -14,7 +14,8 @@ def get_all_categories():
             "user_id": str(category.user_id),
             "parent_id": str(category.parent_id) if category.parent_id is not None else None,
             "name": category.name,
-            "created_at": category.created_at.isoformat() if category.created_at else None
+            "created_at": category.created_at.isoformat() if category.created_at else None,
+            "count": str(category.count)
         })
 
     return {

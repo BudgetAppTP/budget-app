@@ -12,7 +12,7 @@ def get_all_receipts():
         result.append({
             "id": str(r.id),
             "external_uid": r.external_uid,
-            "merchant": r.merchant,
+            "organization_id": r.organization_id,
             "issue_date": r.issue_date.isoformat() if r.issue_date else None,
             "currency": r.currency,
             "total_amount": float(r.total_amount) if r.total_amount is not None else None,
@@ -31,7 +31,7 @@ def create_receipt(data):
 
         receipt = Receipt(
             user_id=user_id,
-            merchant=data.get("merchant"),
+            organization_id=data.get("organization_id"),
             issue_date=date.fromisoformat(data["issue_date"]) if data.get("issue_date") else None,
             currency=data.get("currency", "EUR"),
             total_amount=data.get("total_amount") or 0.0,
@@ -57,7 +57,7 @@ def get_receipt_by_id(receipt_id: uuid.UUID):
     return {
         "id": str(receipt.id),
         "external_uid": receipt.external_uid,
-        "merchant": receipt.merchant,
+        "organization_id": receipt.organization_id,
         "issue_date": receipt.issue_date.isoformat() if receipt.issue_date else None,
         "currency": receipt.currency,
         "total_amount": float(receipt.total_amount) if receipt.total_amount is not None else None,
@@ -73,8 +73,8 @@ def update_receipt(receipt_id: uuid.UUID, data: dict):
         if not receipt:
             return {"error": "Receipt not found"}, 404
 
-        if "merchant" in data:
-            receipt.merchant = data["merchant"]
+        if "organization_id" in data:
+            receipt.organization_id = data["organization_id"]
         if "issue_date" in data:
             receipt.issue_date = date.fromisoformat(data["issue_date"])
         if "currency" in data:
