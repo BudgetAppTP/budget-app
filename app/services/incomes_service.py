@@ -10,9 +10,13 @@ def get_all_incomes():
     incomes = db.session.query(Income).all()
     result = []
     for inc in incomes:
+        # Flatten the Income model into a serializable dict.  Include the
+        # optional organization_id and source fields to fully capture where
+        # income originates.
         result.append({
             "id": str(inc.id),
             "user_id": str(inc.user_id),
+            "organization_id": str(inc.organization_id) if inc.organization_id else None,
             "amount": float(inc.amount) if inc.amount is not None else None,
             "income_date": inc.income_date.isoformat() if inc.income_date else None,
             "source": inc.source,
@@ -34,8 +38,15 @@ def create_income(data: dict):
         if isinstance(user_id, str):
             user_id = uuid.UUID(user_id)
 
+        # Convert organization_id from string to UUID if necessary
+        organization_id = data.get("organization_id")
+        if isinstance(organization_id, str):
+            organization_id = uuid.UUID(organization_id)
+
         income = Income(
             user_id=user_id,
+            # Optional organization reference
+            organization_id=organization_id,
             amount=Decimal(str(data.get("amount", 0))),
             income_date=date.fromisoformat(data["income_date"]) if data.get("income_date") else None,
             source=data.get("source"),
@@ -77,6 +88,14 @@ def update_income(income_id: uuid.UUID, data: dict):
             income.amount = Decimal(str(data["amount"]))
         if "income_date" in data:
             income.income_date = date.fromisoformat(data["income_date"])
+        if "organization_id" in data:
+            org_id = data["organization_id"]
+            if isinstance(org_id, str):
+                try:
+                    org_id = uuid.UUID(org_id)
+                except Exception:
+                    org_id = None
+            income.organization_id = org_id
         if "source" in data:
             income.source = data["source"]
         if "extra_metadata" in data:

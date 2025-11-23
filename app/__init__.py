@@ -43,9 +43,10 @@ def create_app(config_object=None):
             app.models.Base.metadata.create_all(bind=db.engine)
 
     _register_error_handlers(flask_app)
-    _register_swagger(flask_app)
     _register_api(flask_app)
+    _register_swagger(flask_app)
     _register_legacy_guard(flask_app)
+
 
     return flask_app
 
@@ -67,6 +68,27 @@ def _register_api(flask_app: Flask):
 
 
 def _register_swagger(flask_app: Flask):
+    # Regenerate the Swagger/OpenAPI specification before serving it.
+    # Prefer Marshmallow/Apspec-based generation for endpoints with
+    # defined schemas.  Fall back to the docstring parser on failure.
+    try:
+        from pathlib import Path
+        # Attempt to build the spec via the Marshmallow/Apispec builder.
+        from app.utils.api_spec_builder import write_spec as _write_spec
+        static_json_path = Path(flask_app.root_path) / "static" / "swagger.json"
+        _write_spec(flask_app, str(static_json_path))
+    except Exception as e:
+        # If the advanced generation fails, log and fall back to docstring-based generation.
+        flask_app.logger.warning(f"Failed to generate OpenAPI spec via api_spec_builder: {e}")
+        try:
+            from pathlib import Path
+            from app.utils.swagger_auto import write_swagger_json
+            write_swagger_json(flask_app, str(Path(flask_app.root_path) / "static" / "swagger.json"))
+        except Exception as e2:
+            flask_app.logger.warning(f"Failed to regenerate swagger.json using swagger_auto: {e2}")
+
+    # Register Swagger UI blueprint.  It will serve the generated swagger.json
+    # file via the configured API_URL (/static/swagger.json).
     swaggerui_bp = get_swaggerui_blueprint(
         flask_app.config["SWAGGER_URL"],
         flask_app.config["API_URL"],

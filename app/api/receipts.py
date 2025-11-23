@@ -14,6 +14,8 @@ Notes:
 """
 
 from flask import request
+from marshmallow import ValidationError
+from app.schemas import ReceiptCreateSchema, ReceiptUpdateSchema
 from app.api import bp, make_response
 from app.services import receipts_service
 
@@ -60,10 +62,15 @@ def api_receipts_create():
         data: null
         error: {"code":"bad_request","message":"Missing JSON body"}
     """
-    payload = request.get_json() or {}
+    payload = request.get_json(force=True) or {}
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = receipts_service.create_receipt(payload)
+    try:
+        data = ReceiptCreateSchema().load(payload)
+    except ValidationError as err:
+        message = "; ".join([f"{k}: {', '.join(map(str, v))}" for k, v in err.messages.items()])
+        return make_response(None, {"code": "bad_request", "message": message}, 400)
+    response, status = receipts_service.create_receipt(data)
     return make_response(response, None, status)
 
 
@@ -111,7 +118,12 @@ def api_receipts_update(receipt_id):
     payload = request.get_json() or {}
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = receipts_service.update_receipt(receipt_id, payload)
+    try:
+        data = ReceiptUpdateSchema().load(payload)
+    except ValidationError as err:
+        message = "; ".join([f"{k}: {', '.join(map(str, v))}" for k, v in err.messages.items()])
+        return make_response(None, {"code": "bad_request", "message": message}, 400)
+    response, status = receipts_service.update_receipt(receipt_id, data)
     return make_response(response, None, status)
 
 

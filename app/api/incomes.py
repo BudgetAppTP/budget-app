@@ -16,6 +16,8 @@ Actual API returns the same payload in "data" field:
 """
 
 from flask import request
+from marshmallow import ValidationError
+from app.schemas import IncomeCreateSchema, IncomeUpdateSchema
 from app.api import bp, make_response
 from app.services import incomes_service
 
@@ -81,8 +83,16 @@ def api_incomes_create():
         data: null
         error: {"code":"bad_request","message":"Invalid input data"}
     """
+    # Validate the incoming JSON payload using the schema.  On validation
+    # error return a 400 with details.
     payload = request.get_json(force=True) or {}
-    response, status = incomes_service.create_income(payload)
+    try:
+        data = IncomeCreateSchema().load(payload)
+    except ValidationError as err:
+        # Flatten error messages into a single string for the response.
+        message = "; ".join([f"{k}: {', '.join(map(str, v))}" for k, v in err.messages.items()])
+        return make_response(None, {"code": "bad_request", "message": message}, 400)
+    response, status = incomes_service.create_income(data)
     return make_response(response, None, status)
 
 
@@ -142,10 +152,16 @@ def api_incomes_update(income_id):
         data: null
         error: {"code":"not_found","message":"Income not found"}
     """
+    # Use schema to validate update payload; all fields are optional.
     payload = request.get_json() or {}
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = incomes_service.update_income(income_id, payload)
+    try:
+        data = IncomeUpdateSchema().load(payload)
+    except ValidationError as err:
+        message = "; ".join([f"{k}: {', '.join(map(str, v))}" for k, v in err.messages.items()])
+        return make_response(None, {"code": "bad_request", "message": message}, 400)
+    response, status = incomes_service.update_income(income_id, data)
     return make_response(response, None, status)
 
 
