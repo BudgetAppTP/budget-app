@@ -585,5 +585,138 @@
         }
       }
     }
+    ,
+    "/api/categories": {
+      "get": {
+        "summary": "Získanie zoznamu kategórií",
+        "description": "Vráti všetky kategórie zoradené tak, že pripnuté kategórie (is_pinned=true) sú prvé a v rámci oboch skupín sú triedené podľa poľa count zostupne.",
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané kategórie",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "categories": [
+                    {
+                      "id": "e2f1c9a3-1234-4f4c-9bcd-7890abcd1234",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "parent_id": null,
+                      "name": "Potraviny",
+                      "count": 12,
+                      "is_pinned": true,
+                      "created_at": "2025-10-27T19:00:00Z"
+                    },
+                    {
+                      "id": "a1b2c3d4-5678-4abc-9def-0123456789ab",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "parent_id": null,
+                      "name": "Oblečenie",
+                      "count": 5,
+                      "is_pinned": false,
+                      "created_at": "2025-10-20T12:00:00Z"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Vytvorenie novej kategórie",
+        "description": "Pridá novú kategóriu. Ak sa nepošle is_pinned, predvolená hodnota je false.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                "parent_id": null,
+                "name": "Cestovanie",
+                "is_pinned": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kategória vytvorená",
+            "content": {
+              "application/json": {
+                "example": { "id": "e2f1c9a3-1234-4f4c-9bcd-7890abcd1234", "message": "Category created successfully" }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné dáta v požiadavke",
+            "content": { "application/json": { "example": { "error": "Invalid input data" } } }
+          }
+        }
+      }
+    },
+    "/api/categories/{category_id}": {
+      "put": {
+        "summary": "Aktualizácia kategórie",
+        "description": "Upraví názov kategórie, príznak is_pinned a prípadne počet count.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID kategórie"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "name": "Oblečenie a obuv",
+                "is_pinned": true,
+                "count": 7
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kategória aktualizovaná",
+            "content": { "application/json": { "example": { "message": "Category updated successfully" } } }
+          },
+          "400": {
+            "description": "Neplatné alebo chýbajúce dáta",
+            "content": { "application/json": { "example": { "error": "Missing JSON body" } } }
+          },
+          "404": {
+            "description": "Kategória nebola nájdená",
+            "content": { "application/json": { "example": { "error": "Category not found" } } }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Odstránenie kategórie",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID kategórie"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kategória odstránená",
+            "content": { "application/json": { "example": { "message": "Category deleted successfully" } } }
+          },
+          "404": {
+            "description": "Kategória nebola nájdená",
+            "content": { "application/json": { "example": { "error": "Category not found" } } }
+          }
+        }
+      }
+    }
   }
 }
