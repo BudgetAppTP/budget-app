@@ -62,13 +62,14 @@ def create_category():
         data: null
         error: {"code":"bad_request","message":"Invalid input data"}
     """
-    data = request.get_json(force=True)
-    response, status = categories_service.create_category(data)
+    # Accept JSON body (force=True allows clients that forget the Content-Type header)
+    payload = request.get_json(force=True) or {}
+    response, status = categories_service.create_category(payload)
     return make_response(response, None, status)
 
 
 @bp.put("/categories/<uuid:category_id>", strict_slashes=False)
-def update_income(category_id):
+def update_category(category_id):
     """
     PUT /api/categories/{category_id}
     Summary: Update category
@@ -78,7 +79,9 @@ def update_income(category_id):
 
     Request (JSON example):
       {
-        "name": "Updated name"
+        "name": "Updated name",
+        "is_pinned": true,
+        "count": 3
       }
 
     Responses:
@@ -92,11 +95,12 @@ def update_income(category_id):
         data: null
         error: {"code":"not_found","message":"Category not found"}
     """
-    data = request.get_json()
-    if not data:
+    # Force JSON parsing so Postman/clients without Content-Type still work
+    payload = request.get_json(force=True) or {}
+    if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
 
-    response, status = categories_service.update_income(category_id, data)
+    response, status = categories_service.update_category(category_id, payload)
     return make_response(response, None, status)
 
 

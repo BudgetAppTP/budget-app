@@ -6,7 +6,12 @@ from app.extensions import db
 from app.models import Category
 
 def get_all_categories():
-    categories = db.session.query(Category).all()
+    # Order pinned categories first, then unpinned; within each group sort by usage count (highest first)
+    categories = (
+        db.session.query(Category)
+        .order_by(Category.is_pinned.desc(), Category.count.desc())
+        .all()
+    )
     result = []
     for category in categories:
         result.append({
@@ -15,7 +20,8 @@ def get_all_categories():
             "parent_id": str(category.parent_id) if category.parent_id is not None else None,
             "name": category.name,
             "created_at": category.created_at.isoformat() if category.created_at else None,
-            "count": str(category.count)
+            "count": str(category.count),
+            "is_pinned": str(category.is_pinned)
         })
 
     return {
@@ -49,13 +55,17 @@ def create_category(data: dict):
         db.session.rollback()
         return {"error": str(e)}, 400
     
-def update_income(category_id: uuid.UUID, data: dict):
+def update_category(category_id: uuid.UUID, data: dict):
     try:
         category = db.session.get(Category, category_id)
         if not category:
             return {"error": "Category not found"}, 404
         if "name" in data:
             category.name = data["name"]
+        if "is_pinned" in data:
+            category.is_pinned = data["is_pinned"]
+        if "count" in data:
+            category.count = int(data["count"])
         db.session.commit()
         return {"message": "Category updated successfully"}, 200
     except Exception as e:
