@@ -1,33 +1,121 @@
-from . import bp
-from flask import jsonify, request
-from app.api import bp, make_response
+"""
+Categories API
 
+Paths (Swagger-aligned):
+  - GET    /api/categories/      (list)   [strict_slashes=False]
+  - POST   /api/categories/      (create)
+  - PUT    /api/categories/{id}  (update)
+  - DELETE /api/categories/{id}  (delete)
+
+Swagger examples show raw JSON objects like:
+  { "success": true, "categories": [...] }
+
+Actual API returns the same payload in "data" field:
+  { "data": { "success": true, "categories": [...] }, "error": null }
+"""
+
+from flask import request
+
+from app.api import bp, make_response
 from app.services import categories_service
-# GET /api/categories → list all categories
+
+
 @bp.get("/categories", strict_slashes=False)
 def api_categories_list():
+    """
+    GET /api/categories/
+    Summary: List categories
+
+    Responses:
+      200:
+        data:
+          {
+            "success": true,
+            "categories": [
+              {"id": "...", "user_id": "...", "parent_id": "...|null", "name": "str", "created_at": "ISO8601|null"}
+            ]
+          }
+        error: null
+    """
     data, status = categories_service.get_all_categories()
     return make_response(data, None, status)
 
-# POST /api/categories → create a new category
+
 @bp.post("/categories", strict_slashes=False)
 def create_category():
+    """
+    POST /api/categories/
+    Summary: Create category
+
+    Request (JSON example):
+      {
+        "user_id": "<uuid>",
+        "parent_id": "<uuid|null>",
+        "name": "Groceries"
+      }
+
+    Responses:
+      201:
+        data: {"id": "...", "message": "Category created successfully"}
+        error: null
+      400:
+        data: null
+        error: {"code":"bad_request","message":"Invalid input data"}
+    """
     data = request.get_json(force=True)
     response, status = categories_service.create_category(data)
     return make_response(response, None, status)
 
-# PUT /api/categories/<id> → update a specific category
+
 @bp.put("/categories/<uuid:category_id>", strict_slashes=False)
 def update_income(category_id):
+    """
+    PUT /api/categories/{category_id}
+    Summary: Update category
+
+    Path:
+      category_id: uuid
+
+    Request (JSON example):
+      {
+        "name": "Updated name"
+      }
+
+    Responses:
+      200:
+        data: {"message": "Category updated successfully"}
+        error: null
+      400:
+        data: null
+        error: {"code":"bad_request","message":"Missing JSON body"}
+      404:
+        data: null
+        error: {"code":"not_found","message":"Category not found"}
+    """
     data = request.get_json()
     if not data:
-        return make_response(None,{"code": "bad_request", "message": "Missing JSON body"},400)
+        return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
 
     response, status = categories_service.update_income(category_id, data)
     return make_response(response, None, status)
 
-# DELETE /api/categories/<id> → delete a specific category
+
 @bp.delete("/categories/<uuid:category_id>", strict_slashes=False)
 def delete_category(category_id):
-     response,status =  categories_service.delete_category(category_id)
-     return make_response(response, None, status)
+    """
+    DELETE /api/categories/{category_id}
+    Summary: Delete category
+
+    Path:
+      category_id: uuid
+
+    Responses:
+      200:
+        data: {"message": "Category deleted successfully"}
+        error: null
+      404:
+        data: null
+        error: {"code":"not_found","message":"Category not found"}
+    """
+    response, status = categories_service.delete_category(category_id)
+    return make_response(response, None, status)
