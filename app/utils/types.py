@@ -33,16 +33,14 @@ class JSONType(TypeDecorator):
 
 
 @enum.unique
-class OrganizationType(str, enum.Enum):
-    """ Enum representing the types of organizations in the system.
+class TagType(str, enum.Enum):
+    """ Enum representing the types of tags in the system.
 
     Attributes:
-        NONE: Undefined or not yet assigned organization type.
-        MERCHANT: Organization that provides goods or services (receipts).
-        INCOME_SOURCE: Organization that provides income (salary, payments).
-        BOTH: Organization that serves as both merchant and income source.
+        INCOME: (salary, payments).
+        EXPENSE:  (receipts).
+        BOTH: Tag can be used for both income and expenses.
     """
-    NONE = "none"
-    MERCHANT = "merchant"
-    INCOME_SOURCE = "income_source"
+    INCOME = "income"
+    EXPENSE = "expense"
     BOTH = "both"

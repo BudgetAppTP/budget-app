@@ -14,7 +14,7 @@ from app.utils.types import JSONType
 
 if TYPE_CHECKING:
     from .user import User
-    from .organization import Organization
+    from .tag import Tag
 
 
 class Income(Base):
@@ -23,7 +23,7 @@ class Income(Base):
     Attributes:
         id (uuid.UUID): Unique identifier for the income record.
         user_id (uuid.UUID): Foreign key referencing the user who owns this income.
-        organization_id (uuid.UUID | None): Optional foreign key referencing the organization (income source).
+        tag_id (uuid.UUID | None): Optional foreign key referencing the tag (income type).
         amount (Decimal): The amount of income received.
         income_date (date): The date the income was received.
         extra_metadata (dict | None): Optional JSON field containing additional metadata.
@@ -31,8 +31,8 @@ class Income(Base):
     Relationships:
         user (User): Many-to-One relationship.
             The user associated with this income record. Each user can have multiple income entries.
-        organization (Organization | None): Many-to-One relationship.
-            Optional organization associated with this income record.
+        tag (Tag | None): Many-to-One relationship.
+            Optional tag associated with this income record.
     """
     __tablename__ = 'incomes'
 
@@ -47,9 +47,9 @@ class Income(Base):
         nullable=False,
         index=True
     )
-    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+    tag_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey('organizations.id'),
+        ForeignKey('tags.id'),
         nullable=True,
         index=True
     )
@@ -61,9 +61,9 @@ class Income(Base):
     """ Relationships """
     user: Mapped["User"] = relationship("User", back_populates="incomes")
 
-    organization: Mapped["Organization | None"] = relationship(
-        "Organization", back_populates="incomes"
+    tag: Mapped["Tag | None"] = relationship(
+        "Tag", back_populates="incomes"
     )
 
     def __repr__(self) -> str:
-        return f"<Income {self.amount} user_id={self.user_id} organization_id={self.organization_id}>"
+        return f"<Income {self.amount} user_id={self.user_id} tag_id={self.tag_id}>"

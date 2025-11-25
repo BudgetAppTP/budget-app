@@ -2,9 +2,9 @@ from .base import Base
 from .category import Category
 from .financial_target import FinancialTarget
 from .income import Income
-from .organization import Organization
 from .receipt import Receipt
 from .receipt_item import ReceiptItem
+from .tag import Tag
 from .user import User
 
 __all__ = [
@@ -12,8 +12,8 @@ __all__ = [
     "Category",
     "FinancialTarget",
     "Income",
-    "Organization",
     "Receipt",
     "ReceiptItem",
+    "Tag",
     "User",
 ]

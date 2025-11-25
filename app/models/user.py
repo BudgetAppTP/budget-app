@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from .financial_target import FinancialTarget
     from .category import Category
     from .receipt_item import ReceiptItem
+    from .tag import Tag
 
 
 class User(Base):
@@ -42,6 +43,9 @@ class User(Base):
 
         receipt_items (list[ReceiptItem]): One-to-Many relationship (cascade delete).
             All receipt items belonging to this user.
+
+        tags (list[Tag]): One-to-Many relationship (cascade delete).
+            All tags created by this user for categorizing transactions.
     """
     __tablename__ = 'users'
 
@@ -88,6 +92,10 @@ class User(Base):
 
     receipt_items: Mapped[list["ReceiptItem"]] = relationship(
         "ReceiptItem", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    tags: Mapped[list["Tag"]] = relationship(
+        "Tag", back_populates="user", cascade="all, delete-orphan"
     )
 
     def __repr__(self):
