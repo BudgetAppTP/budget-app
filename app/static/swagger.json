@@ -1,415 +1,43 @@
 {
-  "openapi": "3.0.0",
-  "info": {
-    "title": "API Dokumentácia – Príjmy a Výdavky",
-    "version": "1.0.0",
-    "description": "Rozhranie pre prácu s príjmami (Incomes) a výdavkami (Receipts & Receipt Items)."
-  },
-  "servers": [
-    { "url": "/" }
-  ],
   "paths": {
-    "/api/users": {
+    "/api/incomes": {
       "get": {
-        "summary": "Získanie zoznamu používateľov",
-        "responses": {
-          "200": {
-            "description": "Úspešne načítaní používatelia",
-            "content": {
-              "application/json": {
-                "example": [
-                  {
-                    "id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
-                    "username": "anton",
-                    "email": "anton@example.com",
-                    "created_at": "2025-10-27T15:30:00Z"
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Vytvorenie nového používateľa",
-        "description": "Vytvorí nového používateľa systému.\n\n**Povinné polia:** `username`, `email`, `password_hash`\n\n**Nepovinné polia:** žiadne (všetky ostatné sú generované automaticky – `id`, `created_at`).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "example": {
-                "username": "anton",
-                "email": "anton@example.com",
-                "password_hash": "pbkdf2:sha256:260000$..."
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Používateľ úspešne vytvorený",
-            "content": {
-              "application/json": {
-                "example": {
-                  "id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
-                  "message": "User created successfully"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Neplatné dáta – chýbajú povinné polia",
-            "content": {
-              "application/json": {
-                "example": { "error": "Missing required fields" }
-              }
-            }
-          }
-        }
-      }
-    },
-
-    "/api/receipts": {
-      "get": {
-        "summary": "Získanie zoznamu všetkých účteniek",
-        "responses": {
-          "200": {
-            "description": "Úspešne načítané účtenky",
-            "content": {
-              "application/json": {
-                "example": [
-                  {
-                    "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
-                    "external_uid": "INV-2025-00012",
-                    "merchant": "Lidl - potraviny",
-                    "issue_date": "2025-10-27",
-                    "currency": "EUR",
-                    "total_amount": 45.20,
-                    "extra_metadata": { "payment_method": "card", "vat": 7.5 },
-                    "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
-                    "created_at": "2025-10-27T19:00:00Z"
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Vytvorenie novej účtenky",
-        "description": "Vytvorí novú účtenku (receipt) priradenú k existujúcemu používateľovi.\n\n**Povinné polia:** `user_id`, `merchant`, `issue_date`, `total_amount`\n\n**Nepovinné polia:** `currency` (predvolené `EUR`), `external_uid`, `extra_metadata` (Ľubovoľné JSON údaje, napr. DPH, spôsob platby).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "example": {
-                "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
-                "merchant": "Lidl - potraviny",
-                "issue_date": "2025-10-27",
-                "currency": "EUR",
-                "total_amount": 45.20,
-                "external_uid": "INV-2025-00012",
-                "extra_metadata": {
-                  "payment_method": "card",
-                  "vat": 7.5,
-                  "cashier": "Marek",
-                  "location": "Bratislava"
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Úspešne vytvorená účtenka",
-            "content": {
-              "application/json": {
-                "example": {
-                  "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
-                  "message": "Receipt created successfully"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Chybná požiadavka – chýbajú povinné polia alebo zlé formáty dát",
-            "content": {
-              "application/json": {
-                "example": { "error": "Missing required fields" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/receipts/{receipt_id}": {
-      "get": {
-        "summary": "Získanie detailu účtenky podľa ID",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "receipt_id",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" },
-            "description": "UUID účtenky"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Úspešne načítaná účtenka",
-            "content": {
-              "application/json": {
-                "example": {
-                  "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
-                  "external_uid": "INV-2025-00012",
-                  "merchant": "Lidl - potraviny",
-                  "issue_date": "2025-10-27",
-                  "currency": "EUR",
-                  "total_amount": 45.20,
-                  "extra_metadata": { "payment_method": "card", "vat": 7.5 },
-                  "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
-                  "created_at": "2025-10-27T19:00:00Z"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Účtenka nebola nájdená",
-            "content": {
-              "application/json": { "example": { "error": "Receipt not found" } }
-            }
-          }
-        }
-      },
-      "put": {
-        "summary": "Aktualizácia existujúcej účtenky",
-        "description": "Aktualizuje záznam účtenky podľa ID.\n\n**Nepovinné polia:** `merchant`, `issue_date`, `currency`, `total_amount`, `external_uid`, `extra_metadata`.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "receipt_id",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "example": {
-                "merchant": "Tesco - týždenný nákup",
-                "issue_date": "2025-10-29",
-                "currency": "EUR",
-                "total_amount": 60.50,
-                "extra_metadata": {
-                  "payment_method": "cash",
-                  "vat": 9.5,
-                  "cashier": "Mária"
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Úspešne aktualizovaná účtenka",
-            "content": {
-              "application/json": {
-                "example": {
-                  "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
-                  "message": "Receipt updated successfully"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Neplatné dáta alebo formát dátumu",
-            "content": {
-              "application/json": {
-                "example": { "error": "Invalid date format" }
-              }
-            }
-          },
-          "404": {
-            "description": "Účtenka nebola nájdená",
-            "content": {
-              "application/json": { "example": { "error": "Receipt not found" } }
-            }
-          }
-        }
-      },
-      "delete": {
-        "summary": "Odstránenie účtenky podľa ID",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "receipt_id",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Účtenka bola úspešne odstránená",
-            "content": {
-              "application/json": {
-                "example": { "message": "Receipt deleted successfully" }
-              }
-            }
-          },
-          "404": {
-            "description": "Účtenka nebola nájdená",
-            "content": {
-              "application/json": { "example": { "error": "Receipt not found" } }
-            }
-          }
-        }
-      }
-    },
-    "/api/receipts/{receipt_id}/items": {
-      "get": {
-        "summary": "Získanie všetkých položiek účtenky",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "receipt_id",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" },
-            "description": "UUID účtenky"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Úspešne načítané položky",
-            "content": {
-              "application/json": {
-                "example": [
-                  {
-                    "id": "dfcd4441-8a3a-4d62-bac9-2eb7a6dbb2e9",
-                    "name": "Mlieko",
-                    "quantity": 2,
-                    "unit_price": 1.2,
-                    "total_price": 2.4
-                  }
-                ]
-              }
-            }
-          },
-          "404": {
-            "description": "Účtenka nebola nájdená",
-            "content": {
-              "application/json": { "example": { "error": "Receipt not found" } }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Vytvorenie položky pre účtenku",
-        "description": "**Povinné polia:** `name`, `quantity`, `unit_price`.\n\n**Nepovinné:** `category_id`, `extra_metadata`.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "receipt_id",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "example": {
-                "category_id": "a3f84b9a-42cc-4ef9-9f1d-84e7e3e2d56d",
-                "name": "Banány",
-                "quantity": 3,
-                "unit_price": 0.9,
-                "extra_metadata": { "discount": 0.1 }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Položka úspešne pridaná",
-            "content": {
-              "application/json": {
-                "example": { "item_id": "7a05d2e9-2b9f-4f26-bb3b-6b0b6a6d2f98", "message": "Item created successfully" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/receipts/{receipt_id}/items/{item_id}": {
-      "put": {
-        "summary": "Aktualizácia položky účtenky",
-        "parameters": [
-          { "in": "path", "name": "receipt_id", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "in": "path", "name": "item_id", "required": true, "schema": { "type": "string", "format": "uuid" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "example": {
-                "name": "Maslo",
-                "quantity": 1,
-                "unit_price": 2.3,
-                "extra_metadata": { "promo": true }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Úspešne aktualizované" },
-          "404": { "description": "Položka nebola nájdená" }
-        }
-      },
-      "delete": {
-        "summary": "Odstránenie položky účtenky",
-        "parameters": [
-          { "in": "path", "name": "receipt_id", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "in": "path", "name": "item_id", "required": true, "schema": { "type": "string", "format": "uuid" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Položka úspešne vymazaná",
-            "content": { "application/json": { "example": { "message": "Item deleted successfully" } } }
-          },
-          "404": { "description": "Položka nebola nájdená" }
-        }
-      }
-    },
-    "/api/incomes/": {
-      "get": {
-        "summary": "Získanie zoznamu všetkých príjmov",
-        "description": "Vráti zoznam všetkých príjmov vrátane celkovej sumy. Možno použiť voliteľné parametre na triedenie podľa dátumu alebo sumy.",
+        "summary": "List incomes with optional sorting",
         "parameters": [
           {
             "in": "query",
             "name": "sort",
-            "schema": { "type": "string", "enum": ["income_date", "amount"], "default": "income_date" },
-            "description": "Triedenie podľa poľa (income_date alebo amount)"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "income_date",
+                "amount"
+              ]
+            },
+            "required": false,
+            "description": "Field to sort by"
           },
           {
             "in": "query",
             "name": "order",
-            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" },
-            "description": "Poradie triedenia – vzostupne alebo zostupne"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "required": false,
+            "description": "Sort order"
           }
         ],
         "responses": {
           "200": {
-            "description": "Úspešne načítané",
+            "description": "Successful response",
             "content": {
               "application/json": {
-                "example": {
-                  "success": true,
-                  "incomes": [
-                    { "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9", "income_date": "2025-10-01", "description": "Výplata", "amount": 1200.00 },
-                    { "id": "d4c2f11e-89ab-4cbb-9e12-1f2d6f8e1b2a", "income_date": "2025-10-05", "description": "Darček od babky", "amount": 200.00 }
-                  ],
-                  "total_amount": 1400.00
+                "schema": {
+                  "$ref": "#/components/schemas/IncomesList"
                 }
               }
             }
@@ -417,172 +45,608 @@
         }
       },
       "post": {
-        "summary": "Vytvorenie nového príjmu",
-        "description": "Pridá nový záznam o príjme s dátumom, popisom a sumou.",
+        "summary": "Create a new income entry",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "example": {
-                "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
-                "income_date": "2025-10-15",
-                "description": "Freelance projekt",
-                "amount": 500.00
+              "schema": {
+                "$ref": "#/components/schemas/IncomeCreate"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Úspešne vytvorený príjem",
+            "description": "Income created",
             "content": {
               "application/json": {
-                "example": {
-                  "success": true,
-                  "income": {
-                    "id": "e7d4a5b2-3c1a-4d33-9182-0f3a9b1c2d4e",
-                    "income_date": "2025-10-15",
-                    "description": "Freelance projekt",
-                    "amount": 500.00
-                  }
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "message"
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Neplatné vstupné dáta",
-            "content": {
-              "application/json": {
-                "example": { "success": false, "error": "Invalid input data" }
-              }
-            }
+            "description": "Invalid input data"
           }
         }
       }
     },
     "/api/incomes/{income_id}": {
       "get": {
-        "summary": "Získanie detailu príjmu podľa ID",
+        "summary": "Get income by ID",
         "parameters": [
           {
             "in": "path",
             "name": "income_id",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" },
-            "description": "UUID príjmu"
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Income identifier"
           }
         ],
         "responses": {
           "200": {
-            "description": "Úspešne načítaný príjem",
+            "description": "Income found",
             "content": {
               "application/json": {
-                "example": {
-                  "success": true,
-                  "income": {
-                    "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
-                    "income_date": "2025-10-01",
-                    "description": "Výplata",
-                    "amount": 1200.00
-                  }
+                "schema": {
+                  "$ref": "#/components/schemas/Income"
                 }
               }
             }
           },
           "404": {
-            "description": "Príjem nebol nájdený",
-            "content": {
-              "application/json": {
-                "example": { "success": false, "error": "Income not found" }
-              }
-            }
+            "description": "Income not found"
           }
         }
       },
       "put": {
-        "summary": "Aktualizácia existujúceho príjmu",
+        "summary": "Update income by ID",
         "parameters": [
           {
             "in": "path",
             "name": "income_id",
             "required": true,
-            "schema": { "type": "string", "format": "uuid" },
-            "description": "UUID príjmu, ktorý sa má aktualizovať"
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Income identifier"
           }
         ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "example": {
-                "income_date": "2025-10-16",
-                "description": "Zmenený popis",
-                "amount": 600.00
+              "schema": {
+                "$ref": "#/components/schemas/IncomeUpdate"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Úspešne aktualizované",
+            "description": "Income updated",
             "content": {
               "application/json": {
-                "example": {
-                  "success": true,
-                  "income": {
-                    "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
-                    "income_date": "2025-10-16",
-                    "description": "Zmenený popis",
-                    "amount": 600.00
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Príjem nebol nájdený",
-            "content": {
-              "application/json": {
-                "example": { "success": false, "error": "Income not found" }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "summary": "Odstránenie existujúceho príjmu",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "income_id",
-            "required": true,
-            "schema": { "type": "string", "format": "uuid" },
-            "description": "UUID príjmu, ktorý sa má odstrániť"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Úspešne odstránené",
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": true,
-                  "incomes": [
-                    { "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9", "income_date": "2025-10-01", "description": "Výplata", "amount": 1200.00 }
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "message"
                   ]
                 }
               }
             }
           },
+          "400": {
+            "description": "Invalid input"
+          },
           "404": {
-            "description": "Príjem nebol nájdený",
+            "description": "Income not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete income by ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "income_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Income identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Income deleted"
+          },
+          "404": {
+            "description": "Income not found"
+          }
+        }
+      }
+    },
+    "/api/receipts": {
+      "get": {
+        "summary": "List receipts",
+        "responses": {
+          "200": {
+            "description": "Successful response",
             "content": {
               "application/json": {
-                "example": { "success": false, "error": "Income not found" }
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptsList"
+                }
               }
             }
           }
         }
+      },
+      "post": {
+        "summary": "Create a new receipt",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Receipt created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data"
+          }
+        }
+      }
+    },
+    "/api/receipts/{receipt_id}": {
+      "get": {
+        "summary": "Get receipt by ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Receipt identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Receipt found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Receipt"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Receipt not found"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update receipt by ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Receipt identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Receipt updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "404": {
+            "description": "Receipt not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete receipt by ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receipt_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Receipt identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Receipt deleted"
+          },
+          "404": {
+            "description": "Receipt not found"
+          }
+        }
+      }
+    }
+  },
+  "info": {
+    "title": "Budget API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "components": {
+    "schemas": {
+      "Income": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number"
+          },
+          "income_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "extra_metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true
+          }
+        },
+        "required": [
+          "amount",
+          "id",
+          "income_date",
+          "user_id"
+        ],
+        "additionalProperties": false
+      },
+      "IncomeCreate": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number"
+          },
+          "income_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "extra_metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true
+          }
+        },
+        "required": [
+          "amount",
+          "income_date",
+          "user_id"
+        ],
+        "additionalProperties": false
+      },
+      "IncomeUpdate": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "income_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "nullable": true
+          },
+          "extra_metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IncomesList": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "incomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Income"
+            }
+          },
+          "total_amount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "incomes",
+          "success",
+          "total_amount"
+        ],
+        "additionalProperties": false
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "merchant": {
+            "type": "string",
+            "nullable": true
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "total_amount": {
+            "type": "number"
+          },
+          "external_uid": {
+            "type": "string",
+            "nullable": true
+          },
+          "extra_metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "currency",
+          "id",
+          "issue_date",
+          "total_amount",
+          "user_id"
+        ],
+        "additionalProperties": false
+      },
+      "ReceiptCreate": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "merchant": {
+            "type": "string",
+            "nullable": true
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string",
+            "default": "EUR"
+          },
+          "total_amount": {
+            "type": "number"
+          },
+          "external_uid": {
+            "type": "string",
+            "nullable": true
+          },
+          "extra_metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true
+          }
+        },
+        "required": [
+          "issue_date",
+          "total_amount",
+          "user_id"
+        ],
+        "additionalProperties": false
+      },
+      "ReceiptUpdate": {
+        "type": "object",
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "merchant": {
+            "type": "string",
+            "nullable": true
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "total_amount": {
+            "type": "number"
+          },
+          "external_uid": {
+            "type": "string",
+            "nullable": true
+          },
+          "extra_metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReceiptsList": {
+        "type": "object",
+        "properties": {
+          "receipts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Receipt"
+            }
+          }
+        },
+        "required": [
+          "receipts"
+        ],
+        "additionalProperties": false
       }
     }
   }

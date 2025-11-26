@@ -5,7 +5,7 @@ from decimal import Decimal
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Date, Numeric
+from sqlalchemy import ForeignKey, Date, Numeric, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -57,6 +57,12 @@ class Income(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     income_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     extra_metadata: Mapped[dict | None] = mapped_column(JSONType(), nullable=True)
+
+    # Optional free‑text income source.  This allows describing where the income
+    # originated (e.g. employer name) without requiring a related Organization
+    # entry.  It aligns the API and service layer, which expect a `source`
+    # attribute on Income records.
+    source: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     """ Relationships """
     user: Mapped["User"] = relationship("User", back_populates="incomes")

@@ -67,6 +67,13 @@ class Receipt(Base):
         index=True
     )
 
+    # Optional merchant name for the receipt.  This free‑text field allows the
+    # API to store the seller name directly without always creating an
+    # Organization record.  Many endpoints and services expect a `merchant`
+    # attribute on Receipt instances; adding this column aligns the model with
+    # those expectations.
+    merchant: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     issue_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,

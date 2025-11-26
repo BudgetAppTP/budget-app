@@ -30,3 +30,6 @@ reportlab>=4.2
 pytest>=8.0
 flask_swagger_ui>=5.21.0
 flask_cors>=5.0.0
+marshmallow>=3.20.1,<4
+apispec>=6.4.0
+apispec-webframeworks>=0.5.2,<1
