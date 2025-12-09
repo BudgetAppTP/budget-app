@@ -23,13 +23,13 @@ from app.models import (
     Category,
     FinancialTarget,
     Income,
-    Organization,
     Receipt,
     ReceiptItem,
+    Tag,
     User,
 )
 from app.models.base import Base
-from app.utils.types import OrganizationType
+from app.utils.types import TagType
 
 
 def check_environment():
@@ -80,56 +80,34 @@ def seed_users():
     return users
 
 
-def seed_organizations():
-    orgs_data = [
-        {
-            "name": "Quantum Mart",
-            "type": OrganizationType.MERCHANT,
-            "address": "42 Entanglement Avenue, Neo City",
-            "website": "https://quantummart.fake",
-        },
-        {
-            "name": "Byte & Bean Café",
-            "type": OrganizationType.MERCHANT,
-            "address": "7 Cloud Loop, Neo City",
-            "website": "https://byteandbean.fake",
-        },
-        {
-            "name": "The Electric Bazaar",
-            "type": OrganizationType.MERCHANT,
-            "address": "99 Circuit Street, Neo City",
-            "website": "https://electricbazaar.fake",
-        },
-        {
-            "name": "Nebula Freelance Network",
-            "type": OrganizationType.INCOME_SOURCE,
-            "address": "Orbital Hub 3, Neo City",
-            "website": "https://nebulafreelance.fake",
-            "contact_info": "contact@nebulafreelance.fake",
-        },
-        {
-            "name": "NovaTech Solutions",
-            "type": OrganizationType.BOTH,
-            "address": "16 Quantum Plaza, Neo City",
-            "website": "https://novatech.fake",
-            "contact_info": "hr@novatech.fake",
-        },
-    ]
+def seed_tags(users):
+    expense_tags = ["Quantum Mart", "Byte & Bean Café", "The Electric Bazaar"]
+    income_tags = ["Nebula Freelance Network", "NovaTech Solutions"]
 
-    organizations = [
-        Organization(
-            name=data["name"],
-            type=data["type"],
-            address=data.get("address"),
-            website=data.get("website"),
-            contact_info=data.get("contact_info"),
-        )
-        for data in orgs_data
-    ]
+    tags = []
 
-    db.session.add_all(organizations)
+    for user in users:
+        for tag_name in expense_tags:
+            tag = Tag(
+                user_id=user.id,
+                name=tag_name,
+                type=None,
+                counter=0
+            )
+            tags.append(tag)
+
+        for tag_name in income_tags:
+            tag = Tag(
+                user_id=user.id,
+                name=tag_name,
+                type=None,
+                counter=0
+            )
+            tags.append(tag)
+
+    db.session.add_all(tags)
     db.session.flush()
-    return organizations
+    return tags
 
 
 def seed_categories(users):
@@ -191,51 +169,69 @@ def seed_categories(users):
     return [*global_categories, *user_categories, *child_categories]
 
 
-def seed_incomes(users, organizations):
-    nebula = next(org for org in organizations if "Nebula" in org.name)
-    novatech = next(org for org in organizations if "NovaTech" in org.name)
-
+def seed_incomes(users, tags):
     today = date.today()
+
+    def get_user_tag(user_idx, tag_name):
+        return next(
+            (tag for tag in tags if tag.user_id == users[user_idx].id and tag.name == tag_name),
+            None
+        )
 
     incomes_data = [
         {
             "user_idx": 0,
-            "organization": nebula,
+            "tag_name": "Nebula Freelance Network",
             "amount": Decimal("3200.00"),
-            "income_date": today.replace(day=1) - timedelta(days=5),  # Last month
+            "income_date": today.replace(day=1) - timedelta(days=5),
         },
         {
             "user_idx": 0,
-            "organization": nebula,
+            "tag_name": "Nebula Freelance Network",
             "amount": Decimal("3200.00"),
-            "income_date": today.replace(day=1),  # This month
+            "income_date": today.replace(day=1),
         },
         {
             "user_idx": 1,
-            "organization": novatech,
+            "tag_name": "NovaTech Solutions",
             "amount": Decimal("1850.75"),
             "income_date": today - timedelta(days=10),
         },
         {
             "user_idx": 2,
-            "organization": None,
+            "tag_name": None,
             "amount": Decimal("950.00"),
             "income_date": today - timedelta(days=2),
         },
     ]
 
-    incomes = [
-        Income(
+    incomes = []
+    tags_used = []
+
+    for data in incomes_data:
+        tag = get_user_tag(data["user_idx"], data["tag_name"]) if data["tag_name"] else None
+
+        income = Income(
             user_id=users[data["user_idx"]].id,
-            organization_id=data["organization"].id if data["organization"] else None,
+            tag_id=tag.id if tag else None,
             amount=data["amount"],
             income_date=data["income_date"],
         )
-        for data in incomes_data
-    ]
+        incomes.append(income)
+
+        if tag:
+            tags_used.append(tag)
 
     db.session.add_all(incomes)
     db.session.flush()
+
+    for tag in tags_used:
+        tag.increment_counter()
+
+    unique_tags = set(tags_used)
+    for tag in unique_tags:
+        tag.update_type()
+
     return incomes
 
 
@@ -286,61 +282,78 @@ def seed_financial_targets(users):
     return targets
 
 
-def seed_receipts(users, organizations):
-    quantum_mart = next(org for org in organizations if "Quantum" in org.name)
-    byte_bean = next(org for org in organizations if "Byte" in org.name)
-    electric_bazaar = next(org for org in organizations if "Electric" in org.name)
-
+def seed_receipts(users, tags):
     today = date.today()
+
+    def get_user_tag(user_idx, tag_name):
+        return next(
+            (tag for tag in tags if tag.user_id == users[user_idx].id and tag.name == tag_name),
+            None
+        )
 
     receipts_data = [
         {
             "user_idx": 0,
-            "organization": quantum_mart,
+            "tag_name": "Quantum Mart",
             "issue_date": today - timedelta(days=2),
             "total_amount": Decimal("45.80"),
             "external_uid": "QTM-2025-001234",
         },
         {
             "user_idx": 0,
-            "organization": byte_bean,
+            "tag_name": "Byte & Bean Café",
             "issue_date": today - timedelta(days=5),
             "total_amount": Decimal("28.50"),
         },
         {
             "user_idx": 1,
-            "organization": electric_bazaar,
+            "tag_name": "The Electric Bazaar",
             "issue_date": today - timedelta(days=1),
             "total_amount": Decimal("67.20"),
             "external_uid": "EBZ-2025-005678",
         },
         {
             "user_idx": 0,
-            "organization": quantum_mart,
+            "tag_name": "Quantum Mart",
             "issue_date": today - timedelta(days=10),
             "total_amount": Decimal("102.15"),
         },
         {
             "user_idx": 2,
-            "organization": byte_bean,
+            "tag_name": "Byte & Bean Café",
             "issue_date": today,
             "total_amount": Decimal("34.90"),
         },
     ]
 
-    receipts = [
-        Receipt(
+    receipts = []
+    tags_used = []
+
+    for data in receipts_data:
+        tag = get_user_tag(data["user_idx"], data["tag_name"])
+
+        receipt = Receipt(
             user_id=users[data["user_idx"]].id,
-            organization_id=data["organization"].id,
+            tag_id=tag.id if tag else None,
             issue_date=data["issue_date"],
             total_amount=data["total_amount"],
             external_uid=data.get("external_uid"),
         )
-        for data in receipts_data
-    ]
+        receipts.append(receipt)
+
+        if tag:
+            tags_used.append(tag)
 
     db.session.add_all(receipts)
     db.session.flush()
+
+    for tag in tags_used:
+        tag.increment_counter()
+
+    unique_tags = set(tags_used)
+    for tag in unique_tags:
+        tag.update_type()
+
     return receipts
 
 
@@ -420,18 +433,18 @@ def main():
 
         # Seeding order matters — later entities depend on earlier ones.
         users = seed_users()
-        organizations = seed_organizations()
+        tags = seed_tags(users)
         categories = seed_categories(users)
-        incomes = seed_incomes(users, organizations)
+        incomes = seed_incomes(users, tags)
         targets = seed_financial_targets(users)
-        receipts = seed_receipts(users, organizations)
+        receipts = seed_receipts(users, tags)
         items = seed_receipt_items(receipts, categories, users)
 
         db.session.commit()
 
         stats = [
             ("Users", len(users)),
-            ("Organizations", len(organizations)),
+            ("Tags", len(tags)),
             ("Categories", len(categories)),
             ("Incomes", len(incomes)),
             ("Financial Targets", len(targets)),
