@@ -27,6 +27,7 @@ class Receipt(Base):
         external_uid (str | None): Optional external identifier used by third-party systems.
         user_id (uuid.UUID): Foreign key referencing the associated user's ID.
         tag_id (uuid.UUID | None): Optional foreign key referencing the tag (expense type).
+        description (str): A required textual description of the receipt.
         issue_date (date): The date the receipt was issued.
         currency (str): The ISO currency code for the receipt amount (default: "EUR").
         total_amount (float): The total monetary amount of the receipt.
@@ -67,6 +68,11 @@ class Receipt(Base):
         index=True
     )
 
+    description: Mapped[str] = mapped_column(
+        Text,
+        nullable=False
+    )
+
     issue_date: Mapped[date] = mapped_column(
         Date,
         nullable=False,
@@ -104,4 +110,8 @@ class Receipt(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Receipt tag_id={self.tag_id} total_amount={self.total_amount} user_id={self.user_id}>"
+        return (
+            f"<Receipt description={self.description!r} "
+            f"tag_id={self.tag_id} total_amount={self.total_amount} "
+            f"user_id={self.user_id}>"
+        )

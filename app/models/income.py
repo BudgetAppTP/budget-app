@@ -5,7 +5,7 @@ from decimal import Decimal
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Date, Numeric
+from sqlalchemy import ForeignKey, Date, Numeric, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,7 @@ class Income(Base):
         id (uuid.UUID): Unique identifier for the income record.
         user_id (uuid.UUID): Foreign key referencing the user who owns this income.
         tag_id (uuid.UUID | None): Optional foreign key referencing the tag (income type).
+        description (str): A required textual description of the income record.
         amount (Decimal): The amount of income received.
         income_date (date): The date the income was received.
         extra_metadata (dict | None): Optional JSON field containing additional metadata.
@@ -52,6 +53,11 @@ class Income(Base):
         ForeignKey('tags.id'),
         nullable=True,
         index=True
+    )
+
+    description: Mapped[str] = mapped_column(
+        Text,
+        nullable=False
     )
 
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)

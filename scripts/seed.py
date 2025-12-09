@@ -216,6 +216,7 @@ def seed_incomes(users, tags):
             tag_id=tag.id if tag else None,
             amount=data["amount"],
             income_date=data["income_date"],
+            description=f"{data['tag_name'] or 'Unknown Source'}"
         )
         incomes.append(income)
 
@@ -338,6 +339,7 @@ def seed_receipts(users, tags):
             issue_date=data["issue_date"],
             total_amount=data["total_amount"],
             external_uid=data.get("external_uid"),
+            description=f"{data['tag_name'] or 'Unknown Vendor'}"
         )
         receipts.append(receipt)
 
