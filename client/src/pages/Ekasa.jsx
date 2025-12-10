@@ -1,7 +1,10 @@
 import React, { useEffect } from "react";
 import "./style/ekasa.css";
+import T from "../i18n/T";
+import { useLang } from "../i18n/LanguageContext";
 
 export default function Ekasa() {
+   const {lang} = useLang();
   useEffect(() => {
     const DATA = [
       {
@@ -100,7 +103,7 @@ export default function Ekasa() {
               <td>${block.date}</td>
               <td>${renderCategorySelect(it.category)}</td>
               <td>${it.item}</td>
-              <td>${it.qnt}</td>
+              <td class="quantity">${it.qnt}</td>
               <td class="amount">${it.price.toFixed(2)}</td>
               <td>${it.vat}</td>
               <td>${it.seller}</td>
@@ -117,7 +120,8 @@ export default function Ekasa() {
       table.querySelectorAll("th.sortable").forEach((th) => {
         th.addEventListener("click", () => {
           const index = Array.from(th.parentNode.children).indexOf(th);
-          const type = th.textContent.toLowerCase().includes("price") ? "num" : "date";
+          const isPrice = th.classList.contains("price-col");
+          const type = isPrice ? "num" : "date";
           const asc = sortState[index] !== "asc";
           sortState = { [index]: asc ? "asc" : "desc" };
 
@@ -152,35 +156,48 @@ export default function Ekasa() {
 
       renderTable();
 
-      return () => {
-        if (!table) return;
-        table.querySelectorAll("th.sortable").forEach((th) => {
-          const clone = th.cloneNode(true);
-          th.replaceWith(clone);
-        });
-      };
-    }, []);
+      return () => {};
+
+    }, [lang]);
 
   return (
     <div className="wrap ekasa">
       <div className="page-title">
-        🧾 eKasa<div className="gold-line"></div>
+        🧾 <T sk="eKasa" en="eKasa" />
       </div>
 
       <div className="table-card">
         <table id="data-table">
           <thead>
             <tr>
-              <th>OPD</th>
-              <th className="sortable">DÁTUM</th>
-              <th>KATEGÓRIA</th>
-              <th>ITEM</th>
-              <th>QNT</th>
-              <th className="sortable">PRICE (€)</th>
-              <th>VAT</th>
-              <th>SELLER</th>
-              <th>UNIT</th>
-              <th>SELLER-UNIT</th>
+            <th>OPD</th>
+                          <th className="sortable price-col">
+
+              <T sk="DÁTUM" en="DATE" />
+            </th>
+
+            <th>
+              <T sk="KATEGÓRIA" en="CATEGORY" />
+            </th>
+            <th>
+              <T sk="POLOŽKA" en="ITEM" />
+            </th>
+            <th>
+              <T sk="MNOŽSTVO" en="QUANTITY" />
+            </th>
+            <th className="sortable price-col">
+              <T sk="CENA (€)" en="PRICE (€)" />
+            </th>
+            <th>VAT</th>
+            <th>
+              <T sk="PREDAJCA" en="SELLER" />
+            </th>
+            <th>
+              <T sk="UNIT" en="UNIT" />
+            </th>
+            <th>
+              <T sk="SELLER-UNIT" en="SELLER-UNIT" />
+            </th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -188,18 +205,29 @@ export default function Ekasa() {
       </div>
 
       <div className="page-title" style={{ marginTop: "30px" }}>
-        📂 Import eKasa<div className="gold-line"></div>
+        📂 <T sk="Import eKasa" en="Import eKasa" /><div className="gold-line"></div>
       </div>
 
-      <div className="panel">
-        <div className="import-boxes">
-          <div className="import-card" draggable="true">
-            <strong>Nahrať eKasa / PDF</strong>
-            <p>Podporované: .ekd, .json, .pdf</p>
-            <button>Vybrať súbor</button>
-          </div>
+    <div className="panel">
+      <div className="import-boxes">
+
+        <div className="import-card" draggable="true">
+          <strong>
+            <T sk="Nahrať eKasa / PDF" en="Upload eKasa / PDF" />
+          </strong>
+
+          <p>
+            <T sk="Podporované: .ekd, .json, .pdf"
+               en="Supported: .ekd, .json, .pdf" />
+          </p>
+
+          <button>
+            <T sk="Vybrať súbor" en="Choose file" />
+          </button>
         </div>
+
       </div>
     </div>
+  </div>
   );
 }

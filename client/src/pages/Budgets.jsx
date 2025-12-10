@@ -1,8 +1,18 @@
 import React, { useEffect,useState } from "react";
 import "./style/budget.css";
 import { Link } from "react-router-dom";
+import T from "../i18n/T";
+import { useLang } from "../i18n/LanguageContext";
 
 export default function Budgets() {
+  const {lang} = useLang();
+  const [isMobile400, setIsMobile400] = useState(window.innerWidth < 1000);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile400(window.innerWidth < 1000);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const demoData = {
     "2025-01": {
       incomes: [
@@ -102,32 +112,37 @@ export default function Budgets() {
 
         <div className="export-btns">
           <Link className="btn" to="/comparison">
-        Porovnávať mesiace
+     {lang === "sk" ? "Porovnávať mesiace" : "Compare months"}
          </Link>
-          <a className="btn" href="#">Export to PDF</a>
-          <a className="btn" href="#">Export to CSV</a>
+          <a className="btn" href="#">  {lang === "sk" ? "Export do PDF" : "Export to PDF"}</a>
+          <a className="btn" href="#"> {lang === "sk" ? "Export do CSV" : "Export to CSV"}</a>
         </div>
       </div>
 
-      <div className="section-title">Príjmy a Výdavky</div>
+      <div className="section-title">  <T sk="Príjmy a Výdavky" en="Incomes and Expenses" /></div>
 
 
       <div className="tables">
-        {/* === Таблица доходов === */}
         <div className="table-box incomes-table" >
           <div className="table-header" style={{borderTopLeftRadius: "12px",borderRight: "1px solid #bfc2c7"}}>
-            <h3>📊 Príjmy</h3>
+               <h3>📊 <T sk="Príjmy" en="Incomes" /></h3>
              <Link className="table-button" to="/incomes">
-        + Pridať príjem
+        {lang === "sk" ? "+ Pridať príjem" : "+ Add income"}
          </Link>
           </div>
           <table>
             <thead>
 
               <tr>
-                <th  style={{textAlign:"left"}}>Dátum</th>
-                <th  style={{textAlign:"left"}}>Popis</th>
-                <th style={{textAlign:"right"}}>Suma (€)</th>
+              <th style={{ textAlign: "left" }}>
+                <T sk="Dátum" en="Date" />
+              </th>
+              <th style={{ textAlign: "left" }}>
+                <T sk="Popis" en="Description" />
+              </th>
+              <th style={{ textAlign: "right" }}>
+                <T sk="Suma (€)" en="Amount (€)" />
+              </th>
               </tr>
             </thead>
             <tbody>
@@ -141,7 +156,7 @@ export default function Budgets() {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan="2"><strong>Spolu príjmy</strong></td>
+                <td colSpan="2"><strong> <T sk="Spolu príjmy" en="Total income" /></strong></td>
                 <td className="amount-inc" style={{textAlign:"right"}}>
                   <strong >{formatMoney(totalIncome)}</strong>
                 </td>
@@ -153,38 +168,93 @@ export default function Budgets() {
 
         <div className="table-box expenses-table">
 <div className="table-header" style={{borderTopRightRadius: "12px"}}>
-            <h3>💸 Výdavky</h3>
+            <h3>💸 <T sk="Výdavky" en="Expenses" /></h3>
           <Link className="table-button" to="/expenses">
-        + Pridať výdavok
+        {lang === "sk" ? "+ Pridať výdavok" : "+ Add expense"}
          </Link>
           </div>
           <table>
-            <thead>
-              <tr>
-                <th  style={{textAlign:"left"}}>Suma (€)</th>
-                <th  style={{textAlign:"left"}} >Popis</th>
-                <th style={{textAlign:"left"}} >Dátum</th>
+            {isMobile400 ? (
+              <>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>
+                      <T sk="Dátum" en="Date" />
+                    </th>
 
-              </tr>
-            </thead>
-            <tbody>
-              {monthData.expenses.map((e) => (
-                <tr key={e.id}>
-                  <td className="amount-exp">- {formatMoney(e.amount)}</td>
-                  <td>{e.category}</td>
-                  <td>{e.date}</td>
+                    <th style={{ textAlign: "left" }}>
+                      <T sk="Popis" en="Description" />
+                    </th>
 
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td className="amount-exp">
-                  <strong>{formatMoney(totalExpense)}</strong>
-                </td>
-                <td colSpan="2"><strong>Spolu výdavky</strong></td>
-              </tr>
-            </tfoot>
+                    <th style={{ textAlign: "right" }}>
+                      <T sk="Suma (€)" en="Amount (€)" />
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {monthData.expenses.map((e) => (
+                    <tr key={e.id}>
+                      <td>{e.date}</td>
+                      <td>{e.category}</td>
+                      <td className="amount-exp" style={{ textAlign: "right" }}>
+                        - {formatMoney(e.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+
+                <tfoot>
+                  <tr>
+                    <td colSpan="2">
+                      <strong><T sk="Spolu výdavky" en="Total expenses" /></strong>
+                    </td>
+                    <td className="amount-exp" style={{ textAlign: "right" }}>
+                      <strong>{formatMoney(totalExpense)}</strong>
+                    </td>
+                  </tr>
+                </tfoot>
+              </>
+            ) : (
+              <>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>
+                      <T sk="Suma (€)" en="Amount (€)" />
+                    </th>
+
+                    <th style={{ textAlign: "left" }}>
+                      <T sk="Popis" en="Description" />
+                    </th>
+
+                    <th style={{ textAlign: "left" }}>
+                      <T sk="Dátum" en="Date" />
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {monthData.expenses.map((e) => (
+                    <tr key={e.id}>
+                      <td className="amount-exp">- {formatMoney(e.amount)}</td>
+                      <td>{e.category}</td>
+                      <td>{e.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+
+                <tfoot>
+                  <tr>
+                    <td className="amount-exp">
+                      <strong>{formatMoney(totalExpense)}</strong>
+                    </td>
+                    <td colSpan="2">
+                      <strong><T sk="Spolu výdavky" en="Total expenses" /></strong>
+                    </td>
+                  </tr>
+                </tfoot>
+              </>
+            )}
           </table>
 
 
@@ -192,27 +262,30 @@ export default function Budgets() {
 
         </div>
       <div className="balance-box">
-        Zostatok: <strong id="main-balance">{formatMoney(balance)}</strong> €
+         <T sk="Zostatok" en="Balance" />:{" "}
+        <strong id="main-balance">{formatMoney(balance)}</strong> €
       </div>
 
       </div>
 
-      <div className="section-title">📋 Plánovanie rozpočtu</div>
+      <div className="section-title"><T sk="📋 Plánovanie rozpočtu" en="📋 Budget Planning" /></div>
       <div className="plan-box">
         <div className="plan-header">
           <h3>
-            Zostatok:{" "}
-            <strong id="plan-balance">{formatMoney(balance)} €</strong>
+            <T sk="Zostatok" en="Balance" />:{" "}
+          <strong id="plan-balance">{formatMoney(balance)} €</strong>
           </h3>
-          <button className="table-button" type="button">+ Pridať kategóriu</button>
+                  <button className="table-button" type="button">
+          {lang === "sk" ? "+ Pridať kategóriu" : "+ Add category"}
+        </button>
         </div>
 
         <table id="plan-table">
           <thead>
             <tr>
-              <th>Kategória</th>
-              <th>Percento</th>
-              <th>Čiastka (€)</th>
+            <th><T sk="Kategória" en="Category" /></th>
+            <th><T sk="Percento" en="Percentage" /></th>
+            <th><T sk="Čiastka (€)" en="Amount (€)" /></th>
             </tr>
           </thead>
           <tbody>

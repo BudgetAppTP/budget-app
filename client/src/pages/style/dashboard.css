@@ -102,8 +102,8 @@ body {
 .dashboard .date-badge svg { opacity:.65 }
 
 .dashboard.wrap {
-  max-width:var(--maxw);
-  margin:22px auto;
+  max-width:1300px;
+  margin:50px auto;
   padding:0 var(--gap-lg) 40px;
 }
 

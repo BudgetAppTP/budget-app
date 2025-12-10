@@ -1,7 +1,11 @@
 import React, { useEffect } from "react";
 import "./style/dashboard.css";
 import { Link } from "react-router-dom";
+import { useLang } from "../i18n/LanguageContext";
+import T from "../i18n/T";
+
 export default function Dashboard() {
+  const { lang, setLang } = useLang();
       useEffect(() => {
     document.title = "BudgetApp · Dashboard";
   }, []);
@@ -84,7 +88,8 @@ export default function Dashboard() {
       <div className="section-title">
         <span className="marker"></span>
         <div>
-          Mesačný prehľad · <span id="monthTitle">Október 2025</span>
+           <T sk="Mesačný prehľad" en="Monthly Overview" /> ·{" "}
+          <span id="monthTitle">Október 2025</span>
         </div>
       </div>
 
@@ -93,7 +98,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">💶</div>
             <div>
-              <small>Celkové príjmy</small>
+              <small> <T sk="Príjmy" en="Incomes" /></small>
               <div className="value" id="kpiIncome">€ 2 350</div>
             </div>
           </div>
@@ -103,7 +108,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">💳</div>
             <div>
-              <small>Celkové výdavky</small>
+              <small><T sk="Výdavky" en="Expenses" /></small>
               <div className="value" id="kpiExpense">€ 1 840</div>
             </div>
           </div>
@@ -113,7 +118,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">🧾</div>
             <div>
-              <small>Zostatok</small>
+              <small> <T sk="Zostatok" en="Balance" /></small>
               <div className="value" id="kpiBalance">€ 510</div>
             </div>
           </div>
@@ -123,7 +128,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">🎯</div>
             <div>
-              <small>Plnenie cieľov</small>
+              <small><T sk="Ciele" en="Goals" /></small>
               <div className="value" id="kpiGoals">73%</div>
             </div>
           </div>
@@ -135,7 +140,7 @@ export default function Dashboard() {
           <div className="panel" draggable="true">
             <div className="drag-handle" title="Presuň sekciu"></div>
             <header>
-              <h3>Rozdelenie výdavkov tento mesiac</h3>
+              <h3> <T sk="Rozloženie výdavkov" en="Expense Distribution" /></h3>
             </header>
 
             <div className="donut-wrap">
@@ -174,7 +179,7 @@ export default function Dashboard() {
           <div id="goals" className="panel" draggable="true" style={{ marginTop: "16px" }}>
             <div className="drag-handle" title="Presuň sekciu"></div>
             <header>
-              <h2>Finančné ciele</h2>
+              <h2><T sk="Finančné ciele" en="Financial Goals" /></h2>
             </header>
 
             <div className="goals-container" id="goalList">
@@ -206,20 +211,27 @@ export default function Dashboard() {
           </header>
           <div className="import-boxes">
             <div className="import-card" draggable="true">
-              <strong>Naskenovať QR</strong>
-              <p>Otvoriť kameru a naskenovať kód z účtenky</p>
-              <button>Spustiť skener</button>
+              <strong> <T sk="QR kód eKasa" en="QR Code eKasa" /></strong>
+              <p>
+
+                <T sk="Naskenujte QR kód z bločku"
+	                  en="Scan the QR code from your receipt"/>
+
+              </p>
+              <button><T sk="Nahrať QR" en="Upload QR" /></button>
             </div>
             <div className="import-card" draggable="true">
-              <strong>Nahrať eKasa / PDF</strong>
-              <p>Podporované: .ekd, .json, .pdf</p>
-              <button>Vybrať súbor</button>
+              <strong><T sk="PDF alebo JSON" en="PDF or JSON" /></strong>
+              <p><T sk="Importujte súbor z eKasa"
+	                  en="Import an eKasa file"
+                /></p>
+              <button> <T sk="Vybrať súbor" en="Choose File" /></button>
             </div>
            <Link
               to="/Ekasa"
               className="btn"
               style={{ textDecoration: "none", textAlign: "center" }}>
-              Prehľad eKasy
+              <T sk="Otvoriť eKasa" en="Open eKasa" />
            </Link>
           </div>
         </div>

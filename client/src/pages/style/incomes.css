@@ -17,7 +17,7 @@
 }
 
 .incomes.wrap {
-  max-width: 950px;
+  max-width: 1300px;
   margin: 50px auto;
   padding: 0 20px;
 }
@@ -71,7 +71,23 @@
   border: 1px solid var(--grid);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  overflow: hidden;
+   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.incomes .table-card table {
+  min-width: 750px;
+  border-collapse: collapse;
+}
+
+
+.incomes .table-card::-webkit-scrollbar {
+  height: 6px;
+}
+
+.incomes .table-card::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
 }
 
 .incomes table {
@@ -81,20 +97,32 @@
     table-layout: fixed;
 }
 
-
 .incomes th:nth-child(1),
-.incomes td:nth-child(1) { width: 20%; }
+.incomes td:nth-child(1) { width: 15%; }
 
 .incomes th:nth-child(2),
-.incomes td:nth-child(2) { width: 40%; }
+.incomes td:nth-child(2) { width: 30%; }
 
 .incomes th:nth-child(3),
 .incomes td:nth-child(3) { width: 20%; }
 
 .incomes th:nth-child(4),
-.incomes td:nth-child(4) { width: 20%; }
+.incomes td:nth-child(4) { width: 15%; }
 
+.incomes th:nth-child(5),
+.incomes td:nth-child(5) { width: 20%; }
 
+.incomes .form-row input {
+
+      width: 100%;
+    box-sizing: border-box;
+
+  background: var(--white);
+  border: 1.8px solid var(--grid);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
 
 
 .incomes th,
@@ -173,7 +201,8 @@
   transform: scale(1.15);
 }
 
-.incomes .btn {
+.incomes .btn , .incomes .organisation_button{
+  width: 100%;
   background: #ebb72e;
   border: 2px solid #b38a00;
   color: #1a1200;
@@ -189,22 +218,7 @@
   background: #c49a0f;
 }
 
-.incomes form.form-row
- {
-    display: grid;
-    grid-template-columns: 180px 1fr 160px 180px;
-    gap: 12px;
-    margin-top: 22px;
-    align-items: center;
-}
 
-.incomes .form-row input {
-  background: var(--white);
-  border: 1.8px solid var(--grid);
-  border-radius: 6px;
-  padding: 8px 10px;
-  font-size: 14px;
-}
 
 .incomes tr.editing td {
   padding: 0 !important;
@@ -293,4 +307,87 @@
   font-size: 14px;
   font-weight: 500;
   animation: fadeIn 0.3s ease;
+}
+
+
+
+.incomes .incomes-form {
+  width: 100%;
+  margin-top: 15px;
+
+}
+
+.incomes .input-table {
+  width: 100%;
+  border-collapse: collapse;
+
+}
+
+.incomes .input-table td{
+   border: none;
+
+}
+
+.incomes .input-table td {
+  padding: 4px 6px;
+}
+
+.incomes .input-table input, .incomes  .organisation-wrapper {
+  background: white !important;
+  border: 1.8px solid var(--grid) !important;
+  padding: 10px 16px !important;
+  box-sizing: border-box;
+   border-radius: 6px;
+  width: 100%;
+   font-size: 14px !important;
+}
+
+.incomes .input-table tr:hover {
+  background: transparent !important;
+}
+
+
+.incomes .input-table td:focus-within {
+  outline: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.incomes .input-table input:focus {
+  outline: none !important;
+  border: 2px solid black !important;
+  background: white !important;
+}
+
+.incomes .organisation_button{
+  padding: 3px;
+  width: 15%;
+}
+
+@media (max-width: 750px) {
+  .table-card table {
+    min-width: 750px;
+  }
+
+  .input-table,
+  .input-table tbody,
+  .input-table tr {
+    display: block !important;
+    width: 100%;
+  }
+
+  .input-table td {
+    display: block;
+    width: 100% !important;
+    margin-bottom: 10px;
+  }
+
+  .input-table td button.btn {
+    width: 100%;
+  }
+
+  .input-table input,
+  .input-table select {
+    width: 100% !important;
+  }
 }

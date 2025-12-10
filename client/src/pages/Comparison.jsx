@@ -2,10 +2,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Chart, ArcElement, Tooltip, Legend } from "chart.js";
 import "./style/comparison.css";
+import T from "../i18n/T";
+import { useLang } from "../i18n/LanguageContext";
 
 Chart.register(ArcElement, Tooltip, Legend);
 
 const DATA = {
+
   "2025-01": {
     label: "Január 2025",
     incomes: [
@@ -87,116 +90,9 @@ const DATA = {
   },
 };
 
-const MONTH_KEYS = Object.keys(DATA).sort();
-const chartColors = ["#e6c975", "#ccb8a3", "#b1bfd0", "#c0cfad"];
-
-const fmt = (n) =>
-  n.toLocaleString("sk-SK", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-const sum = (arr) => arr.reduce((a, b) => a + (b.amount || 0), 0);
-
-const byTab = (monthKey, tab) => {
-  const d = DATA[monthKey];
-  if (!d) return [];
-  if (tab === "incomes") return d.incomes || [];
-  if (tab === "expenses") return d.expenses || [];
-  if (tab === "needs") return d.needs || [];
-  if (tab === "goals") return d.goals || [];
-  if (tab === "savings") return d.savings || [];
-  return [];
-};
-
-const computeSavings = (monthKey) => {
-  const d = DATA[monthKey] || {};
-  const inc = (d.incomes || []).reduce((s, r) => s + (r.amount || 0), 0);
-  const exp = (d.expenses || []).reduce((s, r) => s + (r.amount || 0), 0);
-  const fromList = (d.savings || []).reduce((s, r) => s + (r.amount || 0), 0);
-
-  const saved = fromList > 0 ? fromList : Math.max(inc - exp, 0);
-  const savedPctOfIncome = inc > 0 ? (saved / inc) * 100 : 0;
-
-  const alloc = Array.isArray(d.savingsAlloc)
-    ? d.savingsAlloc
-    : [{ label: "Sporenie", amount: saved }];
-  const labels = alloc.map((a) => a.label);
-  const data = alloc.map((a) => a.amount);
-
-  return { saved, savedPctOfIncome, labels, data };
-};
-
-function GoalsTable({ month }) {
-  if (!month) return null;
-
-  const monthly = (month.goals || []).filter((g) => g.type === "monthly");
-  const yearly = (month.goals || []).filter((g) => g.type === "yearly");
-
-  const pct = (a, b) => (b ? (a / b) * 100 : 0);
-
-  return (
-    <div className="goals-table">
-      <table className="goals-layout">
-        <thead>
-          <tr>
-            <th>Popis</th>
-            <th>Cieľ (€)</th>
-            <th>Realita (€)</th>
-            <th>Splnené (%)</th>
-            <th>Stav</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td colSpan="5" className="section-title">
-              Mesačné ciele
-            </td>
-          </tr>
-          {monthly.map((g, i) => {
-            const p = pct(g.actual, g.target);
-            const pRounded = p.toFixed(0);
-            const done = p >= 100;
-            return (
-              <tr key={`m-${i}`}>
-                <td>{g.name}</td>
-                <td>{fmt(g.target)}</td>
-                <td>{fmt(g.actual)}</td>
-                <td>{pRounded} %</td>
-                <td>
-                  <span className={`status-icon ${done ? "done" : "fail"}`}>
-                    {done ? "✔" : "✖"}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-          <tr>
-            <td colSpan="5" className="section-title">
-              Ročné ciele
-            </td>
-          </tr>
-          {yearly.map((g, i) => {
-            const p = pct(g.progressYTD, g.target).toFixed(0);
-            return (
-              <tr key={`y-${i}`}>
-                <td>{g.name}</td>
-                <td>{fmt(g.target)}</td>
-                <td>{fmt(g.progressYTD)}</td>
-                <td>{p} %</td>
-                <td>
-                  <span className="status-icon progress">⏳</span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 export default function Comparison() {
+  const {lang} = useLang();
   const [activeTab, setActiveTab] = useState("incomes");
 
   const [indices, setIndices] = useState(() => {
@@ -336,7 +232,7 @@ export default function Comparison() {
               </div>`;
           })
           .join("");
-        html += `<div class="summary">Celkovo: ${fmt(total)} €</div>`;
+        html += `<div class="summary">${lang === "sk" ? "Celkovo" : "Total"}: ${fmt(total)} €</div>`;
         return html;
       };
 
@@ -410,7 +306,7 @@ export default function Comparison() {
               </div>`;
           })
           .join("");
-        html += `<div class="summary">Celkovo: ${fmt(total)} €</div>`;
+        html += `<div class="summary">${lang === "sk" ? "Celkovo" : "Total"}:${fmt(total)} €</div>`;
         return html;
       };
 
@@ -429,7 +325,7 @@ export default function Comparison() {
     } else {
       destroyCharts();
     }
-  }, [activeTab, leftKey, rightKey]);
+  }, [activeTab, leftKey, rightKey, lang]);
 
   // (incomes/expenses)
   const leftRows = showTables ? byTab(leftKey, activeTab) : [];
@@ -438,7 +334,6 @@ export default function Comparison() {
   const leftTotalValue = showTables ? sum(leftRows) : 0;
   const rightTotalValue = showTables ? sum(rightRows) : 0;
 
-  // Summary (len pre incomes/expenses)
   let summaryRow = null;
   if (showSummary) {
     const L = byTab(leftKey, activeTab);
@@ -459,16 +354,16 @@ export default function Comparison() {
   }
 
   const tabs = [
-    { id: "incomes", label: "Príjmy" },
-    { id: "expenses", label: "Výdavky" },
-    { id: "needs", label: "Potreby" },
-    { id: "goals", label: "Ciele" },
-    { id: "savings", label: "Sporenie" },
+    { id: "incomes", label: <T sk="Príjmy" en="Incomes" /> },
+    { id: "expenses", label: <T sk="Výdavky" en="Expenses" /> },
+    { id: "needs", label: <T sk="Potreby" en="Needs" /> },
+    { id: "goals", label: <T sk="Ciele" en="Goals" /> },
+    { id: "savings", label: <T sk="Sporenie" en="Savings" /> },
   ];
 
   return (
     <div className="wrap comparison">
-      <div className="page-title">📈 Porovnanie mesiacov</div>
+      <div className="page-title">📈<T sk=" Porovnanie mesiacov" en=" Monthly comparison" /></div>
 
       <div className="main_box">
         <div className="tabs" id="tabs">
@@ -562,9 +457,9 @@ export default function Comparison() {
                   >
                     <thead>
                       <tr>
-                        <th>DÁTUM</th>
-                        <th>POPIS</th>
-                        <th className="right">SUMA (€)</th>
+                        <th><T sk="DÁTUM" en="DATE" /></th>
+                        <th><T sk="POPIS" en="DESCRIPTION" /></th>
+                        <th className="right"><T sk="SUMA (€)" en="AMOUNT (€)" /></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -587,7 +482,7 @@ export default function Comparison() {
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan="2">Spolu</td>
+                        <td colSpan="2"><T sk="Spolu" en="Total" /></td>
                         <td className="right" id="leftTotal">
                           {showTables ? fmt(leftTotalValue) : fmt(0)}
                         </td>
@@ -670,19 +565,19 @@ export default function Comparison() {
           id="summaryPanel"
           style={{ display: showSummary ? "block" : "none" }}
         >
-          <div className="section-title">Súhrn porovnania</div>
+          <div className="section-title"> <T sk="Súhrn porovnania" en="Comparison summary" /></div>
           <div className="card table-card">
             <table id="summaryTable">
               <thead>
                 <tr>
                   <th id="thL">
-                    {leftMonth ? `${leftMonth.label} (€)` : "Ľavý mesiac (€)"}
+                    {leftMonth ? `${leftMonth.label} (€)` : (lang === "sk" ? "Ľavý mesiac (€)" : "Left month (€)")}
                   </th>
                   <th id="thR">
-                    {rightMonth ? `${rightMonth.label} (€)` : "Pravý mesiac (€)"}
+                    {rightMonth ? `${rightMonth.label} (€)` : (lang === "sk" ? "Pravý mesiac (€)" : "Right month (€)")}
                   </th>
-                  <th>Rozdiel (€)</th>
-                  <th>Trend</th>
+                  <th><T sk="Rozdiel (€)" en="Difference (€)" /></th>
+                  <th><T sk="Trend" en="Trend" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -699,6 +594,116 @@ export default function Comparison() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+const MONTH_KEYS = Object.keys(DATA).sort();
+const chartColors = ["#e6c975", "#ccb8a3", "#b1bfd0", "#c0cfad"];
+
+const fmt = (n) =>
+  n.toLocaleString("sk-SK", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const sum = (arr) => arr.reduce((a, b) => a + (b.amount || 0), 0);
+
+const byTab = (monthKey, tab) => {
+  const d = DATA[monthKey];
+  if (!d) return [];
+  if (tab === "incomes") return d.incomes || [];
+  if (tab === "expenses") return d.expenses || [];
+  if (tab === "needs") return d.needs || [];
+  if (tab === "goals") return d.goals || [];
+  if (tab === "savings") return d.savings || [];
+  return [];
+};
+
+const computeSavings = (monthKey) => {
+  const d = DATA[monthKey] || {};
+  const inc = (d.incomes || []).reduce((s, r) => s + (r.amount || 0), 0);
+  const exp = (d.expenses || []).reduce((s, r) => s + (r.amount || 0), 0);
+  const fromList = (d.savings || []).reduce((s, r) => s + (r.amount || 0), 0);
+
+  const saved = fromList > 0 ? fromList : Math.max(inc - exp, 0);
+  const savedPctOfIncome = inc > 0 ? (saved / inc) * 100 : 0;
+
+  const alloc = Array.isArray(d.savingsAlloc)
+    ? d.savingsAlloc
+    : [{ label: "Sporenie", amount: saved }];
+  const labels = alloc.map((a) => a.label);
+  const data = alloc.map((a) => a.amount);
+
+  return { saved, savedPctOfIncome, labels, data };
+};
+
+function GoalsTable({ month }) {
+  if (!month) return null;
+
+  const monthly = (month.goals || []).filter((g) => g.type === "monthly");
+  const yearly = (month.goals || []).filter((g) => g.type === "yearly");
+
+  const pct = (a, b) => (b ? (a / b) * 100 : 0);
+
+  return (
+    <div className="goals-table">
+      <table className="goals-layout">
+        <thead>
+          <tr>
+            <th><T sk="Popis" en="Description" /></th>
+          <th><T sk="Cieľ (€)" en="Goal (€)" /></th>
+          <th><T sk="Realita (€)" en="Actual (€)" /></th>
+          <th><T sk="Splnené (%)" en="Completed (%)" /></th>
+          <th><T sk="Stav" en="Status" /></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colSpan="5" className="section-title">
+              <T sk="Mesačné ciele" en="Monthly goals" />
+            </td>
+          </tr>
+          {monthly.map((g, i) => {
+            const p = pct(g.actual, g.target);
+            const pRounded = p.toFixed(0);
+            const done = p >= 100;
+            return (
+              <tr key={`m-${i}`}>
+                <td>{g.name}</td>
+                <td>{fmt(g.target)}</td>
+                <td>{fmt(g.actual)}</td>
+                <td>{pRounded} %</td>
+                <td>
+                  <span className={`status-icon ${done ? "done" : "fail"}`}>
+                    {done ? "✔" : "✖"}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+          <tr>
+            <td colSpan="5" className="section-title">
+             <T sk="Ročné ciele" en="Yearly goals" />
+            </td>
+          </tr>
+          {yearly.map((g, i) => {
+            const p = pct(g.progressYTD, g.target).toFixed(0);
+            return (
+              <tr key={`y-${i}`}>
+                <td>{g.name}</td>
+                <td>{fmt(g.target)}</td>
+                <td>{fmt(g.progressYTD)}</td>
+                <td>{p} %</td>
+                <td>
+                  <span className="status-icon progress">⏳</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

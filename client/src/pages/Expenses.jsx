@@ -1,23 +1,33 @@
 import React, {useEffect, useState} from "react";
 import "./style/expenses.css";
+import T from "../i18n/T";
+import { useLang } from "../i18n/LanguageContext";
 
 export default function Expenses() {
+   const { lang, setLang, t } = useLang();
       useEffect(() => {
     document.title = "BudgetApp · Vydavky";
   }, []);
 
 
   const [expenses, setExpenses] = useState([
-    { id: 1, date: "2025-10-02", description: "TERNO real estate", amount: 45.2 },
-    { id: 2, date: "2025-10-05", description: "Doprava", amount: 14.0 },
-    { id: 3, date: "2025-10-07", description: "Byvanie", amount: 865.0 },
+    { id: 1, date: "2025-10-02", description: "unclassified",tag: "TERNO real estate" ,amount: 45.2 },
+    { id: 2, date: "2025-10-05", description: "Doprava", tag:"unclassified",amount: 14.0 },
+    { id: 3, date: "2025-10-07", description: "Byvanie",tag:"unclassified", amount: 865.0 },
   ]);
 
   const [newExpense, setNewExpense] = useState({
     date: "",
     descripiton: "",
+    tag:"",
     amount: "",
   });
+
+const STATIC_CATEGORIES = ["TERNO", "BILLA", "LIDL"];
+const [categories, setCategories] = useState(STATIC_CATEGORIES);
+const [addingNew, setAddingNew] = useState(false);
+const [newCatValue, setNewCatValue] = useState("");
+
 
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -27,18 +37,18 @@ export default function Expenses() {
 
     const handleSubmit = (e) => {
     e.preventDefault();
-    const { date, description, amount } = newExpense;
-    if (!date || !description || !amount) {
-      setError("Všetky polia musia byť vyplnené!");
+    const { date, description, tag, amount } = newExpense;
+    if (!date || !description ||!tag || !amount) {
+      setError(lang === "sk" ? "Všetky polia musia byť vyplnené!" : "All fields must be filled!");
       return;
     }
      setError("");
     const id = expenses.length ? expenses[expenses.length - 1].id + 1 : 1;
     setExpenses([
       ...expenses,
-      { id, date, description, amount: parseFloat(amount) },
+      { id, date, description,tag, amount: parseFloat(amount) },
     ]);
-    setNewExpense({ date: "", description: "", amount: "" });
+    setNewExpense({ date: "", description: "",tag:"", amount: "" });
   };
 
   const handleDelete = (id) => {
@@ -49,7 +59,7 @@ export default function Expenses() {
     if (editingId === id) {
       const { date, description, amount } = editBuffer;
       if (!date || !description || !amount) {
-        setError("Všetky polia musia byť vyplnené!");
+        setError(lang === "sk" ? "Všetky polia musia byť vyplnené!" : "All fields must be filled!");
         return;
       }
 
@@ -87,11 +97,11 @@ export default function Expenses() {
   return (
     <div className="wrap expenses">
       <div className="page-title">
-        💸 Výdavky
+        <T sk="💸 Výdavky" en="💸 Expenses" />
       </div>
 
       <div className="summary">
-        <span>Spolu tento mesiac:</span>
+        <span><T sk="Spolu tento mesiac:" en="Total this month:" /></span>
         <span className="value">{total.toFixed(2)} €</span>
       </div>
 
@@ -100,13 +110,14 @@ export default function Expenses() {
           <thead>
           <tr>
             <th className="sortable" onClick={() => handleSort("date")}>
-              Dátum
+              <T sk="Dátum" en="Date" />
             </th>
-            <th>Popis</th>
+            <th><T sk="Popis" en="Description" /></th>
+             <th style={{ textAlign: "center" }}><T sk="Organizácia" en="Organization" /></th>
             <th className="sortable"  onClick={() => handleSort("amount")} style={{ textAlign: "right" }}>
-              Suma (€)
+              <T sk="Suma (€)" en="Amount (€)" />
             </th>
-            <th style={{ textAlign: "center" }}>Akcie</th>
+            <th style={{ textAlign: "center" }}><T sk="Akcie" en="Actions" /></th>
           </tr>
           </thead>
           <tbody>
@@ -155,6 +166,25 @@ export default function Expenses() {
                     exp.description
                   )}
                   </td>
+                                                      <td style={{ textAlign: "center" }}>
+                   {isEditing ? (
+                                      <textarea
+                    value={data.tag}
+                    onChange={(e) => {
+                      const el = e.target;
+                      el.style.height = "auto";
+                      el.style.height = el.scrollHeight + "px";
+                      setEditBuffer({
+                        ...editBuffer,
+                        tag: el.value,
+                      });
+                    }}
+                    rows={1}
+                  />
+                  ) : (
+                    exp.tag
+                  )}
+                  </td>
                   <td style={{ textAlign: "right" }}>
                     {isEditing ? (
                       <input
@@ -180,7 +210,7 @@ export default function Expenses() {
                               <span
                                 className="action-icon delete"
                                 onClick={() => handleDelete(exp.id)}
-                                title="Vymazať"
+                                title={lang === "sk" ? "Vymazať" : "Delete"}
                               >
                                 🗑️
                               </span>
@@ -190,7 +220,15 @@ export default function Expenses() {
                           <span
                             className="action-icon edit"
                             onClick={() => handleEditToggle(exp.id)}
-                            title={isEditing ? "Uložiť zmeny" : "Upraviť"}
+                            title={
+                        isEditing
+                          ? lang === "sk"
+                            ? "Uložiť zmeny"
+                            : "Save changes"
+                          : lang === "sk"
+                          ? "Upraviť"
+                          : "Edit"
+                      }
                           >
                             {isEditing ? "✔" : "✏️"}
                           </span>
@@ -198,7 +236,9 @@ export default function Expenses() {
                        {!isEditing && (
                                                          <span
                                 className="action-icon redirect"
-                                title="Zobraziť na eKasa"
+                                title={
+                          lang === "sk" ? "Zobraziť na eKasa" : "View on eKasa"
+                        }
                                 onClick={handleEkasaRedirect}
                               >
                                 ➜
@@ -213,7 +253,7 @@ export default function Expenses() {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan="2">Spolu</td>
+              <td colSpan="3"> <T sk="Spolu" en="Total" /></td>
               <td className="amount">{total.toFixed(2)}</td>
               <td></td>
             </tr>
@@ -221,35 +261,115 @@ export default function Expenses() {
         </table>
       </div>
 
-      <form className="form-row" onSubmit={handleSubmit}>
-        <input
+
+
+      <form onSubmit={handleSubmit} className="expense-form">
+  <table className="expense-table">
+    <tbody>
+      <tr>
+        <td style={{ width: "15%" }}>
+          <input
             type="date"
             value={newExpense.date}
             onChange={(e) =>
-                setNewExpense({...newExpense, date: e.target.value})
+              setNewExpense({ ...newExpense, date: e.target.value })
             }
-        />
-        <input
-          type="text"
-          placeholder="Popis"
-          value={newExpense.description}
-          onChange={(e) =>
-            setNewExpense({ ...newExpense, description: e.target.value })
-          }
-        />
+          />
+        </td>
+
+        <td style={{ width: "30%" }}>
           <input
-          type="number"
-          step="0.01"
-          placeholder="Suma (€)"
-          value={newExpense.amount}
-          onChange={(e) =>
-            setNewExpense({ ...newExpense, amount: e.target.value })
-          }
-        />
-        <button className="btn" type="submit">
-          + Pridať výdavok
-        </button>
-      </form>
+            type="text"
+             placeholder={lang === "sk" ? "Popis" : "Description"}
+            value={newExpense.description}
+            onChange={(e) =>
+              setNewExpense({ ...newExpense, description: e.target.value })
+            }
+          />
+        </td>
+
+        <td style={{ width: "20%" }}>
+         {!addingNew ? (
+  <select
+    className="organisation-wrapper"
+    value={newExpense.tag}
+    onChange={(e) => {
+      const val = e.target.value;
+
+      if (val === "add-new") {
+        setAddingNew(true);
+      } else {
+        setNewExpense({ ...newExpense, tag: val });
+      }
+    }}
+  >
+    <option value="" disabled>
+      {lang === "sk" ? "Organizácia" : "Organization"}
+    </option>
+
+    {categories.map((c, i) => (
+      <option key={i} value={c}>
+        {c}
+      </option>
+    ))}
+
+    <option value="add-new">{lang === "sk"
+                      ? "➕ Pridať nový tag"
+                      : "➕ Add new tag"}</option>
+  </select>
+) : (
+  <div style={{ display: "flex", gap: "6px" }}>
+    <input
+      type="text"
+      className="organisation-wrapper"
+      placeholder={
+                      lang === "sk" ? "Nová kategória" : "New category"
+                    }
+      value={newCatValue}
+      onChange={(e) => setNewCatValue(e.target.value)}
+    />
+
+    <button className="organisation_button"
+      type="button"
+      onClick={() => {
+        if (!newCatValue.trim()) return;
+
+        const updated = [...categories, newCatValue.trim()];
+        setCategories(updated);
+        setNewIncome({ ...newIncome, tag: newCatValue.trim() });
+
+        setAddingNew(false);
+        setNewCatValue("");
+      }}
+    >
+      ✔
+    </button>
+  </div>
+)}
+        </td>
+
+        <td style={{ width: "15%" }}>
+          <input
+            type="number"
+            step="0.01"
+            placeholder={lang === "sk" ? "Suma (€)" : "Amount (€)"}
+            value={newExpense.amount}
+            onChange={(e) =>
+              setNewExpense({ ...newExpense, amount: e.target.value })
+            }
+          />
+        </td>
+
+        <td style={{ width: "20%", textAlign: "center" }}>
+          <button type="submit" className="btn">
+             {lang === "sk" ? "+ Pridať záznam" : "+ Add entry"}
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</form>
+
        {error && <div className="error-text">{error}</div>}
     </div>
   );

@@ -1,0 +1,375 @@
+.organisation {
+  --bg: #e6e7ea;
+  --text: #111;
+  --muted: #555;
+  --gold: #d4a017;
+  --grid: #b6b8be;
+  --white: #ffffff;
+  --pin-gray: #8a8a8a;
+  --pinned-bg: #f3f3f3;
+
+  --shadow: rgba(0, 0, 0, 0.08);
+  --gray: #c7c9ce;
+}
+
+.organisation body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.organisation.wrap {
+  max-width: 1300px;
+  margin: 50px auto;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.organisation .page-title {
+  font-size: 34px;
+  font-weight: 800;
+  color: #000;
+  margin-bottom: 25px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.organisation .page-title::after {
+  content: "";
+  flex-grow: 1;
+  height: 2px;
+  background: var(--gold);
+  margin-left: 10px;
+  border-radius: 2px;
+}
+
+.organisation .table-wrap {
+  border: 1px solid var(--grid);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--white);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.organisation table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15.5px;
+  color: #000;
+  table-layout: fixed;
+}
+
+.organisation th:nth-child(1),
+.organisation td:nth-child(1) { width: 70%; }
+
+.organisation th:nth-child(2),
+.organisation td:nth-child(2) { width: 30%; }
+
+.organisation th,
+.organisation td {
+  border: 1px solid var(--grid);
+  padding: 11px 14px;
+  vertical-align: middle;
+  position: relative;
+}
+
+.organisation th {
+  background: #dcdde1;
+  text-align: left;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.organisation tr.editing td {
+  padding: 0 !important;
+}
+
+.organisation tr.editing .actions {
+  padding: 10px 14px;
+}
+
+.organisation td input[type="text"] {
+  background-color: #fff8e1;
+  border: none;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.organisation td input:focus {
+  outline: none;
+}
+
+.organisation tr.editing td {
+  border-top: 2px solid #d4a017;
+  border-bottom: 2px solid #d4a017;
+}
+
+.organisation tr.editing td:first-child {
+  border-left: 2px solid #d4a017;
+}
+
+.organisation tr.editing td:last-child {
+  border-right: 2px solid #d4a017;
+}
+
+.organisation .action-icon.edit:hover {
+  color: var(--gold);
+}
+
+.organisation tbody tr:nth-child(odd) { background: #fff; }
+.organisation tbody tr:nth-child(even) { background: #f5f6f7; }
+.organisation tbody tr:hover {
+  background: #eceef0;
+  transition: background 0.2s;
+}
+
+.organisation tr.pinned {
+  border-left: 3px solid var(--pin-gray);
+  font-weight: 600;
+}
+
+.organisation tr.pinned td:first-child::before {
+  content: "📌";
+  margin-right: 6px;
+  color: var(--pin-gray);
+  opacity: 0.9;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.organisation tr.pinned.editing td:first-child {
+  position: relative;
+}
+
+.organisation tr.pinned.editing td:first-child::before {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.organisation tr.pinned.editing td input[type="text"] {
+  width: 100%;
+  font-weight: 600;
+  font-size: inherit;
+  font-family: inherit;
+  border: none;
+  padding: 10px 14px 10px 32px;
+  box-sizing: border-box;
+}
+
+.organisation .actions {
+  text-align: center;
+}
+
+.organisation .actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.organisation .action-icon {
+  font-size: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.organisation .action-icon.edit:hover,
+.organisation .action-icon.delete:hover,
+.organisation .action-icon.pinned:hover,
+.organisation .action-icon.unpinned:hover {
+  transform: scale(1.1);
+}
+
+.organisation .pin {
+  color: var(--pin-gray);
+  opacity: 0.7;
+}
+
+.organisation .pin.active {
+  opacity: 1;
+}
+
+.organisation .form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.organisation .form-row input[type="text"] {
+  width: 80%;
+  background: var(--white);
+  border: 1.8px solid var(--grid);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 15px;
+  color: #000;
+  height: 42px;
+  box-sizing: border-box;
+}
+
+.organisation .btn {
+  width: 100%;
+  background: #ebb72e;
+  border: 2px solid #b38a00;
+  color: #1a1200;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+  font-size: 15px;
+  flex-shrink: 0;
+  height: 42px;
+}
+
+.organisation .btn:hover {
+  background: #c49a0f;
+}
+
+.organisation .stats-header {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.organisation .stats-header h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #000;
+  margin: 0;
+}
+
+.organisation .choice-box{
+  font-size: 26px;
+  font-weight: 800;
+  color: #000;
+   margin: 0;
+  display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.organisation .choice-box p{
+ margin: 0px;
+}
+
+.organisation .choice-box form{
+    display: flex;
+    align-items: center;
+  gap: 10px;
+}
+
+/*
+.organisation .choice-box form label {
+    position: relative;
+    padding-right: 10px;
+}
+
+.organisation .choice-box form label:first-of-type::after {
+    content: "|";
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #b6b8be;
+    font-weight: 400;
+    opacity: 0.8;
+}*/
+
+
+.organisation .error-text {
+  width: 100%;
+  margin-top: 6px;
+  color: #d32f2f;
+  font-size: 14px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
+.organisation .organisation-form{
+  width: 100%;
+  margin-top: 15px;
+
+}
+
+.organisation .organisation-table {
+  width: 100%;
+  border-collapse: collapse;
+
+}
+
+.organisation .organisation-table td{
+   border: none;
+
+}
+
+.organisation .organisation-table td {
+  padding: 4px 6px;
+}
+
+.organisation  .organisation-table input {
+  background: white !important;
+  border: 1.8px solid var(--grid) !important;
+  padding: 10px 16px !important;
+  box-sizing: border-box;
+   border-radius: 6px;
+  width: 100%;
+   font-size: 14px !important;
+}
+
+.organisation  .organisation-table tr:hover {
+  background: transparent !important;
+}
+
+
+.organisation  .organisation-table td:focus-within {
+  outline: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.organisation  .organisation-table input:focus {
+  outline: none !important;
+  border: 2px solid black !important;
+  background: white !important;
+}
+
+@media (max-width: 750px) {
+  .organisation .btn  {
+    padding: 5px;
+    font-size: 13px;
+  }
+
+  .organisation table{
+    font-size: 14px;
+  }
+
+  .organisation .choice-box {
+    font-size: 20px;
+  }
+
+  .organisation .page-title{
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 450px) {
+
+  .organisation .choice-box {
+    font-size: 18px;
+  }
+
+}
+

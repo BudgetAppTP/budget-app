@@ -16,7 +16,7 @@
 }
 
 .budget.wrap {
-  max-width: 1200px;
+  max-width: 1300px;
   margin: 40px auto;
   padding: 0 20px;
 }
@@ -62,7 +62,6 @@
   gap: 10px;
 }
 
-/* ==== Buttons ==== */
 .budget .btn {
   background: var(--gold);
   border: 1px solid var(--gold-dark);
@@ -74,8 +73,6 @@
   transition: 0.2s;
   text-decoration: none;
 }
-
-
 
 .budget .btn:hover , .budget .month-nav button:hover , .budget .plan-header button:hover , .budget .table-button:hover {
   background: var(--gold-dark);
@@ -93,7 +90,7 @@
 .budget .section-title::after {
   content: "";
   flex-grow: 1;
-  height: 3px;
+  height: 2px;
   background: var(--gold);
   margin-left: 10px;
   border-radius: 2px;
@@ -282,3 +279,74 @@
 .budget .amount-exp{
   color: #b41e1e;
 }
+
+
+.incomes-table table,.expenses-table table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.incomes-table table th:nth-child(1),
+.incomes-table table td:nth-child(1),
+.expenses-table table th:nth-child(1),
+.expenses-table table td:nth-child(1)
+
+{
+  width: 30%;
+}
+
+.incomes-table table th:nth-child(2),
+.incomes-table table td:nth-child(2),
+ .expenses-table table th:nth-child(2),
+.expenses-table table td:nth-child(2) {
+  width: 40%;
+}
+
+.incomes-table table th:nth-child(3),
+.incomes-table table td:nth-child(3),
+.expenses-table table th:nth-child(3),
+.expenses-table table td:nth-child(3){
+  width: 30%;
+}
+
+@media (max-width: 1000px) {
+  .budget .tables {
+    display: block !important;
+  }
+
+  .budget .table-box {
+    width: 100%;
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 800px) {
+
+  .budget .page-header {
+     display: block;
+}
+
+}
+
+
+@media (max-width: 450px) {
+
+  .budget .plan-header button, .budget .table-button {
+     padding: 6px;
+}
+.budget .plan-header h3 {
+    font-size: 18px;
+}
+
+
+
+}
+
+
+@media (max-width: 400px) {
+
+
+}
+
+
+
