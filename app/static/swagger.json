@@ -81,11 +81,16 @@
                   {
                     "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
                     "external_uid": "INV-2025-00012",
-                    "merchant": "Lidl - potraviny",
+                    "tag": "Groceries",
+                    "tag_id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                    "description": "Lidl - potraviny",
                     "issue_date": "2025-10-27",
                     "currency": "EUR",
                     "total_amount": 45.20,
-                    "extra_metadata": { "payment_method": "card", "vat": 7.5 },
+                    "extra_metadata": {
+                      "payment_method": "card",
+                      "vat": 7.5
+                    },
                     "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
                     "created_at": "2025-10-27T19:00:00Z"
                   }
@@ -97,17 +102,18 @@
       },
       "post": {
         "summary": "Vytvorenie novej účtenky",
-        "description": "Vytvorí novú účtenku (receipt) priradenú k existujúcemu používateľovi.\n\n**Povinné polia:** `user_id`, `merchant`, `issue_date`, `total_amount`\n\n**Nepovinné polia:** `currency` (predvolené `EUR`), `external_uid`, `extra_metadata` (Ľubovoľné JSON údaje, napr. DPH, spôsob platby).",
+        "description": "Vytvorí novú účtenku (receipt) priradenú k existujúcemu používateľovi.\n\n**Povinné polia:** `user_id`, `description`\n\n**Nepovinné polia:** `issue_date`, `currency` (predvolené `EUR`), `total_amount` (predvolené `0.0`), `tag_id` (musí patriť tomu istému používateľovi), `external_uid`, `extra_metadata`.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "example": {
                 "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
-                "merchant": "Lidl - potraviny",
+                "description": "Lidl - týždenný nákup",
                 "issue_date": "2025-10-27",
                 "currency": "EUR",
                 "total_amount": 45.20,
+                "tag_id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
                 "external_uid": "INV-2025-00012",
                 "extra_metadata": {
                   "payment_method": "card",
@@ -135,13 +141,25 @@
             "description": "Chybná požiadavka – chýbajú povinné polia alebo zlé formáty dát",
             "content": {
               "application/json": {
-                "example": { "error": "Missing required fields" }
+                "examples": {
+                  "missing_body": {
+                    "summary": "Chýbajúce telo požiadavky",
+                    "value": { "error": "Missing JSON body" }
+                  },
+                  "validation_error": {
+                    "summary": "Chyba validácie",
+                    "value": {
+                      "error": "Missing user_id"
+                    }
+                  }
+                }
               }
             }
           }
         }
       }
     },
+
     "/api/receipts/{receipt_id}": {
       "get": {
         "summary": "Získanie detailu účtenky podľa ID",
@@ -162,11 +180,16 @@
                 "example": {
                   "id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
                   "external_uid": "INV-2025-00012",
-                  "merchant": "Lidl - potraviny",
+                  "tag": "Groceries",
+                  "tag_id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                  "description": "Lidl - potraviny",
                   "issue_date": "2025-10-27",
                   "currency": "EUR",
                   "total_amount": 45.20,
-                  "extra_metadata": { "payment_method": "card", "vat": 7.5 },
+                  "extra_metadata": {
+                    "payment_method": "card",
+                    "vat": 7.5
+                  },
                   "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
                   "created_at": "2025-10-27T19:00:00Z"
                 }
@@ -176,14 +199,16 @@
           "404": {
             "description": "Účtenka nebola nájdená",
             "content": {
-              "application/json": { "example": { "error": "Receipt not found" } }
+              "application/json": {
+                "example": { "error": "Receipt not found" }
+              }
             }
           }
         }
       },
       "put": {
         "summary": "Aktualizácia existujúcej účtenky",
-        "description": "Aktualizuje záznam účtenky podľa ID.\n\n**Nepovinné polia:** `merchant`, `issue_date`, `currency`, `total_amount`, `external_uid`, `extra_metadata`.",
+        "description": "Aktualizuje záznam účtenky podľa ID.\n\n**Nepovinné polia:** `description`, `issue_date`, `currency`, `total_amount`, `tag_id` (null = odpojiť tag), `external_uid`, `extra_metadata`.",
         "parameters": [
           {
             "in": "path",
@@ -197,10 +222,12 @@
           "content": {
             "application/json": {
               "example": {
-                "merchant": "Tesco - týždenný nákup",
+                "description": "Tesco - týždenný nákup",
                 "issue_date": "2025-10-29",
                 "currency": "EUR",
                 "total_amount": 60.50,
+                "tag_id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                "external_uid": "INV-2025-00013",
                 "extra_metadata": {
                   "payment_method": "cash",
                   "vat": 9.5,
@@ -226,14 +253,25 @@
             "description": "Neplatné dáta alebo formát dátumu",
             "content": {
               "application/json": {
-                "example": { "error": "Invalid date format" }
+                "examples": {
+                  "empty_description": {
+                    "summary": "Prázdny popis",
+                    "value": { "error": "Description cannot be empty" }
+                  },
+                  "invalid_date": {
+                    "summary": "Neplatný formát dátumu",
+                    "value": { "error": "Invalid issue_date format, expected YYYY-MM-DD" }
+                  }
+                }
               }
             }
           },
           "404": {
             "description": "Účtenka nebola nájdená",
             "content": {
-              "application/json": { "example": { "error": "Receipt not found" } }
+              "application/json": {
+                "example": { "error": "Receipt not found" }
+              }
             }
           }
         }
@@ -260,12 +298,75 @@
           "404": {
             "description": "Účtenka nebola nájdená",
             "content": {
-              "application/json": { "example": { "error": "Receipt not found" } }
+              "application/json": {
+                "example": { "error": "Receipt not found" }
+              }
             }
           }
         }
       }
     },
+
+    "/api/receipts/import-ekasa": {
+      "post": {
+        "summary": "Import účtenky z eKasa systému",
+        "description": "Na základe `receiptId` z eKasa API načíta údaje o účtenke a uloží ich do lokálnej databázy pod daného používateľa.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "receiptId": "1234567890ABCDEF",
+                "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Úspešne importovaná účtenka",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "Receipt imported successfully",
+                  "tag": "Lidl - potraviny",
+                  "tag_id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                  "receipt_id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
+                  "total_items": 5
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Chyba pri volaní eKasa API alebo validácii vstupov",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "missing_fields": {
+                    "summary": "Chýbajúce polia",
+                    "value": {
+                      "code": "bad_request",
+                      "message": "Missing receiptId or user_id"
+                    }
+                  },
+                  "ekasa_error": {
+                    "summary": "Chyba eKasa / importu",
+                    "value": {
+                      "code": "ekasa_error",
+                      "message": "Import failed: ...",
+                      "details": {
+                        "error": "Import failed: (sqlite3.OperationalError) ..."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
     "/api/receipts/{receipt_id}/items": {
       "get": {
         "summary": "Získanie všetkých položiek účtenky",
@@ -298,7 +399,9 @@
           "404": {
             "description": "Účtenka nebola nájdená",
             "content": {
-              "application/json": { "example": { "error": "Receipt not found" } }
+              "application/json": {
+                "example": { "error": "Receipt not found" }
+              }
             }
           }
         }
@@ -333,13 +436,17 @@
             "description": "Položka úspešne pridaná",
             "content": {
               "application/json": {
-                "example": { "item_id": "7a05d2e9-2b9f-4f26-bb3b-6b0b6a6d2f98", "message": "Item created successfully" }
+                "example": {
+                  "item_id": "7a05d2e9-2b9f-4f26-bb3b-6b0b6a6d2f98",
+                  "message": "Item created successfully"
+                }
               }
             }
           }
         }
       }
     },
+
     "/api/receipts/{receipt_id}/items/{item_id}": {
       "put": {
         "summary": "Aktualizácia položky účtenky",
@@ -361,8 +468,22 @@
           }
         },
         "responses": {
-          "200": { "description": "Úspešne aktualizované" },
-          "404": { "description": "Položka nebola nájdená" }
+          "200": {
+            "description": "Úspešne aktualizované",
+            "content": {
+              "application/json": {
+                "example": { "message": "Item updated successfully" }
+              }
+            }
+          },
+          "404": {
+            "description": "Položka nebola nájdená",
+            "content": {
+              "application/json": {
+                "example": { "error": "Item not found" }
+              }
+            }
+          }
         }
       },
       "delete": {
@@ -374,12 +495,24 @@
         "responses": {
           "200": {
             "description": "Položka úspešne vymazaná",
-            "content": { "application/json": { "example": { "message": "Item deleted successfully" } } }
+            "content": {
+              "application/json": {
+                "example": { "message": "Item deleted successfully" }
+              }
+            }
           },
-          "404": { "description": "Položka nebola nájdená" }
+          "404": {
+            "description": "Položka nebola nájdená",
+            "content": {
+              "application/json": {
+                "example": { "error": "Item not found" }
+              }
+            }
+          }
         }
       }
     },
+
     "/api/incomes/": {
       "get": {
         "summary": "Získanie zoznamu všetkých príjmov",
@@ -406,8 +539,26 @@
                 "example": {
                   "success": true,
                   "incomes": [
-                    { "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9", "income_date": "2025-10-01", "description": "Výplata", "amount": 1200.00 },
-                    { "id": "d4c2f11e-89ab-4cbb-9e12-1f2d6f8e1b2a", "income_date": "2025-10-05", "description": "Darček od babky", "amount": 200.00 }
+                    {
+                      "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "tag": "Salary",
+                      "tag_id": "aa5f9e12-5b74-4d0e-aeb8-8a3e8a3be111",
+                      "description": "Výplata",
+                      "amount": 1200.00,
+                      "income_date": "2025-10-01",
+                      "extra_metadata": null
+                    },
+                    {
+                      "id": "d4c2f11e-89ab-4cbb-9e12-1f2d6f8e1b2a",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "tag": null,
+                      "tag_id": null,
+                      "description": "Darček od babky",
+                      "amount": 200.00,
+                      "income_date": "2025-10-05",
+                      "extra_metadata": null
+                    }
                   ],
                   "total_amount": 1400.00
                 }
@@ -427,7 +578,12 @@
                 "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
                 "income_date": "2025-10-15",
                 "description": "Freelance projekt",
-                "amount": 500.00
+                "amount": 500.00,
+                "tag_id": "aa5f9e12-5b74-4d0e-aeb8-8a3e8a3be111",
+                "extra_metadata": {
+                  "project": "ML model",
+                  "client": "ABC Corp"
+                }
               }
             }
           }
@@ -438,13 +594,8 @@
             "content": {
               "application/json": {
                 "example": {
-                  "success": true,
-                  "income": {
-                    "id": "e7d4a5b2-3c1a-4d33-9182-0f3a9b1c2d4e",
-                    "income_date": "2025-10-15",
-                    "description": "Freelance projekt",
-                    "amount": 500.00
-                  }
+                  "id": "e7d4a5b2-3c1a-4d33-9182-0f3a9b1c2d4e",
+                  "message": "Income created successfully"
                 }
               }
             }
@@ -453,13 +604,27 @@
             "description": "Neplatné vstupné dáta",
             "content": {
               "application/json": {
-                "example": { "success": false, "error": "Invalid input data" }
+                "examples": {
+                  "missing_description": {
+                    "summary": "Chýbajúci popis",
+                    "value": { "error": "Missing description" }
+                  },
+                  "invalid_tag": {
+                    "summary": "Tag neexistuje alebo nepatrí používateľovi",
+                    "value": { "error": "Tag does not belong to this user" }
+                  },
+                  "invalid_format": {
+                    "summary": "Neplatný formát UUID/dát",
+                    "value": { "error": "Invalid data format: ..." }
+                  }
+                }
               }
             }
           }
         }
       }
     },
+
     "/api/incomes/{income_id}": {
       "get": {
         "summary": "Získanie detailu príjmu podľa ID",
@@ -478,13 +643,14 @@
             "content": {
               "application/json": {
                 "example": {
-                  "success": true,
-                  "income": {
-                    "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
-                    "income_date": "2025-10-01",
-                    "description": "Výplata",
-                    "amount": 1200.00
-                  }
+                  "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
+                  "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                  "tag": "Salary",
+                  "tag_id": "aa5f9e12-5b74-4d0e-aeb8-8a3e8a3be111",
+                  "description": "Výplata",
+                  "amount": 1200.00,
+                  "income_date": "2025-10-01",
+                  "extra_metadata": null
                 }
               }
             }
@@ -493,7 +659,7 @@
             "description": "Príjem nebol nájdený",
             "content": {
               "application/json": {
-                "example": { "success": false, "error": "Income not found" }
+                "example": { "error": "Income not found" }
               }
             }
           }
@@ -517,7 +683,11 @@
               "example": {
                 "income_date": "2025-10-16",
                 "description": "Zmenený popis",
-                "amount": 600.00
+                "amount": 600.00,
+                "tag_id": "aa5f9e12-5b74-4d0e-aeb8-8a3e8a3be111",
+                "extra_metadata": {
+                  "note": "upravené po revízii"
+                }
               }
             }
           }
@@ -528,12 +698,24 @@
             "content": {
               "application/json": {
                 "example": {
-                  "success": true,
-                  "income": {
-                    "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
-                    "income_date": "2025-10-16",
-                    "description": "Zmenený popis",
-                    "amount": 600.00
+                  "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9",
+                  "message": "Income updated successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "empty_description": {
+                    "summary": "Prázdny popis",
+                    "value": { "error": "Description cannot be empty" }
+                  },
+                  "invalid_tag": {
+                    "summary": "Neplatný tag",
+                    "value": { "error": "Tag not found" }
                   }
                 }
               }
@@ -543,7 +725,7 @@
             "description": "Príjem nebol nájdený",
             "content": {
               "application/json": {
-                "example": { "success": false, "error": "Income not found" }
+                "example": { "error": "Income not found" }
               }
             }
           }
@@ -565,12 +747,7 @@
             "description": "Úspešne odstránené",
             "content": {
               "application/json": {
-                "example": {
-                  "success": true,
-                  "incomes": [
-                    { "id": "b1a4a77d-2ac9-4e1f-bb28-894f51d4a6c9", "income_date": "2025-10-01", "description": "Výplata", "amount": 1200.00 }
-                  ]
-                }
+                "example": { "message": "Income deleted successfully" }
               }
             }
           },
@@ -578,7 +755,7 @@
             "description": "Príjem nebol nájdený",
             "content": {
               "application/json": {
-                "example": { "success": false, "error": "Income not found" }
+                "example": { "error": "Income not found" }
               }
             }
           }

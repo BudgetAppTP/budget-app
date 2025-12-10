@@ -36,7 +36,17 @@ def api_incomes_list():
           {
             "success": true,
             "incomes": [
-              {"id": "...", "income_date": "YYYY-MM-DD", "description": "str", "amount": number}
+              {
+                "id": "<uuid>",
+                "user_id": "<uuid>",
+                "tag": "Salary" | null,
+                "tag_id": "<uuid>" | null,
+                "description": "Freelance projekt",
+                "amount": number,
+                "income_date": "YYYY-MM-DD" | null,
+                "extra_metadata": { ... } | null
+              },
+              ...
             ],
             "total_amount": number
           }
@@ -63,23 +73,34 @@ def api_incomes_create():
 
     Request (JSON example):
       {
-        "user_id": "<uuid>",
-        "income_date": "YYYY-MM-DD",
-        "description": "Freelance projekt",
-        "amount": 500.00
+        "user_id": "<uuid>",               # required
+        "income_date": "YYYY-MM-DD",       # optional (can be null/omitted)
+        "description": "Freelance projekt",# required, non-empty string
+        "amount": 500.00,                  # optional, defaults to 0 if missing
+        "tag_id": "<uuid>",                # optional, must belong to the same user
+        "extra_metadata": { ... }          # optional JSON
       }
 
     Responses:
       201:
         data:
           {
-            "success": true,
-            "income": {"id": "...", "income_date": "YYYY-MM-DD", "description": "str", "amount": number}
+            "id": "<uuid>",
+            "message": "Income created successfully"
           }
         error: null
+
       400:
-        data: null
-        error: {"code":"bad_request","message":"Invalid input data"}
+        data:
+          {
+            "error": "Missing description"
+              | "Invalid user_id format"
+              | "Invalid tag_id format"
+              | "Tag not found"
+              | "Tag does not belong to this user"
+              | "Invalid data format: ..."
+          }
+        error: null
     """
     payload = request.get_json(force=True) or {}
     response, status = incomes_service.create_income(payload)
@@ -99,13 +120,23 @@ def api_incomes_get(income_id):
       200:
         data:
           {
-            "success": true,
-            "income": {"id":"...","income_date":"YYYY-MM-DD","description":"...","amount":number}
+            "id": "<uuid>",
+            "user_id": "<uuid>",
+            "tag": "Salary" | null,
+            "tag_id": "<uuid>" | null,
+            "description": "Freelance projekt",
+            "amount": number,
+            "income_date": "YYYY-MM-DD" | null,
+            "extra_metadata": { ... } | null
           }
         error: null
+
       404:
-        data: null
-        error: {"code":"not_found","message":"Income not found"}
+        data:
+          {
+            "error": "Income not found"
+          }
+        error: null
     """
     response, status = incomes_service.get_income_by_id(income_id)
     return make_response(response, None, status)
@@ -122,25 +153,43 @@ def api_incomes_update(income_id):
 
     Request (JSON example):
       {
-        "income_date": "YYYY-MM-DD",
-        "description": "Updated",
-        "amount": 600.00
+        "income_date": "YYYY-MM-DD",       # optional
+        "description": "Updated description",  # optional, if present must be non-empty
+        "amount": 600.00,                  # optional
+        "tag_id": "<uuid>",                # optional (null to detach tag)
+        "extra_metadata": { ... }          # optional
       }
 
     Responses:
       200:
         data:
           {
-            "success": true,
-            "income": {"id":"...","income_date":"YYYY-MM-DD","description":"Updated","amount":600.0}
+            "id": "<uuid>",
+            "message": "Income updated successfully"
           }
         error: null
+
       400:
-        data: null
-        error: {"code":"bad_request","message":"Missing JSON body"}
+        - If body is missing:
+          data: null
+          error: {"code":"bad_request","message":"Missing JSON body"}
+
+        - If validation fails (e.g. empty description, invalid tag/user):
+          data:
+            {
+              "error": "Description cannot be empty"
+                | "Invalid tag_id format"
+                | "Tag not found"
+                | "Tag does not belong to this user"
+            }
+          error: null
+
       404:
-        data: null
-        error: {"code":"not_found","message":"Income not found"}
+        data:
+          {
+            "error": "Income not found"
+          }
+        error: null
     """
     payload = request.get_json() or {}
     if not payload:
@@ -160,11 +209,18 @@ def api_incomes_delete(income_id):
 
     Responses:
       200:
-        data: {"success": true, "...": "..."}  # implementation defined
+        data:
+          {
+            "message": "Income deleted successfully"
+          }
         error: null
+
       404:
-        data: null
-        error: {"code":"not_found","message":"Income not found"}
+        data:
+          {
+            "error": "Income not found"
+          }
+        error: null
     """
     response, status = incomes_service.delete_income(income_id)
     return make_response(response, None, status)
