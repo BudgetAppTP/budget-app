@@ -63,6 +63,8 @@ def _register_api(flask_app: Flask):
     import app.api.receipts      # noqa: F401
     import app.api.receipt_items # noqa: F401
     import app.api.users         # noqa: F401
+    import app.api.tags          # noqa: F401
+    import app.api.monthly_budget # noqa: F401
     flask_app.register_blueprint(api_bp)
 
 
