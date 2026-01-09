@@ -12,17 +12,27 @@ Notes:
 - Swagger может показывать «сырой» JSON (без конверта). Фактический ответ — в конверте:
   { "data": <payload>, "error": null }.
 """
+import uuid
 
 from flask import request
 from app.api import bp, make_response
-from app.services import receipts_service
+from app.services import receipts_service, tags_service
 
 
 @bp.get("/receipts", strict_slashes=False)
 def api_receipts_list():
     """
     GET /api/receipts/
-    Summary: List receipts
+    Summary: List receipts with optional sorting and optional month/year filter
+
+    Query:
+      - sort: "issue_date" | "total_amount" (default: "issue_date")
+      - order: "asc" | "desc" (default: "desc")
+      - year: YYYY (optional, must be provided вместе с month)
+      - month: 1..12 (optional, must be provided вместе с year)
+
+    Notes:
+      - If year+month are provided, endpoint returns only receipts from that month/year.
 
     Responses:
       200:
@@ -43,9 +53,90 @@ def api_receipts_list():
           ...
         ]
         error: null
+
+      400:
+        - If query params are invalid:
+          data:
+            { "error": "Both year and month must be provided together"
+              | "Month must be between 1 and 12"
+              | "Invalid year/month format"
+            }
+          error: null
     """
-    receipts = receipts_service.get_all_receipts()
-    return make_response(receipts, None, 200)
+    sort_by = request.args.get("sort", "issue_date")
+    order = request.args.get("order", "desc")
+    reverse = order.lower() == "desc"
+
+    year_raw = request.args.get("year")
+    month_raw = request.args.get("month")
+
+    year = None
+    month = None
+
+    # Parse year/month if provided
+    try:
+        if year_raw is not None:
+            year = int(year_raw)
+        if month_raw is not None:
+            month = int(month_raw)
+    except ValueError:
+        return make_response({"error": "Invalid year/month format"}, None, 400)
+
+    data, status = receipts_service.get_all_receipts(year=year, month=month)
+    if status != 200:
+        return make_response(data, None, status)
+    try:
+        data.sort(key=lambda r: r.get(sort_by), reverse=reverse)
+    except Exception:
+        pass
+
+    return make_response(data, None, 200)
+
+
+@bp.get("/receipts/tags", strict_slashes=False)
+def api_expense_tags_list():
+    """
+    GET /api/receipts/tags
+    Summary: Get all expense-related tags (type=EXPENSE or BOTH)
+
+    Query (optional):
+      - user_id: uuid (if provided, returns only tags of that user)
+
+    Responses:
+      200:
+        data:
+          {
+            "success": true,
+            "tags": [
+              {
+                "id": "<uuid>",
+                "user_id": "<uuid>",
+                "name": "Groceries",
+                "type": "EXPENSE" | "BOTH",
+                "counter": number
+              },
+              ...
+            ]
+          }
+        error: null
+
+      400:
+        - If user_id format is invalid:
+          data:
+            { "error": "Invalid user_id format" }
+          error: null
+    """
+    raw_user_id = request.args.get("user_id")
+    user_id = None
+
+    if raw_user_id:
+        try:
+            user_id = uuid.UUID(raw_user_id)
+        except ValueError:
+            return make_response({"error": "Invalid user_id format"}, None, 400)
+
+    data, status = tags_service.get_expense_tags(user_id=user_id)
+    return make_response(data, None, status)
 
 
 @bp.post("/receipts", strict_slashes=False)

@@ -8,8 +8,48 @@ from datetime import date, datetime
 from app.services import tags_service, ekasa_service
 
 
-def get_all_receipts():
-    receipts = db.session.query(Receipt).all()
+def get_all_receipts(year: int | None = None, month: int | None = None):
+    """
+    Get all receipts.
+
+    Optional filtering:
+      - year + month: return only receipts that belong to given month/year.
+
+    Args:
+      year: int | None
+      month: int | None (1..12)
+
+    Returns:
+      tuple: (payload: list|dict, status_code: int)
+
+      payload example (success):
+        [
+          {"id":"...", "issue_date":"YYYY-MM-DD", "total_amount": 10.0, ...},
+          ...
+        ]
+    """
+    query = db.session.query(Receipt)
+
+    # Filter by month/year (both must be provided together)
+    if (year is None) ^ (month is None):
+        return {"error": "Both year and month must be provided together"}, 400
+
+    if year is not None and month is not None:
+        if month < 1 or month > 12:
+            return {"error": "Month must be between 1 and 12"}, 400
+
+        start = date(year, month, 1)
+        if month == 12:
+            end = date(year + 1, 1, 1)
+        else:
+            end = date(year, month + 1, 1)
+
+        query = query.filter(
+            Receipt.issue_date >= start,
+            Receipt.issue_date < end
+        )
+
+    receipts = query.all()
 
     result = []
     for r in receipts:
@@ -26,7 +66,8 @@ def get_all_receipts():
             "user_id": str(r.user_id),
             "created_at": r.created_at.isoformat() if r.created_at else None
         })
-    return result
+
+    return result, 200
 
 def _parse_user_id(raw_user_id):
     """
@@ -286,12 +327,16 @@ def import_receipt_from_ekasa(receipt_id: str, user_id: str):
         if tag is not None:
             tags_service.register_tag_assigned(tag)
 
-        # Items
-        for i in r.get("items", []):
+        # Items (eKasa can return items=null)
+        items = r.get("items") or []  # None -> []
+        if not isinstance(items, list):
+            items = []
+
+        for i in items:
             item = ReceiptItem(
                 receipt=receipt,
                 user_id=user_uuid,
-                name=i.get("name", "").strip(),
+                name=(i.get("name") or "").strip(),
                 quantity=Decimal(str(i.get("quantity", 1))),
                 unit_price=Decimal(str(i.get("price", 0))),
                 total_price=Decimal(str(i.get("price", 0))),
@@ -309,7 +354,7 @@ def import_receipt_from_ekasa(receipt_id: str, user_id: str):
             "tag": tag.name if tag else None,
             "tag_id": tag.id if tag else None,
             "receipt_id": str(receipt.id),
-            "total_items": len(r.get("items", [])),
+            "total_items": len(items),
         }, 201
 
     except Exception as e:

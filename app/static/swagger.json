@@ -72,6 +72,33 @@
     "/api/receipts": {
       "get": {
         "summary": "Získanie zoznamu všetkých účteniek",
+        "description": "Vráti zoznam všetkých účteniek. Možno použiť voliteľné parametre na triedenie podľa dátumu alebo sumy a filtrovanie podľa mesiaca/roku.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": { "type": "string", "enum": ["issue_date", "total_amount"], "default": "issue_date" },
+            "description": "Triedenie podľa poľa (issue_date alebo total_amount)"
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" },
+            "description": "Poradie triedenia – vzostupne alebo zostupne"
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": { "type": "integer", "example": 2025 },
+            "description": "Rok (použiť spolu s month)"
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 12, "example": 10 },
+            "description": "Mesiac (1..12) (použiť spolu s year)"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Úspešne načítané účtenky",
@@ -95,6 +122,27 @@
                     "created_at": "2025-10-27T19:00:00Z"
                   }
                 ]
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_year_month_format": {
+                    "summary": "Neplatný formát year/month",
+                    "value": { "error": "Invalid year/month format" }
+                  },
+                  "missing_one_param": {
+                    "summary": "Chýba year alebo month",
+                    "value": { "error": "Both year and month must be provided together" }
+                  },
+                  "month_out_of_range": {
+                    "summary": "Mesiac mimo rozsahu",
+                    "value": { "error": "Month must be between 1 and 12" }
+                  }
+                }
               }
             }
           }
@@ -300,6 +348,56 @@
             "content": {
               "application/json": {
                 "example": { "error": "Receipt not found" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/receipts/tags": {
+      "get": {
+        "summary": "Získanie všetkých expense tagov",
+        "description": "Vráti zoznam tagov, ktoré sú typu EXPENSE alebo BOTH. Voliteľne je možné filtrovať podľa používateľa.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "user_id",
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID používateľa (voliteľné)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "tags": [
+                    {
+                      "id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "name": "Groceries",
+                      "type": "EXPENSE",
+                      "counter": 3
+                    },
+                    {
+                      "id": "aa5f9e12-5b74-4d0e-aeb8-8a3e8a3be111",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "name": "Home",
+                      "type": "BOTH",
+                      "counter": 5
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "example": { "error": "Invalid user_id format" }
               }
             }
           }
