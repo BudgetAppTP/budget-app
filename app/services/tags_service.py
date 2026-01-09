@@ -99,3 +99,48 @@ def find_or_create_tag_from_ekasa(user_id: uuid.UUID, data: dict) -> Tag | None:
     db.session.add(tag)
     db.session.flush()
     return tag
+
+
+def get_income_tags(user_id: uuid.UUID | None = None):
+    """
+    Get all tags that relate to incomes.
+
+    Includes:
+      - TagType.INCOME
+      - TagType.BOTH
+
+    Args:
+      user_id: optional UUID to filter tags for a specific user
+
+    Returns:
+      tuple: (payload: dict, status_code: int)
+
+      payload example:
+        {
+          "success": True,
+          "tags": [
+            {"id":"...", "user_id":"...", "name":"Salary", "type":"INCOME", "counter": 3},
+            ...
+          ]
+        }
+    """
+    query = db.session.query(Tag).filter(
+        Tag.type.in_([TagType.INCOME, TagType.BOTH])
+    )
+
+    if user_id is not None:
+        query = query.filter(Tag.user_id == user_id)
+
+    tags = query.order_by(Tag.name.asc()).all()
+
+    result = []
+    for t in tags:
+        result.append({
+            "id": str(t.id),
+            "user_id": str(t.user_id),
+            "name": t.name,
+            "type": t.type.name if t.type is not None else None,
+            "counter": int(t.counter) if t.counter is not None else 0
+        })
+
+    return {"success": True, "tags": result}, 200

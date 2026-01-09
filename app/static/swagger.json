@@ -529,6 +529,18 @@
             "name": "order",
             "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" },
             "description": "Poradie triedenia – vzostupne alebo zostupne"
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": { "type": "integer", "example": 2025 },
+            "description": "Rok (použiť spolu s month)"
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 12, "example": 10 },
+            "description": "Mesiac (1..12) (použiť spolu s year)"
           }
         ],
         "responses": {
@@ -561,6 +573,27 @@
                     }
                   ],
                   "total_amount": 1400.00
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_year_month_format": {
+                    "summary": "Neplatný formát year/month",
+                    "value": { "error": "Invalid year/month format" }
+                  },
+                  "missing_one_param": {
+                    "summary": "Chýba year alebo month",
+                    "value": { "error": "Both year and month must be provided together" }
+                  },
+                  "month_out_of_range": {
+                    "summary": "Mesiac mimo rozsahu",
+                    "value": { "error": "Month must be between 1 and 12" }
+                  }
                 }
               }
             }
@@ -624,7 +657,56 @@
         }
       }
     },
-
+    "/api/incomes/tags": {
+      "get": {
+        "summary": "Získanie všetkých income tagov",
+        "description": "Vráti zoznam tagov, ktoré sú typu INCOME alebo BOTH. Voliteľne je možné filtrovať podľa používateľa.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "user_id",
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID používateľa (voliteľné)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "tags": [
+                    {
+                      "id": "aa5f9e12-5b74-4d0e-aeb8-8a3e8a3be111",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "name": "Salary",
+                      "type": "INCOME",
+                      "counter": 3
+                    },
+                    {
+                      "id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "name": "Freelance",
+                      "type": "BOTH",
+                      "counter": 5
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "example": { "error": "Invalid user_id format" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/incomes/{income_id}": {
       "get": {
         "summary": "Získanie detailu príjmu podľa ID",
