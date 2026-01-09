@@ -393,3 +393,86 @@ def api_receipts_import_ekasa():
 
     # Success path – payload goes into `data`
     return make_response(service_payload, None, status)
+
+
+@bp.get("/receipts/ekasa-items", strict_slashes=False)
+def api_receipts_ekasa_items():
+    """
+    GET /api/receipts/ekasa-items
+    Summary: Get all eKasa items for a specific month+year, grouped by receipt (check)
+
+    Query:
+      - year: YYYY (required together with month)
+      - month: 1..12 (required together with year)
+      - user_id: uuid (optional filter)
+
+    Notes:
+      - Only receipts imported from eKasa are returned.
+        (Detected by Receipt.external_uid != null)
+
+    Responses:
+      200:
+        data:
+          {
+            "success": true,
+            "checks": [
+              {
+                "receipt_id": "<uuid>",
+                "external_uid": "<ekasa receiptId>",
+                "issue_date": "YYYY-MM-DD",
+                "description": "...",
+                "currency": "EUR",
+                "total_amount": number,
+                "tag": "Groceries"|null,
+                "tag_id": "<uuid>"|null,
+                "user_id": "<uuid>",
+                "items": [
+                  {
+                    "id": "<uuid>",
+                    "name": "...",
+                    "quantity": number,
+                    "unit_price": number,
+                    "total_price": number,
+                    "category_id": "<uuid>"|null,
+                    "extra_metadata": {...}|null
+                  }
+                ]
+              }
+            ],
+            "total_checks": number,
+            "total_items": number
+          }
+        error: null
+
+      400:
+        data: { "error": "Both year and month must be provided together"
+                     | "Invalid year/month format"
+                     | "Month must be between 1 and 12"
+                     | "Invalid user_id format" }
+        error: null
+    """
+    year_raw = request.args.get("year")
+    month_raw = request.args.get("month")
+
+    # optional user filter
+    raw_user_id = request.args.get("user_id")
+    user_id = None
+    if raw_user_id:
+        try:
+            user_id = uuid.UUID(raw_user_id)
+        except ValueError:
+            return make_response({"error": "Invalid user_id format"}, None, 400)
+
+    # Parse year/month (both optional, но должны быть вместе)
+    year = None
+    month = None
+    try:
+        if year_raw is not None:
+            year = int(year_raw)
+        if month_raw is not None:
+            month = int(month_raw)
+    except ValueError:
+        return make_response({"error": "Invalid year/month format"}, None, 400)
+
+    data, status = receipts_service.get_ekasa_items(year=year, month=month, user_id=user_id)
+    return make_response(data, None, status)

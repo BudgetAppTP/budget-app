@@ -1,6 +1,8 @@
 import uuid
 from decimal import Decimal
 
+from sqlalchemy.orm import joinedload
+
 from app.extensions import db
 from app.models import Receipt, Tag, ReceiptItem
 from datetime import date, datetime
@@ -360,3 +362,85 @@ def import_receipt_from_ekasa(receipt_id: str, user_id: str):
     except Exception as e:
         db.session.rollback()
         return {"error": f"Import failed: {str(e)}"}, 400
+
+def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: uuid.UUID | None = None):
+    """
+    Return eKasa receipt items grouped under their receipt (check) for a given month/year.
+
+    Rules:
+      - year and month must be provided together (same as incomes/receipts filters)
+      - month must be 1..12
+      - only eKasa-imported receipts are included (Receipt.external_uid != null)
+      - optional user_id filter
+    """
+    # month/year validation (same messages as other endpoints)
+    if (year is None) ^ (month is None):
+        return {"error": "Both year and month must be provided together"}, 400
+
+    start = end = None
+    if year is not None and month is not None:
+        if month < 1 or month > 12:
+            return {"error": "Month must be between 1 and 12"}, 400
+
+        start = date(year, month, 1)
+        end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+
+    query = (
+        db.session.query(Receipt)
+        .options(
+            joinedload(Receipt.items),
+            joinedload(Receipt.tag),
+        )
+        .filter(Receipt.external_uid.isnot(None))  # eKasa-import marker
+    )
+
+    # optional date filter
+    if start is not None and end is not None:
+        query = query.filter(
+            Receipt.issue_date >= start,
+            Receipt.issue_date < end,
+        )
+
+    # optional user filter
+    if user_id is not None:
+        query = query.filter(Receipt.user_id == user_id)
+
+    receipts = query.order_by(Receipt.issue_date.asc(), Receipt.created_at.asc()).all()
+
+    checks = []
+    total_items = 0
+
+    for r in receipts:
+        items = []
+        for it in (r.items or []):
+            items.append({
+                "id": str(it.id),
+                "name": it.name,
+                "quantity": float(it.quantity) if it.quantity is not None else None,
+                "unit_price": float(it.unit_price) if it.unit_price is not None else None,
+                "total_price": float(it.total_price) if it.total_price is not None else None,
+                "category_id": str(it.category_id) if it.category_id else None,
+                "extra_metadata": it.extra_metadata,
+            })
+
+        total_items += len(items)
+
+        checks.append({
+            "receipt_id": str(r.id),
+            "external_uid": r.external_uid,  # eKasa receiptId
+            "issue_date": r.issue_date.isoformat() if r.issue_date else None,
+            "description": r.description,
+            "currency": r.currency,
+            "total_amount": float(r.total_amount) if r.total_amount is not None else None,
+            "tag": r.tag.name if r.tag else None,
+            "tag_id": str(r.tag_id) if r.tag_id else None,
+            "user_id": str(r.user_id),
+            "items": items,
+        })
+
+    return {
+        "success": True,
+        "checks": checks,
+        "total_checks": len(checks),
+        "total_items": total_items,
+    }, 200
