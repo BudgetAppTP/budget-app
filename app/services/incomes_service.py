@@ -7,8 +7,51 @@ from app.models import Income, Tag
 from app.services import tags_service
 
 
-def get_all_incomes():
-    incomes = db.session.query(Income).all()
+def get_all_incomes(year: int | None = None, month: int | None = None):
+    """
+    Get all incomes.
+
+    Optional filtering:
+      - year + month: return only incomes that belong to given month/year.
+
+    Args:
+      year: int | None
+      month: int | None (1..12)
+
+    Returns:
+      tuple: (payload: dict, status_code: int)
+
+      payload example:
+        {
+          "success": True,
+          "incomes": [...],
+          "total_amount": 1400.0
+        }
+    """
+    query = db.session.query(Income)
+
+    # Filter by month/year (both must be provided together)
+    if (year is None) ^ (month is None):
+        return {"error": "Both year and month must be provided together"}, 400
+
+    if year is not None and month is not None:
+        if month < 1 or month > 12:
+            return {"error": "Month must be between 1 and 12"}, 400
+
+        start = date(year, month, 1)
+        if month == 12:
+            end = date(year + 1, 1, 1)
+        else:
+            end = date(year, month + 1, 1)
+
+        query = query.filter(
+            Income.income_date.isnot(None),
+            Income.income_date >= start,
+            Income.income_date < end
+        )
+
+    incomes = query.all()
+
     result = []
     for inc in incomes:
         result.append({

@@ -72,6 +72,33 @@
     "/api/receipts": {
       "get": {
         "summary": "Získanie zoznamu všetkých účteniek",
+        "description": "Vráti zoznam všetkých účteniek. Možno použiť voliteľné parametre na triedenie podľa dátumu alebo sumy a filtrovanie podľa mesiaca/roku.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": { "type": "string", "enum": ["issue_date", "total_amount"], "default": "issue_date" },
+            "description": "Triedenie podľa poľa (issue_date alebo total_amount)"
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" },
+            "description": "Poradie triedenia – vzostupne alebo zostupne"
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": { "type": "integer", "example": 2025 },
+            "description": "Rok (použiť spolu s month)"
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 12, "example": 10 },
+            "description": "Mesiac (1..12) (použiť spolu s year)"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Úspešne načítané účtenky",
@@ -95,6 +122,27 @@
                     "created_at": "2025-10-27T19:00:00Z"
                   }
                 ]
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_year_month_format": {
+                    "summary": "Neplatný formát year/month",
+                    "value": { "error": "Invalid year/month format" }
+                  },
+                  "missing_one_param": {
+                    "summary": "Chýba year alebo month",
+                    "value": { "error": "Both year and month must be provided together" }
+                  },
+                  "month_out_of_range": {
+                    "summary": "Mesiac mimo rozsahu",
+                    "value": { "error": "Month must be between 1 and 12" }
+                  }
+                }
               }
             }
           }
@@ -306,7 +354,157 @@
         }
       }
     },
-
+    "/api/receipts/tags": {
+      "get": {
+        "summary": "Získanie všetkých expense tagov",
+        "description": "Vráti zoznam tagov, ktoré sú typu EXPENSE alebo BOTH. Voliteľne je možné filtrovať podľa používateľa.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "user_id",
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID používateľa (voliteľné)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "tags": [
+                    {
+                      "id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "name": "Groceries",
+                      "type": "EXPENSE",
+                      "counter": 3
+                    },
+                    {
+                      "id": "aa5f9e12-5b74-4d0e-aeb8-8a3e8a3be111",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "name": "Home",
+                      "type": "BOTH",
+                      "counter": 5
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "example": { "error": "Invalid user_id format" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/receipts/ekasa-items": {
+      "get": {
+        "summary": "Získanie eKasa položiek za konkrétny mesiac+rok (zoskupené podľa bločku)",
+        "description": "Vráti všetky eKasa položky (receipt items) za zadaný mesiac a rok. Položky patriace k rovnakému bločku (účtenke) sú vrátené ako pole `items` pod jedným záznamom v `checks`.\n\n**Poznámka:** Endpoint vracia iba účtenky importované z eKasa (napr. tie, ktoré majú `external_uid`).",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "schema": { "type": "integer", "example": 2025 },
+            "description": "Rok (použiť spolu s month)"
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 12, "example": 10 },
+            "description": "Mesiac (1..12) (použiť spolu s year)"
+          },
+          {
+            "in": "query",
+            "name": "user_id",
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID používateľa (voliteľné) – filtruje iba bločky daného používateľa"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "checks": [
+                    {
+                      "receipt_id": "c0e4f248-f14d-4f53-b92c-9f5ecb8239d4",
+                      "external_uid": "1234567890ABCDEF",
+                      "issue_date": "2025-10-27",
+                      "description": "Lidl - potraviny",
+                      "currency": "EUR",
+                      "total_amount": 45.2,
+                      "tag": "Groceries",
+                      "tag_id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "items": [
+                        {
+                          "id": "dfcd4441-8a3a-4d62-bac9-2eb7a6dbb2e9",
+                          "name": "Mlieko",
+                          "quantity": 2,
+                          "unit_price": 1.2,
+                          "total_price": 2.4,
+                          "category_id": null,
+                          "extra_metadata": {
+                            "vatRate": 20,
+                            "itemType": "T"
+                          }
+                        },
+                        {
+                          "id": "7a05d2e9-2b9f-4f26-bb3b-6b0b6a6d2f98",
+                          "name": "Chlieb",
+                          "quantity": 1,
+                          "unit_price": 1.5,
+                          "total_price": 1.5,
+                          "category_id": "a3f84b9a-42cc-4ef9-9f1d-84e7e3e2d56d",
+                          "extra_metadata": null
+                        }
+                      ]
+                    }
+                  ],
+                  "total_checks": 1,
+                  "total_items": 2
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_year_month_format": {
+                    "summary": "Neplatný formát year/month",
+                    "value": { "error": "Invalid year/month format" }
+                  },
+                  "missing_one_param": {
+                    "summary": "Chýba year alebo month",
+                    "value": { "error": "Both year and month must be provided together" }
+                  },
+                  "month_out_of_range": {
+                    "summary": "Mesiac mimo rozsahu",
+                    "value": { "error": "Month must be between 1 and 12" }
+                  },
+                  "invalid_user_id": {
+                    "summary": "Neplatný formát user_id",
+                    "value": { "error": "Invalid user_id format" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/receipts/import-ekasa": {
       "post": {
         "summary": "Import účtenky z eKasa systému",
@@ -529,6 +727,18 @@
             "name": "order",
             "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" },
             "description": "Poradie triedenia – vzostupne alebo zostupne"
+          },
+          {
+            "in": "query",
+            "name": "year",
+            "schema": { "type": "integer", "example": 2025 },
+            "description": "Rok (použiť spolu s month)"
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 12, "example": 10 },
+            "description": "Mesiac (1..12) (použiť spolu s year)"
           }
         ],
         "responses": {
@@ -561,6 +771,27 @@
                     }
                   ],
                   "total_amount": 1400.00
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_year_month_format": {
+                    "summary": "Neplatný formát year/month",
+                    "value": { "error": "Invalid year/month format" }
+                  },
+                  "missing_one_param": {
+                    "summary": "Chýba year alebo month",
+                    "value": { "error": "Both year and month must be provided together" }
+                  },
+                  "month_out_of_range": {
+                    "summary": "Mesiac mimo rozsahu",
+                    "value": { "error": "Month must be between 1 and 12" }
+                  }
                 }
               }
             }
@@ -624,7 +855,56 @@
         }
       }
     },
-
+    "/api/incomes/tags": {
+      "get": {
+        "summary": "Získanie všetkých income tagov",
+        "description": "Vráti zoznam tagov, ktoré sú typu INCOME alebo BOTH. Voliteľne je možné filtrovať podľa používateľa.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "user_id",
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "UUID používateľa (voliteľné)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Úspešne načítané",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "tags": [
+                    {
+                      "id": "aa5f9e12-5b74-4d0e-aeb8-8a3e8a3be111",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "name": "Salary",
+                      "type": "INCOME",
+                      "counter": 3
+                    },
+                    {
+                      "id": "12c23b3e-8fab-4df7-95dc-8a3e3d79c9f1",
+                      "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6",
+                      "name": "Freelance",
+                      "type": "BOTH",
+                      "counter": 5
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neplatné vstupné dáta",
+            "content": {
+              "application/json": {
+                "example": { "error": "Invalid user_id format" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/incomes/{income_id}": {
       "get": {
         "summary": "Získanie detailu príjmu podľa ID",
