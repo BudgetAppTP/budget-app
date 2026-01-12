@@ -1041,6 +1041,74 @@
           }
         }
       }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "summary": "Get total incomes and total expenses for a month (default: current month)",
+        "description": "Returns the sum of all incomes and the sum of all expenses for the selected month.\n\nRules:\n- If `year` and `month` are not provided -> uses the current month.\n- If only one of `year`/`month` is provided -> returns 400.\n- Optional `user_id` filters totals for a specific user.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "schema": { "type": "integer", "example": 2025 },
+            "description": "Year (use together with month). If omitted with month, current month is used."
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 12, "example": 10 },
+            "description": "Month (1..12) (use together with year). If omitted with year, current month is used."
+          },
+          {
+            "in": "query",
+            "name": "user_id",
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Optional user UUID to calculate totals only for that user."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully calculated totals",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "year": 2025,
+                  "month": 10,
+                  "total_incomes": 1400.0,
+                  "total_expenses": 320.75,
+                  "balance": 1079.25
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_year_month_format": {
+                    "summary": "Invalid year/month format",
+                    "value": { "error": "Invalid year/month format" }
+                  },
+                  "missing_one_param": {
+                    "summary": "Only year or only month provided",
+                    "value": { "error": "Both year and month must be provided together" }
+                  },
+                  "month_out_of_range": {
+                    "summary": "Month out of range",
+                    "value": { "error": "Month must be between 1 and 12" }
+                  },
+                  "invalid_user_id": {
+                    "summary": "Invalid user_id format",
+                    "value": { "error": "Invalid user_id format" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
