@@ -1109,6 +1109,91 @@
           }
         }
       }
+    },
+    "/api/analytics/donut": {
+      "get": {
+        "summary": "Donut chart analytics by month/year",
+        "description": "Returns total expenses for the selected month, category breakdown (amount + percentage), and detailed grouping by category -> tag -> date.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": { "type": "integer", "example": 2025 },
+            "description": "Year (required, use together with month)"
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 12, "example": 10 },
+            "description": "Month 1..12 (required, use together with year)"
+          },
+          {
+            "in": "query",
+            "name": "user_id",
+            "required": false,
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Optional user filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Analytics data",
+            "content": {
+              "application/json": {
+                "example": {
+                  "year": 2025,
+                  "month": 10,
+                  "total_amount": 924.2,
+                  "categories": [
+                    { "category": "Jedlo", "amount": 415.89, "percentage": 45.0 },
+                    { "category": "Bývanie", "amount": 231.05, "percentage": 25.0 },
+                    { "category": "Doprava", "amount": 92.42, "percentage": 10.0 }
+                  ],
+                  "tags_by_category": {
+                    "Jedlo": {
+                      "Billa": {
+                        "2025-10-02": 45.1,
+                        "2025-10-10": 19.99
+                      },
+                      "Lidl": {
+                        "2025-10-05": 12.8
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "invalid_year_month": {
+                    "summary": "Bad year/month format",
+                    "value": { "error": "Invalid year/month format" }
+                  },
+                  "missing_param": {
+                    "summary": "Missing year or month",
+                    "value": { "error": "Both year and month must be provided together" }
+                  },
+                  "month_range": {
+                    "summary": "Month out of range",
+                    "value": { "error": "Month must be between 1 and 12" }
+                  },
+                  "invalid_user": {
+                    "summary": "Invalid user_id",
+                    "value": { "error": "Invalid user_id format" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
+
   }
 }
