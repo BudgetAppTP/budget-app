@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from "react";
 import Chart from "chart.js/auto";
 import "./style/needs.css";
+import T from "../i18n/T";
+import { useLang } from "../i18n/LanguageContext";
 
 export default function Needs() {
+     const {lang} = useLang();
 
         useEffect(() => {
     document.title = "BudgetApp · Potreby";
@@ -21,7 +24,11 @@ const [editBuffer, setEditBuffer] = useState({});
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!newCategory.trim()) {
-      setError("Zadajte názov kategórie!");
+            setError(lang === "sk"
+  ? "Zadajte názov organizácie!"
+  : "Enter the organization name!"
+);
+
       return;
     }
     setError("");
@@ -41,7 +48,10 @@ const handleEditToggle = (id) => {
   if (editingId === id) {
     const name = (editBuffer.name || "").trim();
     if (!name) {
-      setError("Názov kategórie nesmie byť prázdny!");
+          setError(lang === "sk"
+  ? "Názov kategórie nesmie byť prázdny!"
+  : "Category name cannot be empty!"
+);
       return;
     }
 
@@ -127,7 +137,7 @@ useEffect(() => {
   }
 
   const ctx = document.getElementById("donutChart");
-  if (!ctx) return; // ← безопасно выходим, если канваса нет
+  if (!ctx) return;
 
   const monthlyData = {
     "September 2025": {
@@ -176,7 +186,7 @@ useEffect(() => {
       })
       .join("");
 
-    html += `<div class="summary-line">Celkovo: ${total.toFixed(2)} €</div>`;
+    html += `<div class="summary-line">${lang === "sk" ? "Celkovo" : "Total"}: ${total.toFixed(2)} €</div>`;
     txBox.innerHTML = html;
   }
 
@@ -315,21 +325,24 @@ useEffect(() => {
       detBox.querySelector(".details-total").textContent = "";
 
     showCategoryShares(month);
-  }
-}, []);
+  } return () => {
+    if (chart) chart.destroy();
+  };
+
+}, [lang]);
 
 
   return (
     <div className="wrap needs">
       <div>
-        <div className="page-title">📦 Potreby</div>
+        <div className="page-title"><T sk="📦 Potreby" en="📦 Needs" /></div>
 
         <div className="table-wrap">
  <table>
             <thead>
               <tr>
-                <th>KATEGÓRIA</th>
-                <th style={{ textAlign: "center" }}>AKCIE</th>
+                <th><T sk="KATEGÓRIA" en="CATEGORY" /></th>
+                <th style={{ textAlign: "center" }}><T sk="AKCIE" en="ACTIONS" /></th>
               </tr>
             </thead>
             <tbody>
@@ -373,7 +386,15 @@ useEffect(() => {
                               <span
                                 className={`action-icon ${cat.pinned ? "pinned" : "unpinned"}`}
                                 onClick={() => handlePin(cat.id)}
-                                title={cat.pinned ? "Odkotviť kategóriu" : "Pripnúť kategóriu"}
+                                title={
+                            cat.pinned
+                              ? lang === "sk"
+                                ? "Odkotviť kategóriu"
+                                : "Unpin category"
+                              : lang === "sk"
+                              ? "Pripnúť kategóriu"
+                              : "Pin category"
+                          }
                               >
                                 📌
                               </span>
@@ -388,7 +409,15 @@ useEffect(() => {
                           <span
                             className="action-icon edit"
                             onClick={() => handleEditToggle(cat.id)}
-                            title={isEditing ? "Uložiť zmeny" : "Upraviť"}
+                            title={
+                          isEditing
+                            ? lang === "sk"
+                              ? "Uložiť zmeny"
+                              : "Save changes"
+                            : lang === "sk"
+                            ? "Upraviť"
+                            : "Edit"
+                        }
                           >
                             {isEditing ? "✔" : "✏️"}
                           </span>
@@ -399,7 +428,7 @@ useEffect(() => {
                               <span
                                 className="action-icon delete"
                                 onClick={() => handleDelete(cat.id)}
-                                title="Vymazať"
+                                title={lang === "sk" ? "Vymazať" : "Delete"}
                               >
                                 🗑️
                               </span>
@@ -414,25 +443,39 @@ useEffect(() => {
           </table>
         </div>
 
-        <form className="form-row" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="needs-form">
+          <table className="needs-table">
+             <tbody>
+              <tr>
+          <td style={{ width: "70%" }}>
           <input
             type="text"
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
-            placeholder="Nová kategória"
+            placeholder={lang === "sk" ? "Nová kategória" : "New category"}
           />
+          </td>
+            <td style={{ width: "30%" }}>
           <button
             className="btn"
             type="submit"
           >
-            + Pridať potreby
+            {lang === "sk" ? "+ Pridať potreby" : "+ Add need"}
           </button>
+                   </td>
+                   </tr>
+             </tbody>
+          </table>
         </form>
         {error && <div className="error-text">{error}</div>}
       </div>
 
+
+
+
+
       <div className="statistic">
-        <div className="page-title">📊 Mesačná štatistika výdavkov</div>
+        <div className="page-title"> <T sk="📊 Mesačná štatistika výdavkov" en="📊 Monthly expense statistics" /></div>
 
         <div className="chart-section">
           <div className="chart-container">
@@ -449,7 +492,7 @@ useEffect(() => {
           </div>
 
           <div className="details-container" id="details">
-            <h3>Podiel potreb</h3>
+            <h3><T sk="Podiel potreb" en="Share of needs" /></h3>
             <div className="details-total"></div>
             <div className="transactions" id="transactions"></div>
           </div>

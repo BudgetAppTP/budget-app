@@ -102,8 +102,8 @@ body {
 .dashboard .date-badge svg { opacity:.65 }
 
 .dashboard.wrap {
-  max-width:var(--maxw);
-  margin:22px auto;
+  max-width:1300px;
+  margin:50px auto;
   padding:0 var(--gap-lg) 40px;
 }
 
@@ -255,12 +255,12 @@ body {
 .dashboard .import-boxes {
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-  gap:40px;
+  gap:30px;
 }
 .dashboard .import-card {
   border:2px dashed #e4d5a3;
   border-radius:var(--radius-lg);
-  padding:24px;
+  padding:20px;
   text-align:center;
   transition:background .3s ease;
   cursor:grab;
@@ -408,4 +408,18 @@ body {
   background: linear-gradient(to right, var(--gold) 25%, transparent 25%, transparent 50%, var(--gold) 50%, var(--gold) 75%, transparent 75%);
   background-size: 10px 3px;
   opacity: 1;
+}
+
+
+.dashboard  .import-ekasa input{
+  width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+        outline: none;
+      margin-top: 10px;
+}
+
+.dashboard  .import-ekasa button{
+      margin-top: 12px;
+      width: 100%;
 }

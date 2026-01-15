@@ -8,9 +8,13 @@ import Savings from "./pages/Savings";
 import Needs from "./pages/Needs";
 import Ekasa from "./pages/EKasa";
 import Comparison from "./pages/Comparison";
+import Organisation from "./pages/Organisation";
+
+import { LanguageProvider } from "./i18n/LanguageContext";
 
 export default function App() {
   return (
+    <LanguageProvider>
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
@@ -19,10 +23,12 @@ export default function App() {
         <Route path="/budgets" element={<Budgets/>} />
         <Route path="/savings" element={<Savings/>} />
         <Route path="/needs" element={<Needs/>} />
+        <Route path="/organisation" element={<Organisation/>} />
         <Route path="/Ekasa" element={<Ekasa/>} />
         <Route path="/comparison" element={<Comparison/>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
+    </LanguageProvider>
   );
 }

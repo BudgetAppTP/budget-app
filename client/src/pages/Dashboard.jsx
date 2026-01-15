@@ -1,7 +1,14 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import "./style/dashboard.css";
 import { Link } from "react-router-dom";
+import { useLang } from "../i18n/LanguageContext";
+import T from "../i18n/T";
+
+const API_BASE = "/api";
+const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
+
 export default function Dashboard() {
+  const { lang, setLang } = useLang();
       useEffect(() => {
     document.title = "BudgetApp · Dashboard";
   }, []);
@@ -79,12 +86,81 @@ export default function Dashboard() {
     };
   }, []);
 
+  const [ekasaReceiptId, setEkasaReceiptId] = useState("");
+  const [ekasaError, setEkasaError] = useState("");
+  const [ekasaSuccess, setEkasaSuccess] = useState("");
+  const [ekasaLoading, setEkasaLoading] = useState(false);
+
+  const handleImportEkasa = async () => {
+  const rid = (ekasaReceiptId || "").trim();
+
+  if (!rid) {
+    setEkasaError(
+      lang === "sk" ? "Zadajte ID bločku." : "Please enter receipt ID."
+    );
+    return;
+  }
+
+  setEkasaError("");
+  setEkasaLoading(true);
+
+  try {
+    const res = await fetch(`${API_BASE}/receipts/import-ekasa`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        receiptId: rid,
+        user_id: USER_ID,
+      }),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok || json?.error) {
+      const backendMsg =
+        json?.error?.message ||
+        json?.error?.details?.error ||
+        json?.data?.error ||
+        (lang === "sk"
+          ? "Import z eKasa zlyhal."
+          : "Import from eKasa failed.");
+
+      setEkasaError(backendMsg);
+      return;
+    }
+
+    setEkasaReceiptId("");
+    setEkasaError("");
+    setEkasaSuccess(
+      lang === "sk" ? "Bloček bol importovaný ✔" : "Receipt imported ✔"
+    );
+  } catch (err) {
+    console.error(err);
+    setEkasaError(
+      lang === "sk"
+        ? "Chyba spojenia so serverom."
+        : "Server connection error."
+    );
+  } finally {
+    setEkasaLoading(false);
+  }
+};
+
+  useEffect(() => {
+    if (!ekasaSuccess) return;
+    const t = setTimeout(() => setEkasaSuccess(""), 2500); // 2.5s
+    return () => clearTimeout(t);
+  }, [ekasaSuccess]);
+
+
+
   return (
     <main className="wrap dashboard">
       <div className="section-title">
         <span className="marker"></span>
         <div>
-          Mesačný prehľad · <span id="monthTitle">Október 2025</span>
+           <T sk="Mesačný prehľad" en="Monthly Overview" /> ·{" "}
+          <span id="monthTitle">Október 2025</span>
         </div>
       </div>
 
@@ -93,7 +169,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">💶</div>
             <div>
-              <small>Celkové príjmy</small>
+              <small> <T sk="Príjmy" en="Incomes" /></small>
               <div className="value" id="kpiIncome">€ 2 350</div>
             </div>
           </div>
@@ -103,7 +179,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">💳</div>
             <div>
-              <small>Celkové výdavky</small>
+              <small><T sk="Výdavky" en="Expenses" /></small>
               <div className="value" id="kpiExpense">€ 1 840</div>
             </div>
           </div>
@@ -113,7 +189,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">🧾</div>
             <div>
-              <small>Zostatok</small>
+              <small> <T sk="Zostatok" en="Balance" /></small>
               <div className="value" id="kpiBalance">€ 510</div>
             </div>
           </div>
@@ -123,7 +199,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">🎯</div>
             <div>
-              <small>Plnenie cieľov</small>
+              <small><T sk="Ciele" en="Goals" /></small>
               <div className="value" id="kpiGoals">73%</div>
             </div>
           </div>
@@ -135,7 +211,7 @@ export default function Dashboard() {
           <div className="panel" draggable="true">
             <div className="drag-handle" title="Presuň sekciu"></div>
             <header>
-              <h3>Rozdelenie výdavkov tento mesiac</h3>
+              <h3> <T sk="Rozloženie výdavkov" en="Expense Distribution" /></h3>
             </header>
 
             <div className="donut-wrap">
@@ -174,7 +250,7 @@ export default function Dashboard() {
           <div id="goals" className="panel" draggable="true" style={{ marginTop: "16px" }}>
             <div className="drag-handle" title="Presuň sekciu"></div>
             <header>
-              <h2>Finančné ciele</h2>
+              <h2><T sk="Finančné ciele" en="Financial Goals" /></h2>
             </header>
 
             <div className="goals-container" id="goalList">
@@ -206,20 +282,87 @@ export default function Dashboard() {
           </header>
           <div className="import-boxes">
             <div className="import-card" draggable="true">
-              <strong>Naskenovať QR</strong>
-              <p>Otvoriť kameru a naskenovať kód z účtenky</p>
-              <button>Spustiť skener</button>
+              <strong> <T sk="QR kód eKasa" en="QR Code eKasa" /></strong>
+              <p>
+
+                <T sk="Naskenujte QR kód z bločku"
+	                  en="Scan the QR code from your receipt"/>
+
+              </p>
+              <button><T sk="Nahrať QR" en="Upload QR" /></button>
             </div>
             <div className="import-card" draggable="true">
-              <strong>Nahrať eKasa / PDF</strong>
-              <p>Podporované: .ekd, .json, .pdf</p>
-              <button>Vybrať súbor</button>
+              <strong><T sk="PDF alebo JSON" en="PDF or JSON" /></strong>
+              <p><T sk="Importujte súbor z eKasa"
+	                  en="Import an eKasa file"
+                /></p>
+              <button> <T sk="Vybrať súbor" en="Choose File" /></button>
             </div>
+
+            <div className="import-card import-ekasa">
+  <strong>
+    <T sk="Import z eKasa" en="Import from eKasa" />
+  </strong>
+
+  <p>
+    <T
+      sk="Zadajte ID bločku (receiptId) z eKasa a importujte výdavok."
+      en="Enter eKasa receipt ID (receiptId) to import an expense."
+    />
+  </p>
+
+  <input
+    type="text"
+    value={ekasaReceiptId}
+    onChange={(e) => {
+      setEkasaReceiptId(e.target.value);
+      setEkasaError("");
+      setEkasaSuccess("");
+    }}
+    placeholder={lang === "sk" ? "ID bločku (receiptId)" : "Receipt ID (receiptId)"}
+    style={{
+      border: ekasaError ? "1px solid #e53935" : "1px solid #d0d0d0",
+    }}
+  />
+
+
+  <button
+    type="button"
+    onClick={handleImportEkasa}
+    disabled={ekasaLoading}
+    style={{
+      cursor: ekasaLoading ? "not-allowed" : "pointer",
+      opacity: ekasaLoading ? 0.7 : 1,
+    }}
+  >
+    {ekasaLoading
+      ? lang === "sk"
+        ? "Importujem..."
+        : "Importing..."
+      : lang === "sk"
+      ? "Importovať"
+      : "Import"}
+  </button>
+
+  {ekasaError && (
+    <div style={{ marginTop: "8px", color: "#e53935", fontSize: "13px" }}>
+      {ekasaError}
+    </div>
+  )}
+
+  {ekasaSuccess && (
+  <div style={{ marginTop: "8px", color: "#2e7d32", fontSize: "13px" }}>
+    {ekasaSuccess}
+  </div>
+)}
+</div>
+
+
            <Link
               to="/Ekasa"
               className="btn"
               style={{ textDecoration: "none", textAlign: "center" }}>
-              Prehľad eKasy
+              <T sk="Otvoriť eKasa" en="Open eKasa" />
            </Link>
           </div>
         </div>
