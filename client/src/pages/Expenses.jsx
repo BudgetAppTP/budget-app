@@ -439,7 +439,7 @@ setExpenses([...expenses, newRow]);
   };
 
   const handleEkasaRedirect = () => {
-    alert("➡ Presmerovanie na eKasa (demo)");
+    alert("Presmerovanie na eKasa (demo)");
   };
 
 
