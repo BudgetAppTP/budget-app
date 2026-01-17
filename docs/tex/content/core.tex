@@ -1,0 +1,164 @@
+% ==================================================
+% CORE CONTENT
+% ==================================================
+
+
+% --------------------------------------------------
+% ARCHITECTURE OVERVIEW
+% --------------------------------------------------
+\section{Návrh aplikácie}
+
+Budget Tracker je navrhnutý ako multilayer aplikácia, rozdelená do troch hlavných vrstiev:
+
+\begin{itemize}
+    \item \textbf{Frontend (UI):} Vytvorený pomocou Reactu s využitím JavaScriptu a CSS, poskytuje intuitívne a responzívne používateľské rozhranie pre viacero typov zariadení.
+    \item \textbf{Backend (API):} REST API postavené v jazyku Python, ktoré spracováva komunikáciu medzi frontendom a databázou a implementuje kľúčové funkcie, ako je rozpočtovanie, kategorizácia, sledovanie cieľov a analýza príjmov.
+    \item \textbf{Databáza:} Spravuje perzistenciu pomocou modelov SQLAlchemy ORM, s podporou PostgreSQL vo výrobnom prostredí a SQLite vo vývojovom/testovacom.
+\end{itemize}
+
+Tento vrstvený prístup pomáha udržiavať modulárnu, testovateľnú štruktúru kódu. V dokumentácii Flask sa odporúča štruktúrovať aplikáciu ako balík so samostatnými modulmi pre modely, routy a šablóny~\cite{flask-sqlalchemy-pattern}.
+
+\subsection{Rozdelenie architektúry aplikácie}
+
+Budget Tracker sa presunul z architektúry šablón na strane servera na úplne oddelený klient-server model. Namiesto poskytovania HTML cez Flask, back-end poskytuje RESTful API a samostatný webový klient ho využíva na komunikáciu s databázou.
+
+Na strane servera Flask používa vzor aplikácie factory. Namiesto registrácie šablón používateľského rozhrania však registruje blueprinty API, ktoré definujú koncové body JSON. API je organizované okolo zdrojov, ako sú používatelia, príjmy, výdavky, rozpočty, ciele a príjmy.
+
+\subsection{Architektonické vzory a návrhové zdôvodnenie}
+
+Hoci systém sleduje klasickú trojvrstvovú architektúru pozostávajúcu z prezentačnej vrstvy, aplikačnej vrstvy a dátovej vrstvy, na zabezpečenie modularity, konfigurovateľnosti a testovateľnosti backendovej implementácie bolo potrebné použiť aj dodatočné architektonické vzory.
+
+Backend využíva vzor \textit{Application Factory}, ktorý oddeľuje vytváranie aplikácie od jej konfigurácie~\cite{flask_app_factories}. Počas spúšťania aplikácia dynamicky načítava konfiguračnú triedu na základe premennej prostredia \texttt{APP\_ENV}. Pre vývojové, testovacie a produkčné prostredie sú definované samostatné konfiguračné triedy. Vo vývojovom a testovacom prostredí je databáza založená na SQLite, čo umožňuje rýchle a izolované testovanie, zatiaľ čo v produkčnom prostredí je databázové pripojenie konfigurované prostredníctvom premennej prostredia \texttt{DATABASE\_URL}, pričom cieľovým databázovým systémom je PostgreSQL. Tento návrh umožňuje správanie špecifické pre jednotlivé prostredia bez duplicitného kódu a podporuje plynulé nasadzovanie v rôznych fázach vývoja.
+
+Smerovanie API je organizované pomocou jedného nadradeného Flask \textit{Blueprint}, ktorý reprezentuje verejné REST API aplikácie. V rámci tohto blueprintu sú trasy logicky rozdelené do samostatných modulov podľa doménových konceptov, ako sú autentifikácia, transakcie a rozpočty. Tento hybridný prístup zachováva jednotný API \textit{namespace} a zároveň zabezpečuje modulárnu organizáciu zdrojového kódu, čím vyvažuje jednoduchosť a udržiavateľnosť.
+
+Obchodná logika je plne zapuzdrená v samostatnej \textit{servisnej vrstve}. Služby sú zodpovedné za vynucovanie doménových pravidiel, vykonávanie validácií a koordináciu perzistenčných operácií. HTTP obslužné rutiny slúžia iba ako body orchestrácie, ktoré prekladajú požiadavky na volania služieb a formátujú odpovede. Toto oddelenie zabraňuje hromadeniu obchodnej logiky v API vrstve a umožňuje opätovné použitie služieb naprieč viacerými koncovými bodmi.
+
+Otázky perzistencie sú izolované pomocou vzoru \textit{Repository} postaveného nad ORM modelmi SQLAlchemy. Repozitáre abstrahujú prístup k databáze od servisnej vrstvy, čo umožňuje aplikácii prepínať medzi SQLite a PostgreSQL bez dopadu na doménovú logiku. Táto abstrakcia zároveň zlepšuje testovateľnosť tým, že umožňuje mockovanie repozitárov počas jednotkových testov.
+
+% TODO: Check
+\subsection{Vykonávacie cesty prípadov použitia a tok dát}
+\label{sec:dataflow}
+
+Táto časť opisuje, ako sa kľúčové používateľské akcie šíria systémom od frontendu
+(React) cez backend (Flask) až po perzistenčnú vrstvu (PostgreSQL/SQLite prostredníctvom SQLAlchemy).
+
+\subsubsection{Prípad použitia 1: Vytvorenie príjmu }
+\label{sec:uc-create-income}
+
+\begin{figure}[p]
+  \centering
+  \includegraphics[width=\textwidth]{figures/uc1_income_creation.png}
+  \caption{Sekvenčný diagram znázorňujúci tok dát pri vytváraní príjmu}
+  \label{fig:uc1-create-income}
+\end{figure}
+
+
+\paragraph{Cieľ}
+Umožniť používateľovi vytvoriť záznam o príjme, ktorý je uložený v databáze a priradený
+k príslušnému používateľskému účtu.
+
+\paragraph{Primárny aktér}
+Koncový používateľ interagujúci so stránkou \texttt{Incomes.jsx}.
+
+\paragraph{Priebeh vykonania} 
+Obrázok~\ref{fig:uc1-create-income} ilustruje tok dát:
+
+\begin{enumerate}
+    \item Používateľ vyplní inline formulár v rámci \texttt{Incomes.jsx}.
+    \item Vstupy formulára sú dočasne uložené v lokálnom stave Reactu až do odoslania.
+    \item Po odoslaní frontend odošle požiadavku typu \texttt{POST} na \texttt{/api/incomes}
+    s JSON \mbox{payloadom}, ktorý obsahuje polia príjmu a explicitné \texttt{user\_id}.
+    \item Backendový obslužný handler v \texttt{app/api/incomes.py} prijme požiadavku.
+    \item Handler deleguje spracovanie na \texttt{incomes\_service.py}.
+    \item Služba validuje vstup a vytvorí novú entitu Income, ktorú prepojí
+    s poskytnutým \texttt{user\_id} (vzťah cudej väzby na model User).
+    \item Entita je uložená prostredníctvom SQLAlchemy pomocou \texttt{db.session}
+    (commit/flush).
+    \item Backend vráti odpoveď \texttt{201 Created} s obsahom, ktorý zahŕňa ID nového príjmu
+    a správu o úspechu (napr. \texttt{\{id, message\}}).
+\end{enumerate}
+
+\paragraph{Alternatívne a chybové toky}
+\begin{itemize}
+    \item \textbf{Zlyhanie validácie:} Chýbajúce alebo neplatné polia vedú k odpovedi
+    \texttt{400 Bad Request}.
+    \item \textbf{Neplatný odkaz na používateľa:} Ak dodané \texttt{user\_id}
+    nezodpovedá existujúcemu používateľovi, backend vráti chybu
+    (najčastejšie \texttt{404 Not Found} alebo \texttt{400 Bad Request} v závislosti od implementácie).
+    \item \textbf{Zlyhanie databázy:} Chyby pri perzistencii vedú k odpovedi
+    \texttt{500 Internal Server Error} a k záznamu v aplikačnom logu.
+\end{itemize}
+
+\paragraph{Bezpečnostná poznámka (aktuálny stav)}
+Identita používateľa nie je v aktuálnej implementácii určovaná prostredníctvom relácie
+alebo JWT autentifikácie. Namiesto toho klient explicitne poskytuje \texttt{user\_id}
+v tele požiadavky a backend tejto hodnote dôveruje pri priraďovaní príjmu k používateľovi.
+Tento prístup je vhodný pre prototyp vo fáze vývoja, avšak v produkčnom prostredí by
+vyžadoval dodatočné zabezpečenie (napr. odvodenie identity používateľa z autentifikovaného
+kontextu namiesto vstupu od klienta).
+
+\subsubsection{Prípad použitia 2: Vytvorenie výdavku (prechodný demonštračný tok)}
+\label{sec:uc-create-expense}
+
+\paragraph{Cieľ}
+Umožniť používateľovi zaznamenať výdavok pomocou zovšeobecneného koncového bodu pre transakcie
+počas počiatočného vývoja, pred zavedením databázového modelu a služby Expense.
+
+\paragraph{Primárny aktér}
+Koncový používateľ interagujúci so stránkou \texttt{Expenses.jsx}.
+
+\paragraph{Priebeh vykonania}
+\begin{enumerate}
+    \item Používateľ vyplní inline formulár v rámci \texttt{Expenses.jsx}.
+    \item Frontend odošle požiadavku typu \texttt{POST} na \texttt{/api/transactions} s JSON
+    payloadom, ktorý obsahuje \texttt{kind="expense"} a príslušné polia.
+    \item Backendový obslužný handler v \texttt{app/api/transactions.py} prijme požiadavku.
+    \item Logika vytvárania transakcie je vykonaná priamo v kontrolérovej vrstve
+    (pre tento koncový bod sa nepoužíva samostatná služba).
+    \item Výdavok je uložený v pamäťovej kolekcii namiesto perzistencie v databáze.
+    \item Backend vráti odpoveď \texttt{201 Created} a v tele odpovede zahrnie celú
+    vytvorenú entitu transakcie.
+\end{enumerate}
+
+\paragraph{Architektonické poznámky}
+Na rozdiel od príjmov nie sú výdavky zatiaľ implementované ako doménová entita podporená databázou.
+Koncový bod \texttt{/api/transactions} preto slúži ako demonštračný mechanizmus a očakáva sa,
+že bude nahradený samostatným koncovým bodom \texttt{/api/expenses} s modulom
+\texttt{expenses\_service.py} a zodpovedajúcim modelom Expense. Dlhodobý zámer naznačený
+zdrojovým kódom spočíva v udržiavaní oddelených zapisovacích koncových bodov pre príjmy a výdavky,
+pričom transakcie môžu byť voliteľne využívané len na agregované čítanie
+(napr. kombinované prehľady histórie).
+
+
+
+% --------------------------------------------------
+% IMPLEMENTATION DETAILS
+% --------------------------------------------------
+\section{Implementácia}
+
+Implementácia aplikácie je rozdelená na backend, frontend a databázovú vrstvu.
+
+\subsection{Backend}
+Backend je postavený na frameworku \textbf{Flask}. Používa sa vzor Application Factory na vytvorenie inštancie aplikácie, čo umožňuje flexibilnú konfiguráciu.
+
+\begin{itemize}
+    \item \textbf{API a Blueprints:} Funkcionalita API je modulárne rozdelená pomocou Flask Blueprints. Každý zdroj (napr. transakcie, rozpočty) má vlastný modul v balíku \texttt{app/api}.
+    \item \textbf{Dátová vrstva:} Perzistencia je riešená pomocou \textbf{SQLAlchemy ORM}. Modely sú definované v \texttt{app/models}. Pre komunikáciu s databázou sa používa Repository pattern, ktorý abstrahuje prístup k dátam.
+    \item \textbf{Servisná vrstva:} Biznis logika je oddelená do servisnej vrstvy \texttt{app/services}, ktorá koordinuje operácie medzi API controllermi a dátovými repozitármi.
+\end{itemize}
+
+\subsection{Frontend}
+Frontend je moderná Single-Page Application (SPA) postavená pomocou \textbf{Reactu} s \textbf{Vite} a \textbf{TypeScriptom}.
+
+\begin{itemize}
+    \item \textbf{Štruktúra:} Zdrojový kód sa nachádza v priečinku `client/src`. Aplikácia je rozdelená na znovupoužiteľné komponenty (`components`) a stránky (`pages`), ktoré reprezentujú jednotlivé pohľady aplikácie.
+    \item \textbf{API komunikácia:} Na komunikáciu s backendovým API slúži centralizovaný HTTP klient (`client/src/api/http.ts`), ktorý využíva definície koncových bodov z `client/src/api/endpoints.ts`.
+    \item \textbf{Proxy:} Vývojový server Vite je nakonfigurovaný tak, aby presmeroval požiadavky z `/api` na backendový server bežiaci na porte 5000, čím sa obchádzajú problémy s CORS počas vývoja.
+\end{itemize}
+
+\subsection{Databáza}
+\begin{itemize}
+    \item \textbf{Vývoj a Produkcia:} Vo vývojovom prostredí sa používa \textbf{SQLite} pre jednoduchosť a rýchlosť. V produkčnom prostredí je aplikácia pripravená na beh s \textbf{PostgreSQL}.
+    \item \textbf{Schéma a Migrácie:} Hoci je projekt nakonfigurovaný s `Flask-Migrate` a `Alembic`, databázové migrácie sú v súčasnej fáze vývoja deaktivované. Schéma sa vytvára automaticky z modelov pri prvom spustení aplikácie. Pre vizualizáciu schémy sa používa nástroj `ERAlchemy`.
+\end{itemize}
