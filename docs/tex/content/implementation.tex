@@ -1,0 +1,50 @@
+% ==================================================
+% IMPLEMENTATION DETAILS
+% ==================================================
+
+\section{Implementácia}
+
+Systém je implementovaný ako plne oddelená klient--server aplikácia, pozostávajúca z backendovej REST API vrstvy implementovanej v jazyku Python a klientskej single-page aplikácie postavenej na \texttt{React}. Toto oddelenie umožňuje nezávislý vývoj, testovanie a nasadzovanie oboch vrstiev.
+
+% --------------------------------------------------
+
+\subsection{Backend (Flask API)} 
+
+Backend je implementovaný ako JSON-orientované REST API pomocou frameworku Flask. Zodpovedá za realizáciu obchodnej logiky, validáciu vstupov, perzistenciu dát a autentifikáciu používateľov. Prístup k databáze je zabezpečený prostredníctvom ORM knižnice SQLAlchemy, integrovanej do Flask aplikácie pomocou rozšírenia Flask-SQLAlchemy, ktoré spravuje databázové relácie a aplikačnú konfiguráciu. Evolúcia databázovej schémy je podporovaná nástrojom Alembic, sprístupneným cez rozšírenie Flask-Migrate (dočasne je deaktivované, ako je spomenuté v sekcii~\ref{sec:schema-evolution}), zatiaľ čo automatizované testovanie je realizované pomocou testovacieho frameworku Pytest.
+
+Backendový kód je organizovaný ako modulárny Python balík v adresári \texttt{app/}. API koncové body sú zoskupené podľa domén v \texttt{app/api/} a registrované pod jedným nadradeným Flask Blueprintom. Perzistentné entity sú definované v \texttt{app/models/}, zatiaľ čo obchodné pravidlá sú zapuzdrené v \texttt{app/services/}. Základné doménové objekty a dátové prenosové objekty (DTO) sa nachádzajú v \texttt{app/core/}, čo vytvára jasnú hranicu medzi perzistenčnými modelmi a rozhraniami API.
+
+Inicializácia aplikácie sleduje návrhový vzor Application Factory, implementovaný v \texttt{app/\_\_init\_\_.py}, ktorý umožňuje konfiguráciu špecifickú pre jednotlivé prostredia a zlepšuje testovateľnosť aplikácie. Kľúčovými návrhovými rozhodnutiami sú použitie samostatnej servisnej vrstvy na centralizáciu doménovej logiky a repozitárovej abstrakcie na oddelenie služieb od ORM riešenia. Tento prístup umožňuje nahradiť databázové repozitáre pamäťovými implementáciami počas testovania a znižuje previaznosť medzi obchodnými pravidlami a perzistenciou. Konfigurácia aplikácie je riadená prostredníctvom tried špecifických pre prostredie, definovaných v súbore \texttt{config.py}, pričom hodnoty sú dodávané pomocou premenných prostredia \textit{(Environment Variables)}.
+
+% --------------------------------------------------
+
+\subsection{Frontend (React SPA)} 
+
+Frontend je implementovaný ako klientska single-page aplikácia založená na React. Backend je využívaný výlučne prostredníctvom HTTP API a aplikácia neobsahuje žiadnu logiku server-side rendering. HTTP komunikácia je realizovaná prostredníctvom knižnice Axios, klientsku navigáciu zabezpečuje React Router a vizualizácia dát je podporená grafovou knižnicou Chart.js.
+
+Zdrojový kód frontendu sa nachádza v adresári \texttt{client/src/}. Komunikácia s API je centralizovaná v \texttt{client/src/api/}, kde je definovaná predkonfigurovaná inštancia Axios s nastavením základnej adresy a práce s autentifikačnými povereniami. Znovupoužiteľné používateľské komponenty sú organizované v adresári \texttt{components/}, zatiaľ čo pohľady na úrovni trás \textit{route-level views} sú implementované v \texttt{pages/}. Používateľské rozhranie sleduje komponentovo orientovanú architektúru a využíva React Hooks na správu stavu a životného cyklu komponentov, čo podporuje kompozíciu a predvídateľný tok dát.
+
+Použitý technologický stack a projektová štruktúra spoločne zabezpečujú  oddelenie zodpovedností medzi prezentačnou vrstvou, aplikačnou logikou a prístupom k dátam, pričom zostávajú v súlade s architektonickými princípmi definovanými v predchádzajúcich kapitolách.
+
+% --------------------------------------------------
+
+\subsection{Nastavenie a konfigurácia projektu}
+
+\paragraph{Inicializácia backendu}
+
+Backendová aplikácia je spúšťaná prostredníctvom samostatného vstupného bodu (\texttt{run.py}), ktorý vyvoláva funkciu \texttt{create\_app} zodpovednú za vytvorenie inštancie Flask aplikácie. Celková inicializačná logika je centralizovaná v tejto továrenskej funkcii. Počas spúšťania aplikácie funkcia \texttt{create\_app} vykonáva nasledujúce kroky: 
+
+\begin{itemize}
+    \item vytvorí inštanciu Flask aplikácie,
+    \item načíta príslušný konfiguračný objekt na základe premennej prostredia
+    \texttt{APP\_ENV},
+    \item inicializuje základné rozšírenia, najmä databázový prístup a podpora migrácií,
+    \item zaregistruje API blueprint,
+    \item nastavia sa globálne mechanizmy spracovania chýb.
+\end{itemize}
+
+Správanie špecifické pre jednotlivé prostredia je riadené prostredníctvom \textit{environment variable} \texttt{APP\_ENV}. Ak táto premenná nie je explicitne nastavená, aplikácia štandardne používa vývojovú konfiguráciu. 
+
+Konfiguračné triedy sú definované v súbore \texttt{config.py} a sledujú dedičný model: spoločná základná \texttt{(Base)} konfigurácia definuje všeobecné predvolené nastavenia, zatiaľ čo vývojová, testovacia a produkčná konfigurácia tieto nastavenia selektívne prepisujú. Vývojové a testovacie prostredia používajú databázu SQLite (v súborovej, resp. pamäťovej podobe), čo umožňuje rýchlu iteráciu a izolované testovanie, zatiaľ čo produkčná konfigurácia vypína režim ladenia a očakáva externý reťazec pripojenia k databáze dodaný prostredníctvom premenných prostredia.
+
+Niekoľko konfiguračných hodnôt je kritických pre správnu funkciu aplikácie. Premenná \texttt{SECRET\_KEY} je nevyhnutná na bezpečné podpisovanie relačných súborov cookie a vykonávanie ďalších kryptografických operácií. Pripojenie k databáze je riadené prostredníctvom pripojovacieho URI knižnice SQLAlchemy, ktoré je v neprodukčných konfiguráciách definované priamo, zatiaľ čo v produkčnom prostredí je dodávané externe. Cross-Origin Resource Sharing (CORS) je konfigurované pri spúšťaní aplikácie tak, aby umožnilo frontendu prístup ku všetkým trasám \texttt{/api/*}, čo podporuje lokálny vývoj v scenároch, kde frontend a backend bežia na odlišných portoch.
