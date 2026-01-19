@@ -4,6 +4,45 @@
 
 \section{Analýza existujúcich riešení}
 
-TODO: write analysis of existing solutions here.
+Táto kapitola poskytuje prehľad existujúcich riešení pre sledovanie rozpočtu a financií, ktoré sú relevantné pre návrh systému Budget Tracker. Na základe analýzy existujúcich implementácií vyhodnocuje bežné prístupy k architektúre a funkčné vlastnosti, ktoré sa v moderných systémoch považujú za štandardné.
+\subsection{Riešenia pre správu rozpočtu}
+
+\subsubsection{Intuit QuickBooks Online}
+
+\textbf{QuickBooks Online} je popredná cloudová účtovná platforma pre malé a stredné podniky. Umožňuje používateľom sledovať príjmy a výdavky, fakturovať zákazníkom a generovať finančné správy na jednej platforme~\cite{xe2025quickbooks}. Ako webové a mobilné riešenie ponúka QuickBooks Online prepojené bankové kanály na automatický import transakcií a podporuje bežné pracovné postupy, ako je fakturácia a vystavovanie faktúr, s rozsiahlou ponukou doplnkových aplikácií (napr. pre mzdy, evidenciu zásob, reporting). Tieto funkcie robia z QuickBooks integrovaný nástroj na finančné riadenie, ktorý v rámci jediného systému pokrýva účtovníctvo, platby a základné potreby rozpočtovania.
+
+\subsubsection{You Need A Budget (YNAB)}
+
+\textbf{YNAB} je softvér na sledovanie osobných financií a rozpočtu, ktorý sa zameriava na pomoc osobám získať kontrolu nad svojimi finančnými prostriedkami. YNAB sa zameriava na metodiku rozpočtovania pomocou obálok a poskytuje intuitívne nástroje na vytváranie rozpočtov, sledovanie výdavkov a plánovanie finančných cieľov~\cite{telekom2026ynab}. Funguje na základe štyroch jednoduchých pravidiel, ktoré pomáhajú vytvárať dobré rozpočtové návyky. YNAB ponúka synchronizáciu v reálnom čase medzi zariadeniami, takže používatelia môžu aktualizovať svoje rozpočty na webe alebo v mobile. Aplikácia podporuje bezpečné pripojenie k banke na automatický import transakcií a kategorizáciu výdavkov s cieľom odhaliť vzorce výdavkov. Používatelia využívajú interaktívne správy (napr. trendy výdavkov, čistá hodnota) a nástroje na sledovanie cieľov, aby mohli merať pokrok. Celkovo sa základná funkcionalita YNAB zameriava na disciplínu osobného rozpočtovania, znižovanie finančného stresu a pomoc používateľom pri rozdeľovaní finančných prostriedkov tak, aby dosiahli svoje finančné ciele.
+
+% --------------------------------------------------
+
+\subsection{„Must-have“ funkcionality moderných systémov}
+
+Moderné riešenia na sledovanie rozpočtu a správu financií zdieľajú sadu základných funkcionalít, ktoré reagujú na potreby automatizácie spracovania údajov aj na posilnenie kontroly používateľa nad financiami. Na základe vyššie uvedených riešení možno medzi nevyhnutné vlastnosti súčasného systému na sledovanie rozpočtu zaradiť najmä nasledujúce oblasti:
+
+\begin{itemize}
+    \item \textbf{Automatizovaný import transakcií:} plynulé načítanie transakčných údajov z externých zdrojov (napr. bankových dát alebo finančných API) s cieľom minimalizovať ručné zadávanie údajov.
+    \item \textbf{Kategorizácia výdavkov a rozpočtovanie:} schopnosť kategorizovať príjmy a výdavky do zmysluplných skupín a definovať rozpočty pre tieto kategórie.
+    \item \textbf{Reportovanie a analýzy v reálnom čase:} generovanie finančných prehľadov a vizualizácií, ako sú výkazy ziskov a strát, grafy vývoja výdavkov alebo čistá hodnota za určité obdobie.
+    \item \textbf{Viacplatformový prístup a spolupráca:} architektúra založená na cloude, ktorá podporuje používanie na webe, v mobilných zariadeniach alebo na viacerých zariadeniach, často s prístupom viacerých používateľov.
+    \item \textbf{Bezpečnosť a ochrana údajov:} implementácia bezpečnostných opatrení na ochranu citlivých finančných informácií, vrátane šifrovania údajov a bezpečného pripojenia k bankovým službám.
+\end{itemize}
+
+% --------------------------------------------------
+
+\subsection{Budget Tracker oproti iným riešeniam}
+
+Systém Budget Tracker je navrhnutý tak, aby zdieľal mnohé z vyššie uvedených funkcionalít, ale zároveň sa odlišuje unikátnou integráciou so systémom eKasa (slovenský systém elektronických pokladníc). Táto voľba dizajnu ponúka výrazné rozdiely vo funkcionalite a modeli integrácie v porovnaní s typickými bankovými aplikáciami na správu rozpočtu alebo systémami viazanými na POS:
+
+\paragraph{Nezávislosť od bankových dátových zdrojov}
+
+Na rozdiel od bežných nástrojov na tvorbu rozpočtu, ktoré využívajú bankové API alebo údaje o transakciách kartou na získavanie údajov o výdavkoch, Budget Tracker čerpá informácie o nákupoch priamo z elektronických pokladničných dokladov eKasa. Systém eKasa je online štátna platforma, ktorá spája všetky pokladnice v celej krajine s portálom Finančnej správy~\cite{financnasprava2025process}. 
+
+Prostredníctvom prístupu k tomuto univerzálnemu zdroju finančných údajov môže Budget Tracker zaznamenávať transakcie bez toho, aby mal prístup k údajom o bankovom účte alebo platobnej karte používateľa. Táto nezávislosť od banky znamená, že aj hotovostné nákupy (ktoré sa nikdy neobjavujú na výpisoch z bankového účtu) sú zaznamenané, ak je vystavená účtenka. Tým sa zvyšuje ochrana súkromia, nakoľko používatelia nemusia poskytovať prístup k bankovým údajom a systém nezohľadňuje, ktorá banka alebo platobná metóda bola použitá pri transakcii.
+
+\paragraph{Zaznamenávanie účteniek nezávislé od obchodníka a zariadenia}
+
+Integrácia eKasa do aplikácie Budget Tracker je navrhnutá na softvérovej úrovni a nie je viazaná na žiadny konkrétny POS hardvér ani platformu obchodníka. Na Slovensku musí každá pokladňa obchodníka (či už ide o fyzický terminál alebo virtuálnu aplikáciu pokladne) vydávať účtenky eKasa. Aplikácia môže tieto účtenky načítať (napríklad naskenovaním QR kódu eKasa alebo vyhľadaním ID účtenky) bez ohľadu na to, v pokladni ktorého predajcu bola vytvorená.
 
 \clearpage

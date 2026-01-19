@@ -30,7 +30,7 @@ Použitý technologický stack a projektová štruktúra spoločne zabezpečujú
 
 \subsection{Nastavenie a konfigurácia projektu}
 
-\paragraph{Inicializácia backendu}
+\subsubsection{Inicializácia backendu}
 
 Backendová aplikácia je spúšťaná prostredníctvom samostatného vstupného bodu (\texttt{run.py}), ktorý vyvoláva funkciu \texttt{create\_app} zodpovednú za vytvorenie inštancie Flask aplikácie. Celková inicializačná logika je centralizovaná v tejto továrenskej funkcii. Počas spúšťania aplikácie funkcia \texttt{create\_app} vykonáva nasledujúce kroky: 
 
@@ -48,3 +48,56 @@ Správanie špecifické pre jednotlivé prostredia je riadené prostredníctvom 
 Konfiguračné triedy sú definované v súbore \texttt{config.py} a sledujú dedičný model: spoločná základná \texttt{(Base)} konfigurácia definuje všeobecné predvolené nastavenia, zatiaľ čo vývojová, testovacia a produkčná konfigurácia tieto nastavenia selektívne prepisujú. Vývojové a testovacie prostredia používajú databázu SQLite (v súborovej, resp. pamäťovej podobe), čo umožňuje rýchlu iteráciu a izolované testovanie, zatiaľ čo produkčná konfigurácia vypína režim ladenia a očakáva externý reťazec pripojenia k databáze dodaný prostredníctvom premenných prostredia.
 
 Niekoľko konfiguračných hodnôt je kritických pre správnu funkciu aplikácie. Premenná \texttt{SECRET\_KEY} je nevyhnutná na bezpečné podpisovanie relačných súborov cookie a vykonávanie ďalších kryptografických operácií. Pripojenie k databáze je riadené prostredníctvom pripojovacieho URI knižnice SQLAlchemy, ktoré je v neprodukčných konfiguráciách definované priamo, zatiaľ čo v produkčnom prostredí je dodávané externe. Cross-Origin Resource Sharing (CORS) je konfigurované pri spúšťaní aplikácie tak, aby umožnilo frontendu prístup ku všetkým trasám \texttt{/api/*}, čo podporuje lokálny vývoj v scenároch, kde frontend a backend bežia na odlišných portoch.
+
+\subsubsection{Inicializácia frontendu}
+
+Frontendová aplikácia je inicializovaná prostredníctvom štandardného vstupného bodu Reactu umiestneného v súbore \texttt{main.jsx}. Pri spustení je koreňový React komponent pripojený k DOM pomocou funkcie \texttt{createRoot} a aplikácia je obalená komponentom \texttt{BrowserRouter}, ktorý zabezpečuje klientsku navigáciu na strane prehliadača.
+
+Globálne aspekty rozloženia používateľského rozhrania sú riešené na tejto najvyššej úrovni vykresľovaním hlavného aplikačného komponentu, ktorý následne skladá zdieľané štrukturálne prvky, ako je navigačný panel a kontajner stránok. Počas inicializácie nie sú registrovaní žiadni globálni poskytovatelia stavu ani kontextové obaly; namiesto toho sa aplikácia spolieha na lokálny stav komponentov a získavanie dát na úrovni jednotlivých stránok.
+
+\subsection{Databázová vrstva}
+
+Modely ORM sú organizované podľa konvencie jeden model na jeden súbor v adresári \texttt{app/models/}, čo umožňuje izolovať definície entít a uľahčuje navigáciu. Všetky modely zdedili spoločnú deklaratívnu základňu definovanú v \texttt{app/models/base.py}. 
+
+\subsubsection{Spracovanie vzťahov}
+
+Vzťahy medzi entitami sú explicitne definované pomocou konštrukcie \texttt{relationship()} v SQLAlchemy v kombinácii s obmedzeniami cudzích kľúčov. Obojsmerné asociácie sú vytvorené pomocou \texttt{back\_populates}, čo umožňuje navigáciu a synchronizáciu medzi súvisiacimi objektmi v rámci tej istej relácie.
+
+
+\subsubsection{Používanie databázových sessions}
+
+Databázové \textit{sessions} sú poskytované prostredníctvom rozšírenia Flask-SQLAlchemy a sú priamo využívané vo funkciách servisnej vrstvy. Operácie čítania používajú reláciu ne-transakčným spôsobom, a to prostredníctvom priamych dotazov alebo vyhľadávania podľa primárneho kľúča.
+
+Operácie zápisu sledujú konzistentný vzor jednotky práce (\textit{unit-of-work}). Všetky zmeny sú vykonávané v rámci jedného bloku \texttt{try-except}, pričom úpravy sú najskôr pripravené v rámci databázovej relácie a potvrdenie (\texttt{commit}) je vykonané až po úspešnom dokončení všetkých krokov. V prípade vzniku výnimky je explicitne vykonaný návrat zmien (\texttt{rollback}), čím je zabezpečené, že čiastočné zmeny nie sú nikdy perzistované a stav databázy zostáva konzistentný.
+
+
+\subsubsection{Konvencie a obmedzenia na úrovni modelov}
+
+Dátový model vynucuje viaceré pravidlá konzistencie na úrovni ORM aj databázy. Väčšina polí je označená ako nenulovateľná, čím sa predchádza vzniku neúplných záznamov. Predvolené hodnoty sú definované jednak na aplikačnej úrovni (napríklad pre generovanie UUID), ako aj na úrovni databázy (napríklad pre časové pečiatky a čítače). Na vzťahoch vlastníctva sú nakonfigurované kaskádové pravidlá mazania, ktoré zabezpečujú, že závislé záznamy sú automaticky odstránené pri vymazaní nadradenej entity. 
+
+% --------------------------------------------------
+
+\subsection{Testovanie, zabezpečenie kvality a nasadenie}
+
+Testovanie a zabezpečenie kvality sú implementované predovšetkým na strane backendu so zameraním na overovanie externe pozorovateľného správania API. Podpora nasadzovania odráža prístup orientovaný na vývoj s zámerom pre produkčné prostredie, avšak v súčasnosti bez plnej automatizácie.
+
+\subsubsection{Rozsah a prístup k testovaniu} Testovanie backendu je realizované pomocou frameworku Pytest a je zamerané najmä na integračné testy, ktoré overujú správanie aplikácie prostredníctvom jej HTTP rozhrania. Testy využívajú testovacieho klienta frameworku Flask na priame odosielanie požiadaviek na API a overujú HTTP stavové kódy, ako aj štruktúru a obsah JSON odpovedí. Pokrytie zahŕňa základné kontrolné koncové body, kľúčové API zdroje a kompletný autentifikačný cyklus (registrácia, prihlásenie, odhlásenie).
+
+Okrem toho nižšie úrovne integračných testov overujú, že aplikačná továreň sa správne inicializuje, aplikácia sa dokáže pripojiť k databáze a databázové tabuľky sú úspešne vytvorené na základe ORM modelov SQLAlchemy. Pre frontend v súčasnosti nie sú implementované žiadne automatizované testy.
+
+\subsubsection{Statická analýza a kvalita kódu}
+
+Kvalita backendového kódu je vynucovaná prostredníctvom nástroja Flake8, ktorý je integrovaný do CI pipeline. Kritické chyby spôsobujú zlyhanie zostavenia, zatiaľ čo štýlové upozornenia a upozornenia týkajúce sa zložitosti kódu sú reportované, no v súčasnosti neblokujú zlučovanie zmien.
+
+Na strane frontendu je nakonfigurovaný nástroj ESLint na vynucovanie pravidiel kvality kódu pre React. Statická analýza frontendu môže byť spúšťaná manuálne prostredníctvom npm skriptov. Súčasťou projektu je aj súbor \texttt{.editorconfig}, ktorý zabezpečuje konzistentné formátovanie kódu naprieč rôznymi vývojovými prostrediami.
+
+% --------------------------------------------------
+
+\subsection{Aktuálne obmedzenia}
+
+Zabezpečenie kvality je obmedzené absenciou automatizovaných frontendových testov, v dôsledku čoho logika na strane klienta zostáva neoverená, ako aj nedostatočným pokrytím unit testov na strane backendu. 
+
+Evolúcia databázovej schémy vo vývojovom prostredí sa spolieha na manuálnu rekreáciu databázy a proces nasadzovania aplikácie zostáva manuálny. Tieto zjednodušenia sú v aktuálnej fáze vývoja zámerné, avšak predstavujú jasne identifikované oblasti pre budúce zlepšenie s rastúcou vyspelosťou projektu.
+
+
+\clearpage

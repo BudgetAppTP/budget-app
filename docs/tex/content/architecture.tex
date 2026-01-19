@@ -128,14 +128,14 @@ Obrázok~\ref{fig:flow2-create-expense} ilustruje tok dát:
 
 \begin{enumerate}
     \item Používateľ vyplní inline formulár v rámci \texttt{Expenses.jsx}.
-    \item Frontend odošle požiadavku typu \texttt{POST} na \texttt{/api/transactions} s JSON
-    payloadom, ktorý obsahuje \texttt{kind="expense"} a príslušné polia.
-    \item Backendový obslužný handler v \texttt{app/api/transactions.py} prijme požiadavku.
-    \item Logika vytvárania transakcie je vykonaná priamo v kontrolérovej vrstve
-    (pre tento koncový bod sa nepoužíva samostatná služba).
-    \item Výdavok je uložený v pamäťovej kolekcii namiesto perzistencie v databáze.
-    \item Backend vráti odpoveď \texttt{201 Created} a v tele odpovede zahrnie celú
-    vytvorenú entitu transakcie.
+    \item Frontend odošle požiadavku typu \texttt{POST} na \texttt{/api/receipts} s JSON
+    payloadom, ktorý obsahuje polia pre bloček a jeho položky.
+    \item Backendový obslužný handler v \texttt{app/api/receipts.py} prijme požiadavku.
+    \item Handler deleguje spracovanie na príslušnú servisnú vrstvu (napr. \texttt{receipts\_service.py}).
+    \item Služba validuje vstup a vytvorí novú entitu \texttt{Receipt} a súvisiace \texttt{ReceiptItem} entity, ktoré prepojí s príslušným používateľským účtom.
+    \item Entity sú uložené prostredníctvom SQLAlchemy pomocou \texttt{db.session} (commit/flush).
+    \item Backend vráti odpoveď \texttt{201 Created} s obsahom, ktorý zahŕňa ID nového bločka
+    a správu o úspechu (napr. \texttt{\{id, message\}}).
 \end{enumerate}
 
 
