@@ -1,0 +1,21 @@
+% ==================================================
+% GOALS OF THE SOLUTION
+% ==================================================
+
+\section{Ciele riešenia}
+
+Aplikácia má za cieľ poskytnúť používateľom komplexný prehľad o ich osobných financiách:
+
+\begin{itemize}
+    \item \textbf{Zaznamenávanie príjmov a výdavkov:} používatelia môžu zaznamenávať príjmy z~viacerých zdrojov a zaznamenávať výdavky. Každý výdavok je možné priradiť do~kategórie, čo umožňuje presné sledovanie a vykazovanie.
+    \item \textbf{Mesačné rozpočty:} finančné údaje sú usporiadané podľa mesiacov. Používatelia môžu zobraziť históriu minulých mesiacov a porovnať rozpočty v čase.
+    \item \textbf{Rozdelenie financií podľa potrieb:} systém podporuje rozdelenie mesačného rozpočtu na časti, ako sú potreby, voľný čas/želania, úspory a investície. Tento dizajn odráža široko používané stratégie rozpočtovania, ako napríklad pravidlo \texttt{50/30/20} navrhuje prideliť 50\% príjmu po zdanení na potreby, 30\% na želania a 20\% na úspory~\cite{upenn2026popularbudgeting}. Tracker umožňuje používateľom prispôsobiť tieto kategórie a ďalej rozdeliť potreby (napr. stravovanie, bývanie, doprava).
+    \item \textbf{Integrácia QR kódov z platobných dokladov (eKasa):} slovenské pokladničné doklady vytlačené online pokladnicami obsahujú QR kód, ktorý kóduje odkaz na informácie o transakcií. Budget Tracker implementuje funkcionalitu, ktorá umožňuje používateľom naskenovať QR/eKasa kód na potvrdenke, aby mohli automaticky importovať položky a vyplniť záznamy o výdavkoch.
+    \item \textbf{Finančné ciele:} Používatelia môžu definovať krátkodobé alebo dlhodobé ciele (napr. mesačný rozpočet na potraviny, cieľ úspor, investičný cieľ). Ciele pretrvávajú v priebehu mesiacov, podľa potreby, a môžu spúšťať notifikácie, keď sú dosiahnuté prahové hodnoty pokroku.
+\end{itemize}
+
+Cieľom tohto projektu je vytvoriť aplikáciu s prehľadným a intuitívnym používateľským rozhraním, ktorá bude responzívna na počítačoch, tabletoch a smartfónoch. Taktiež systém by mal podporovať export údajov v bežných formátoch, vrátane CSV a PDF, čo umožní používateľom ukladať alebo analyzovať informácie o osobných financiách.
+
+Kľúčovou úlohou je ochrana údajov používateľov prostredníctvom moderných bezpečnostných opatrení, vrátane viacfaktorovej autentifikácie pre citlivé operácie, silných šifrovacích algoritmov TLS a spoľahlivej ochrany prihlasovacích údajov, ako sú hashované heslá a šifrované biometrické informácie.
+
+\clearpage

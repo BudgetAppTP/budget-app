@@ -1,0 +1,351 @@
+.budget {
+  --bg: #ececec;
+  --white: #ffffff;
+  --grid: #bfc2c7;
+  --text: #111;
+  --gold: #d4a017;
+  --gold-dark: #b38a00;
+  --header-bg: #f8f8f8;
+}
+
+.budget body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+  margin: 0;
+}
+
+.budget.wrap {
+  max-width: 1300px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.budget .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.budget .month-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.budget .month-nav button {
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+
+
+.budget .month-nav h2 {
+  background: #fff;
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.budget .export-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.budget .btn {
+  background: var(--gold);
+  border: 1px solid var(--gold-dark);
+  color: #fff;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+  text-decoration: none;
+}
+
+.budget .btn:hover , .budget .month-nav button:hover , .budget .plan-header button:hover , .budget .table-button:hover {
+  background: var(--gold-dark);
+}
+
+.budget .month-nav button:hover{
+  transform: scale(1.15);
+}
+
+.budget .section-title {
+  display: flex;
+  align-items: center;
+  font-size: 22px;
+  font-weight: 700;
+  margin: 30px 0 15px;
+  position: relative;
+}
+
+.budget .section-title::after {
+  content: "";
+  flex-grow: 1;
+  height: 2px;
+  background: var(--gold);
+  margin-left: 10px;
+  border-radius: 2px;
+}
+
+.budget .tables {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--grid);
+  background: var(--white);
+  border-radius: 12px;
+
+}
+
+.budget .table-box {
+  display: flex;
+  flex-direction: column;
+}
+
+
+.budget .table-box table {
+  flex-grow: 1;
+  width: 100%;
+  border-collapse: collapse;
+    border-top: 2px solid #bcbcbc;
+  border-bottom: 2px solid #bcbcbc;
+}
+
+.budget .table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: var(--header-bg);
+}
+
+.budget .table-header h3 {
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.budget .table-header button {
+  background: var(--gold);
+  border: none;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+
+
+.budget table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.budget th,
+.budget td {
+  border: 1px solid var(--grid);
+  padding: 8px 12px;
+  font-size: 15px;
+}
+
+.budget th {
+  background: #ececec;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+.budget tfoot td {
+  font-weight: 700;
+  background: #f9f9f9;
+}
+
+.budget .balance-box {
+  grid-column: 1 / -1;
+  background: var(--white);
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 12px;
+  color: var(--text);
+  border-radius: 0 0 12px 12px;
+}
+
+.budget .balance-box strong {
+  color: var(--gold-dark);
+}
+
+
+.budget .plan-box {
+  background: var(--white);
+  border: 1px solid var(--grid);
+  border-radius: 8px;
+  margin-top: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.budget .plan-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--header-bg);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--grid);
+}
+
+.budget .plan-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.budget .plan-header button, .budget .table-button  {
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 600;
+   text-decoration: none;
+    transition: 0.2s;
+}
+
+
+
+.budget input.percent-input {
+  width: 60px;
+  text-align: center;
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  padding: 3px;
+}
+
+.budget .plan-box table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.budget .plan-box th,
+.budget .plan-box td {
+  border: 1px solid var(--grid);
+  padding: 10px 12px;
+}
+
+.budget .plan-box th {
+  background: #ececec;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+.budget tbody tr:nth-child(odd) {
+  background-color: #fff;
+}
+
+.budget tbody tr:nth-child(even) {
+  background-color: #f5f6f7;
+}
+
+.budget tbody tr:hover {
+  background: #eceef0;
+  transition: background 0.2s;
+}
+
+.budget tbody tr {
+  transition: background 0.3s ease, transform 0.15s ease;
+}
+
+.budget .amount-inc{
+  color: #267240;
+}
+
+.budget .amount-exp{
+  color: #b41e1e;
+}
+
+
+.incomes-table table,.expenses-table table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.incomes-table table th:nth-child(1),
+.incomes-table table td:nth-child(1),
+.expenses-table table th:nth-child(1),
+.expenses-table table td:nth-child(1)
+
+{
+  width: 30%;
+}
+
+.incomes-table table th:nth-child(2),
+.incomes-table table td:nth-child(2),
+ .expenses-table table th:nth-child(2),
+.expenses-table table td:nth-child(2) {
+  width: 40%;
+}
+
+.incomes-table table th:nth-child(3),
+.incomes-table table td:nth-child(3),
+.expenses-table table th:nth-child(3),
+.expenses-table table td:nth-child(3){
+  width: 30%;
+}
+
+@media (max-width: 1000px) {
+  .budget .tables {
+    display: block !important;
+  }
+
+  .budget .table-box {
+    width: 100%;
+    margin-bottom: 20px;
+  }
+}
+
+@media (max-width: 800px) {
+
+  .budget .page-header {
+     display: block;
+}
+
+}
+
+
+@media (max-width: 450px) {
+
+  .budget .plan-header button, .budget .table-button {
+     padding: 6px;
+}
+.budget .plan-header h3 {
+    font-size: 18px;
+}
+
+
+
+}
+
+
+
+

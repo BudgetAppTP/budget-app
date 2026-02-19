@@ -1,0 +1,125 @@
+\documentclass[a4paper,12pt]{article}
+
+% --------------------------------------------------
+% LANGUAGE & ENCODING
+% --------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[slovak]{babel}
+\usepackage{microtype}
+
+% --------------------------------------------------
+% LAYOUT & TYPOGRAPHY
+% --------------------------------------------------
+\usepackage{adjustbox}
+\usepackage{afterpage}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{lmodern}
+\usepackage{needspace}
+
+
+\renewcommand{\familydefault}{\sfdefault}
+
+% Page geometry (FEI style)
+\geometry{
+    top=2cm,
+    bottom=1.8cm,
+    left=2.75cm,
+    right=2.75cm
+}
+
+% --------------------------------------------------
+% MATH, GRAPHICS, FLOATS
+% --------------------------------------------------
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage[section]{placeins}
+
+% --------------------------------------------------
+% GLOSSARY / ACRONYMS
+% --------------------------------------------------
+\usepackage[acronym]{glossaries}
+\makeglossaries
+
+\renewcommand*{\glossaryentrynumbers}[1]{}
+\renewcommand*{\acronymentry}[2]{%
+  \glsentryitem{##1}\glstarget{##1}{\glossentryname{##1}} -- ##2%
+}
+
+% --------------------------------------------------
+% BIBLIOGRAPHY
+% --------------------------------------------------
+\usepackage[backend=biber,style=numeric]{biblatex}
+\addbibresource{source.bib}
+
+% --------------------------------------------------
+% PDF ATTACHMENTS / APPENDICES
+% --------------------------------------------------
+\usepackage{pdfpages}
+\usepackage{pgffor}
+
+% --------------------------------------------------
+% DOCUMENT
+% --------------------------------------------------
+\begin{document}
+\pagestyle{empty}
+
+\input{content/title.tex}
+\input{content/glossary.tex}
+
+\newpage
+\tableofcontents
+\newpage
+
+\glsaddall          % adds ALL glossary entries
+\glsaddallunused    % ensures unused entries are included
+
+\printglossary[type=\acronymtype, title={Zoznam skratiek}]
+\addcontentsline{toc}{section}{Zoznam skratiek}
+\newpage
+
+
+% ==================================================
+% MAIN CONTENT
+% ==================================================
+
+\clearpage
+\pagestyle{plain}
+
+\input{content/assignment.tex}
+\input{content/introduction.tex}
+\input{content/goals.tex}
+\input{content/existing_solutions.tex}
+\input{content/architecture.tex}
+\input{content/implementation.tex}
+
+\FloatBarrier
+\clearpage
+
+% ==================================================
+% BIBLIOGRAPHY
+% ==================================================
+
+\printbibliography
+\FloatBarrier
+\clearpage
+
+% ==================================================
+% APPENDICES
+% ==================================================
+
+\appendix
+\section{Prílohy}
+\subsection{Príloha č. 1 -- ponuka}
+\includepdf[pages=1-4]{minutes/Ponuka.pdf}
+
+
+\subsection{Príloha č. 2 -- zápisnice zo stretnutí}
+\clearpage
+
+\foreach \week in {1,...,12}{
+    \includepdf[pages=-]{minutes/TP_Reports_w\week.pdf}
+    \clearpage
+}
+
+\end{document}

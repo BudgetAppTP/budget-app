@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import uuid
 from decimal import Decimal
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, Date, DateTime, Numeric, Text, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from .user import User
 
 
 class FinancialTarget(Base):
@@ -70,7 +76,8 @@ class FinancialTarget(Base):
         nullable=False
     )
     deadline_date: Mapped[date | None] = mapped_column(
-        Date,nullable=True
+        Date,
+        nullable=True
     )
     is_completed: Mapped[bool] = mapped_column(
         Boolean,

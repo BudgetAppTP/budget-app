@@ -1,0 +1,500 @@
+.needs {
+  --bg: #e6e7ea;
+  --text: #111;
+  --muted: #555;
+  --gold: #d4a017;
+  --grid: #b6b8be;
+  --white: #ffffff;
+  --pin-gray: #8a8a8a;
+  --pinned-bg: #f3f3f3;
+
+  --shadow: rgba(0, 0, 0, 0.08);
+  --gray: #c7c9ce;
+}
+
+
+.needs body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.needs.wrap {
+  max-width: 1300px;
+  margin: 50px auto;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.needs .page-title {
+  font-size: 34px;
+  font-weight: 800;
+  color: #000;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.needs .page-title::after {
+  content: "";
+  flex-grow: 1;
+  height: 2px;
+  background: var(--gold);
+  margin-left: 10px;
+  border-radius: 2px;
+}
+
+.needs .table-wrap {
+  border: 1px solid var(--grid);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--white);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.needs table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15.5px;
+  color: #000;
+  table-layout: fixed;
+}
+
+.needs th:nth-child(1),
+.needs td:nth-child(1) { width: 70%; }
+
+.needs th:nth-child(2),
+.needs td:nth-child(2) { width: 30%; }
+
+.needs .form-row input {
+
+      width: 100%;
+    box-sizing: border-box;
+
+  background: var(--white);
+  border: 1.8px solid var(--grid);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+
+
+
+
+.needs th,
+.needs td {
+  border: 1px solid var(--grid);
+  padding: 11px 14px;
+  vertical-align: middle;
+  position: relative;
+}
+
+.needs th {
+  background: #dcdde1;
+  text-align: left;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.needs tr.editing td {
+  padding: 0 !important;
+
+}
+
+
+.needs tr.editing .actions
+{
+  padding: 10px 14px;
+}
+
+.needs td input[type="text"]{
+   background-color: #fff8e1;
+    border: none;
+   width: 100%;
+  height:100%; ;
+   box-sizing: border-box;
+   padding: 10px 14px;
+
+   font-size: inherit;
+  font-family: inherit;
+}
+
+.needs td input:focus{
+  outline: none;
+}
+
+.needs tr.editing td {
+  border-top: 2px solid #d4a017;
+  border-bottom: 2px solid #d4a017;
+}
+
+.needs tr.editing td:first-child {
+  border-left: 2px solid #d4a017;
+}
+
+.needs tr.editing td:last-child {
+  border-right: 2px solid #d4a017;
+}
+
+
+.needs .action-icon.edit:hover{
+ color: var(--gold);
+}
+
+
+
+.needs tbody tr:nth-child(odd) { background: #fff; }
+.needs tbody tr:nth-child(even) { background: #f5f6f7; }
+.needs tbody tr:hover { background: #eceef0; transition: background 0.2s; }
+
+
+.needs tr.pinned {
+  border-left: 3px solid var(--pin-gray);
+  font-weight: 600;
+}
+
+.needs tr.pinned td:first-child::before {
+  content: "📌";
+  margin-right: 6px;
+  color: var(--pin-gray);
+  opacity: 0.9;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.needs tr.pinned.editing td:first-child {
+  position: relative;
+}
+
+.needs tr.pinned.editing td:first-child::before {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.needs tr.pinned.editing td input[type="text"] {
+  width: 100%;
+  font-weight: 600;
+  font-size: inherit;
+  font-family: inherit;
+  border: none;
+  padding: 10px 14px 10px 32px;
+  box-sizing: border-box;
+}
+
+
+
+
+.needs .actions { text-align: center; }
+
+.needs .actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+
+.needs .action-icon {
+  font-size: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+
+.needs .action-icon.edit:hover,.needs .action-icon.delete:hover,.needs .action-icon.pinned:hover,.needs .action-icon.unpinned:hover {
+  transform: scale(1.1);
+}
+
+.needs .pin {
+  color: var(--pin-gray);
+  opacity: 0.7;
+}
+
+.needs .pin.active {
+  opacity: 1;
+}
+
+
+.needs .form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.needs .form-row input[type="text"] {
+  width: 80%;
+  background: var(--white);
+  border: 1.8px solid var(--grid);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 15px;
+  color: #000;
+  height: 42px;
+  box-sizing: border-box;
+}
+
+.needs .btn {
+  width: 100%;
+  background: #ebb72e;
+  border: 2px solid #b38a00;
+  color: #1a1200;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s;
+  font-size: 15px;
+  flex-shrink: 0;
+  height: 42px;
+}
+
+.needs .btn:hover {
+  background: #c49a0f;
+}
+
+.needs .stats-header {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.needs .stats-header h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: #000;
+  margin: 0;
+}
+
+.needs .chart-section {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 25px;
+  margin-top: 25px;
+  flex-wrap: nowrap;
+}
+
+.needs .chart-container {
+  flex: 1 1 55%;
+  min-width: 0;
+  background: var(--white);
+  border-radius: 12px;
+  box-shadow: 0 2px 6px var(--shadow);
+  padding: 25px;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.needs .month-nav {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+  font-weight: 700;
+  font-size: 18px;
+  color: #000;
+}
+
+.needs .month-nav .gold {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+.needs .arrow {
+  cursor: pointer;
+  font-size: 20px;
+  color: var(--muted);
+  transition: color 0.2s;
+}
+
+.needs .arrow:hover {
+  color: var(--gold);
+}
+
+.needs .chart-canvas-wrapper {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.needs .details-container {
+  flex: 1 1 45%;
+  min-width: 0;
+  width: 45%;
+  background: var(--white);
+  border-radius: 10px;
+  padding: 25px 30px;
+  border: 1.8px dashed var(--gray);
+  box-shadow: 0 3px 6px var(--shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.needs .details-container h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.needs .details-total {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 5px 0 15px 0;
+  color: #000;
+}
+
+.needs .transactions {
+  border-top: 1px solid #ddd;
+  padding-top: 10px;
+  overflow-y: auto;
+}
+
+.needs .transaction-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 15px;
+}
+
+.needs .transaction-item .left {
+  display: flex;
+  flex-direction: column;
+}
+
+.needs .transaction-item .left span {
+  color: #333;
+  font-weight: 500;
+}
+
+.needs .transaction-item small {
+  color: #888;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.needs .transaction-item .right {
+  text-align: right;
+  font-weight: 600;
+  color: #000;
+}
+
+.needs .color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.needs .summary-line {
+  border-top: 2px solid var(--gold);
+  margin-top: 10px;
+  padding-top: 8px;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: right;
+}
+
+.needs .error-text {
+  width: 100%;
+  margin-top: 6px;
+  color: #d32f2f;
+  font-size: 14px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
+
+
+.needs .needs-form{
+  width: 100%;
+  margin-top: 15px;
+
+}
+
+.needs .needs-table {
+  width: 100%;
+  border-collapse: collapse;
+
+}
+
+.needs .needs-table td{
+   border: none;
+
+}
+
+.needs  .needs-table td {
+  padding: 4px 6px;
+}
+
+.needs  .needs-table input {
+  background: white !important;
+  border: 1.8px solid var(--grid) !important;
+  padding: 10px 16px !important;
+  box-sizing: border-box;
+   border-radius: 6px;
+  width: 100%;
+   font-size: 14px !important;
+}
+
+.needs  .needs-table tr:hover {
+  background: transparent !important;
+}
+
+
+.needs  .needs-table td:focus-within {
+  outline: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.needs  .needs-table input:focus {
+  outline: none !important;
+  border: 2px solid black !important;
+  background: white !important;
+}
+
+@media (max-width: 450px) {
+
+  .needs .action-icon {
+    font-size: 17px;
+}
+
+  .needs .btn {
+    padding: 5px;
+    font-size: 12px;
+}
+
+  .needs .page-title {
+    font-size: 30px;
+}
+
+  .needs .chart-section {
+  flex-direction: column;
+}
+
+  .needs .details-container {
+     width: auto;
+}
+
+}

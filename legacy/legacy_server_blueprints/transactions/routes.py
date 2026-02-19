@@ -83,7 +83,6 @@ def sort_incomes():
 
 @bp.route("/expenses", methods=["GET", "POST"])
 def expense_list():
-    global demo_expenses
     form = ExpenseForm()
     categories = ["Jedlo", "Doprava", "Byvanie", "Voľný čas"]
 
@@ -98,7 +97,6 @@ def expense_list():
 
 @bp.post("/expenses/add")
 def add_expense():
-    global demo_expenses
     try:
         data = request.get_json(force=True)
         new_id = demo_expenses[-1]["id"] + 1 if demo_expenses else 1
@@ -118,13 +116,11 @@ def add_expense():
 
 @bp.delete("/expenses/delete/<int:item_id>")
 def delete_expense(item_id):
-    global demo_expenses
     demo_expenses = [e for e in demo_expenses if e["id"] != item_id]
     return jsonify({"success": True})
 
 @bp.put("/expenses/edit/<int:item_id>")
 def edit_expense(item_id):
-    global demo_expenses
     data = request.get_json(force=True)
     for e in demo_expenses:
         if e["id"] == item_id:

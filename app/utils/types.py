@@ -1,10 +1,11 @@
+import enum
+
 from sqlalchemy.types import TypeDecorator, JSON as SA_JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 
 class JSONType(TypeDecorator):
-    """
-    Choose the appropriate JSON column type for the database.
+    """ Choose the appropriate JSON column type for the database.
 
     Uses PostgreSQL's JSONB type if available, otherwise falls back to
     the generic JSON type. This allows models to work across different
@@ -29,3 +30,17 @@ class JSONType(TypeDecorator):
         if dialect.name == "postgresql":
             return dialect.type_descriptor(JSONB())
         return dialect.type_descriptor(SA_JSON())
+
+
+@enum.unique
+class TagType(str, enum.Enum):
+    """ Enum representing the types of tags in the system.
+
+    Attributes:
+        INCOME: (salary, payments).
+        EXPENSE:  (receipts).
+        BOTH: Tag can be used for both income and expenses.
+    """
+    INCOME = "income"
+    EXPENSE = "expense"
+    BOTH = "both"
