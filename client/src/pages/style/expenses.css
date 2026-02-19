@@ -16,8 +16,8 @@
 }
 
 .expenses.wrap {
-  max-width: 950px;
-  margin: 40px auto;
+  max-width: 1300px;
+  margin: 50px auto;
   padding: 0 20px;
 }
 
@@ -40,6 +40,14 @@
   border-radius: 2px;
 }
 
+.expenses .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+
 .expenses .summary {
   background: var(--white);
   border: 2px solid var(--grid);
@@ -48,7 +56,6 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
   font-size: 16px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
@@ -62,12 +69,58 @@
     padding: 3px 8px;
 }
 
+
+
+.expenses .month-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+
+.expenses .month-nav button {
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.expenses .month-nav h2 {
+  background: #fff;
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
 .expenses .table-card {
   background: var(--white);
   border: 1px solid var(--grid);
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  overflow: hidden;
+   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.expenses .table-card table {
+  min-width: 750px;
+  border-collapse: collapse;
+}
+
+
+.expenses .table-card::-webkit-scrollbar {
+  height: 6px;
+}
+
+.expenses .table-card::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
 }
 
 .expenses table {
@@ -79,16 +132,31 @@
 }
 
 .expenses th:nth-child(1),
-.expenses td:nth-child(1) { width: 20%; }
+.expenses td:nth-child(1) { width: 15%; }
 
 .expenses th:nth-child(2),
-.expenses td:nth-child(2) { width: 40%; }
+.expenses td:nth-child(2) { width: 30%; }
 
 .expenses th:nth-child(3),
 .expenses td:nth-child(3) { width: 20%; }
 
 .expenses th:nth-child(4),
-.expenses td:nth-child(4) { width: 20%; }
+.expenses td:nth-child(4) { width: 15%; }
+
+.expenses th:nth-child(5),
+.expenses td:nth-child(5) { width: 20%; }
+
+.expenses .form-row input {
+
+      width: 100%;
+    box-sizing: border-box;
+
+  background: var(--white);
+  border: 1.8px solid var(--grid);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
 
 .expenses th,
 .expenses td {
@@ -161,13 +229,12 @@
   transition: 0.2s;
 }
 
-.expenses .action-icon.edit:hover,.expenses .action-icon.delete:hover,.expenses .action-icon.redirect:hover {
+.expenses .action-icon.edit:hover,.expenses .action-icon.delete:hover,.expenses .action-icon.redirect:hover,.expenses .month-nav button:hover {
   transform: scale(1.15);
+  color: var(--gold-dark);
 }
 
-.expenses .action-icon.redirect:hover, .expenses .action-icon.edit:hover{
- color: var(--gold);
-}
+
 
 
 .expenses form.form-row
@@ -279,7 +346,8 @@
   border-radius: 3px;
 }
 
-.expenses .btn {
+.expenses .btn,.expenses .organisation_button {
+   width: 100%;
     background: #ebb72e;
     border: 2px solid #b38a00;
     color: #1a1200;
@@ -323,4 +391,94 @@
   font-size: 14px;
   font-weight: 500;
   animation: fadeIn 0.3s ease;
+}
+
+
+
+.expenses .expense-form {
+  width: 100%;
+  margin-top: 15px;
+
+}
+
+.expenses .expense-table {
+  width: 100%;
+  border-collapse: collapse;
+
+}
+
+.expenses .expense-table td{
+   border: none;
+
+}
+
+.expenses .expense-table td {
+  padding: 4px 6px;
+}
+
+.expenses .expense-table input, .expenses  .organisation-wrapper{
+  background: white !important;
+  border: 1.8px solid var(--grid) !important;
+  padding: 10px 16px !important;
+  box-sizing: border-box;
+   border-radius: 6px;
+  width: 100%;
+   font-size: 14px !important;
+}
+
+.expenses .expense-table tr:hover {
+  background: transparent !important;
+}
+
+
+.expenses .expense-table td:focus-within {
+  outline: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.expenses .expense-table input:focus {
+  outline: none !important;
+  border: 2px solid black !important;
+  background: white !important;
+}
+
+.expenses .organisation_button{
+  padding: 3px;
+  width: 15%;
+}
+
+
+
+@media (max-width: 750px) {
+  .table-card table {
+    min-width: 750px;
+  }
+
+  .expense-table,
+  .expense-table tbody,
+  .expense-table tr {
+    display: block !important;
+    width: 100%;
+  }
+
+  .expense-table td {
+    display: block;
+    width: 100% !important;
+    margin-bottom: 10px;
+  }
+
+  .expense-table td button.btn {
+    width: 100%;
+  }
+
+  .expense-table input,
+  .expense-table select {
+    width: 100% !important;
+  }
+
+    .expenses .page-header {
+     display: block;
+    margin-bottom:25px;
+}
 }

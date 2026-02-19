@@ -9,7 +9,7 @@
 }
 
 .ekasa.wrap {
-  max-width: 1100px;
+  max-width: 1300px;
   margin: 50px auto;
   padding: 0 20px;
 }
@@ -22,9 +22,75 @@
   margin-bottom: 15px;
 }
 
+
+
+.ekasa .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+
+.ekasa .summary {
+  background: var(--white);
+  border: 2px solid var(--grid);
+  border-radius: 8px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.ekasa .summary .value {
+  color: var(--gold-dark);
+  font-weight: 700;
+  margin-left: 4px;
+      background: #fff5d6;
+    border-radius: 6px;
+    padding: 3px 8px;
+}
+
+
+
+.ekasa .month-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+
+.ekasa .month-nav button {
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.ekasa .month-nav h2 {
+  background: #fff;
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.ekasa .month-nav button:hover {
+  transform: scale(1.15);
+  color: var(--gold-dark);
+}
+
 .ekasa .gold-line {
   flex-grow: 1;
-  height: 3px;
+  height: 2px;
   background: var(--gold);
   margin-left: 12px;
 }
@@ -55,14 +121,24 @@
   background: var(--gold-dark);
 }
 
-.ekasa .table-card {
-  background: var(--white);
-  border: 1px solid var(--grid);
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  overflow: hidden;
-  margin-top: 20px;
+
+
+.ekasa .table-card table {
+  min-width: 750px;
+  border-collapse: collapse;
 }
+
+
+.ekasa .table-card::-webkit-scrollbar {
+  height: 6px;
+}
+
+.ekasa .table-card::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+
 
 .ekasa table {
   width: 100%;
@@ -132,6 +208,9 @@
   padding: 5px 8px;
   font-family: 'Inter', sans-serif;
   font-size: 13px;
+
+   width: 100%;
+  box-sizing: border-box;
 }
 
 .ekasa .pinned::before {
@@ -140,6 +219,10 @@
 
 .ekasa .amount {
   text-align: right;
+}
+
+.ekasa .quantity, .ekasa .vat {
+  text-align: center;
 }
 
 .ekasa .import-boxes {
@@ -183,4 +266,185 @@
 
 .ekasa .panel {
   padding-top: 20px;
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+
+}
+.ekasa .panel > .import-card {
+  flex: 1;
+  min-width: 0;
+}
+
+
+@media (max-width: 750px) {
+  .ekasa .table-card table {
+    min-width: 750px;
+  }
+
+  .ekasa .page-header {
+     display: block;
+    margin-bottom:25px;
+}
+}
+
+
+.ekasa .loading{
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid rgba(17,24,39,0.10);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(17,24,39,0.06);
+}
+.ekasa .error-text{
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: rgba(229,57,53,0.08);
+  border: 1px solid rgba(229,57,53,0.35);
+  border-radius: 14px;
+  color: #b71c1c;
+  font-weight: 700;
+}
+.ekasa .empty-row{
+  opacity: 0.7;
+  padding: 12px;
+}
+
+
+.ekasa .btn{
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(17,24,39,0.12);
+  background: #fff;
+  cursor: pointer;
+  font-weight: 900;
+  box-shadow: 0 10px 24px rgba(17,24,39,0.06);
+}
+.ekasa .btn:hover{ border-color: rgba(17,24,39,0.20); }
+
+.ekasa .ekasa-sort-row{
+  display:flex;
+  justify-content: flex-end;
+  margin: 10px 0 6px;
+}
+
+
+.ekasa .ekasa-checks{
+  display:flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+
+.ekasa .table-card{
+  background: #ffffff;
+
+  border: 1px dashed #979797 !important;
+  border-radius: 16px;
+  box-shadow: none !important;
+  margin-top: 10px;
+
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+
+.ekasa .receipt-card{
+  position: relative;
+  padding: 16px;
+}
+
+
+.ekasa .receipt-header{
+  position: relative;
+  display:flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 6px 12px;
+}
+
+.ekasa .receipt-org{
+  font-size: 18px;
+  font-weight: 950;
+  letter-spacing: 0.2px;
+}
+
+.ekasa .receipt-meta{
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ekasa .receipt-pill{
+  display:inline-flex;
+  align-items:center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(201,162,39,0.12);
+  border: 1px solid rgba(200, 163, 55, 0.72);
+  font-weight: 800;
+}
+.ekasa .receipt-pill-label{
+  font-weight: 800;
+  color: rgba(17,24,39,0.70);
+}
+
+.ekasa .receipt-id{
+  margin-left: auto;
+  font-size: 12px;
+  color: rgba(17,24,39,0.65);
+  background: rgba(17,24,39,0.04);
+  border: 1px solid rgba(17,24,39,0.10);
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-weight: 700;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.ekasa .import-ekasa input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  outline: none;
+  margin-top: 10px;
+}
+
+.ekasa .import-ekasa button {
+  margin-top: 12px;
+  width: 100%;
+}
+
+
+.ekasa table tfoot .total-row td {
+  background: #dfe1e5;
+  font-weight: 700;
+  border-top: 2px solid #d0d7de;
+  padding: 10px 12px;
+}
+
+.ekasa table tfoot .total-label {
+  text-align: left;
+}
+
+.ekasa table tfoot .total-value {
+  text-align: right;
+}
+
+
+@media (max-width: 720px){
+  .receipt-id{ margin-left: 0; width: 100%; }
+
+  .ekasa .panel{
+    flex-direction: column;
+  }
 }

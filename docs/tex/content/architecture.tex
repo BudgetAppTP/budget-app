@@ -1,0 +1,350 @@
+% ==================================================
+% ARCHITECTURE OVERVIEW
+% ==================================================
+
+\section{Návrh aplikácie}
+
+Budget Tracker je navrhnutý ako multilayer aplikácia, rozdelená do troch hlavných vrstiev:
+
+\begin{itemize}
+    \item \textbf{Frontend (UI):} Vytvorený pomocou Reactu s využitím JavaScriptu a CSS, poskytuje intuitívne a responzívne používateľské rozhranie pre viacero typov zariadení.
+    \item \textbf{Backend (API):} REST API postavené v jazyku Python, ktoré spracováva komunikáciu medzi frontendom a databázou a implementuje kľúčové funkcie, ako je rozpočtovanie, kategorizácia, sledovanie cieľov a analýza príjmov.
+    \item \textbf{Databáza:} Spravuje perzistenciu pomocou modelov SQLAlchemy ORM, s podporou PostgreSQL vo výrobnom prostredí a SQLite vo vývojovom/testovacom.
+\end{itemize}
+
+Tento vrstvený prístup pomáha udržiavať modulárnu, testovateľnú štruktúru kódu. V dokumentácii Flask sa odporúča štruktúrovať aplikáciu ako balík so samostatnými modulmi pre modely, routy a šablóny~\cite{flask-sqlalchemy-pattern}.
+
+% --------------------------------------------------
+\subsection{Rozdelenie architektúry aplikácie}
+
+Budget Tracker sa presunul z architektúry šablón na strane servera na úplne oddelený klient-server model. Namiesto poskytovania HTML cez Flask, back-end poskytuje RESTful API a samostatný webový klient ho využíva na komunikáciu s databázou.
+
+Na strane servera Flask používa vzor aplikácie factory. Namiesto registrácie šablón používateľského rozhrania však registruje blueprinty API, ktoré definujú koncové body JSON. API je organizované okolo zdrojov, ako sú používatelia, príjmy, výdavky, rozpočty, ciele a príjmy.
+
+
+% --------------------------------------------------
+\subsection{Architektonické vzory a návrhové zdôvodnenie}
+
+Hoci systém sleduje klasickú trojvrstvovú architektúru pozostávajúcu z prezentačnej vrstvy, aplikačnej vrstvy a dátovej vrstvy, na zabezpečenie modularity, konfigurovateľnosti a testovateľnosti backendovej implementácie bolo potrebné použiť aj dodatočné architektonické vzory.
+
+Backend využíva vzor \textit{Application Factory}, ktorý oddeľuje vytváranie aplikácie od jej konfigurácie~\cite{flask_app_factories}. Počas spúšťania aplikácia dynamicky načítava konfiguračnú triedu na základe premennej prostredia \texttt{APP\_ENV}. Pre vývojové, testovacie a produkčné prostredie sú definované samostatné konfiguračné triedy. Vo vývojovom a testovacom prostredí je databáza založená na SQLite, čo umožňuje rýchle a izolované testovanie, zatiaľ čo v produkčnom prostredí je databázové pripojenie konfigurované prostredníctvom premennej prostredia \texttt{DATABASE\_URL}, pričom cieľovým databázovým systémom je PostgreSQL. Tento návrh umožňuje správanie špecifické pre jednotlivé prostredia bez duplicitného kódu a podporuje plynulé nasadzovanie v rôznych fázach vývoja.
+
+Smerovanie API je organizované pomocou jedného nadradeného Flask \textit{Blueprint}, ktorý reprezentuje verejné REST API aplikácie. V rámci tohto blueprintu sú trasy logicky rozdelené do samostatných modulov podľa doménových konceptov, ako sú autentifikácia, transakcie a rozpočty. Tento hybridný prístup zachováva jednotný API \textit{namespace} a zároveň zabezpečuje modulárnu organizáciu zdrojového kódu, čím vyvažuje jednoduchosť a udržiavateľnosť.
+
+Obchodná logika je plne zapuzdrená v samostatnej \textit{servisnej vrstve}. Služby sú zodpovedné za vynucovanie doménových pravidiel, vykonávanie validácií a koordináciu perzistenčných operácií. HTTP obslužné rutiny slúžia iba ako body orchestrácie, ktoré prekladajú požiadavky na volania služieb a formátujú odpovede. Toto oddelenie zabraňuje hromadeniu obchodnej logiky v API vrstve a umožňuje opätovné použitie služieb naprieč viacerými koncovými bodmi.
+
+Otázky perzistencie sú izolované pomocou vzoru \textit{Repository} postaveného nad ORM modelmi SQLAlchemy. Repozitáre abstrahujú prístup k databáze od servisnej vrstvy, čo umožňuje aplikácii prepínať medzi SQLite a PostgreSQL bez dopadu na doménovú logiku. Táto abstrakcia zároveň zlepšuje testovateľnosť tým, že umožňuje mockovanie repozitárov počas jednotkových testov.
+
+% --------------------------------------------------
+\subsection{Vykonávacie cesty prípadov použitia a tok dát}
+\label{sec:dataflow}
+
+Táto časť opisuje, ako sa kľúčové používateľské akcie šíria systémom od frontendu
+(React) cez backend (Flask) až po perzistenčnú vrstvu (PostgreSQL/SQLite prostredníctvom SQLAlchemy).
+
+\subsubsection{Use-Case 1: Vytvorenie príjmu }
+\label{sec:uc-create-income}
+
+\afterpage{%
+    \clearpage
+    \newgeometry{top=1cm,left=1cm,right=1cm,bottom=2.5cm}
+    \begin{figure}[p]
+    \centering
+    \adjustbox{max totalsize={\textwidth}{\textheight}}{
+        \includegraphics{figures/flow1_income_creation.png}
+    }
+    \caption{Sekvenčný diagram znázorňujúci tok dát pri vytváraní príjmu.}
+    \label{fig:flow1-create-income}
+    \end{figure}
+    \restoregeometry
+}%
+
+\paragraph{Cieľ}
+Umožniť používateľovi vytvoriť záznam o príjme, ktorý je uložený v databáze a priradený
+k príslušnému používateľskému účtu.
+
+\paragraph{Primárny aktér}
+Koncový používateľ interagujúci so stránkou \texttt{Incomes.jsx}.
+
+\paragraph{Priebeh vykonania} 
+Obrázok~\ref{fig:flow1-create-income} ilustruje tok dát:
+
+\begin{enumerate}
+    \item Používateľ vyplní inline formulár v rámci \texttt{Incomes.jsx}.
+    \item Vstupy formulára sú dočasne uložené v lokálnom stave Reactu až do odoslania.
+    \item Po odoslaní frontend odošle požiadavku typu \texttt{POST} na \texttt{/api/incomes}
+    s JSON \mbox{payloadom}, ktorý obsahuje polia príjmu a explicitné \texttt{user\_id}.
+    \item Backendový obslužný handler v \texttt{app/api/incomes.py} prijme požiadavku.
+    \item Handler deleguje spracovanie na \texttt{incomes\_service.py}.
+    \item Služba validuje vstup a vytvorí novú entitu Income, ktorú prepojí
+    s poskytnutým \texttt{user\_id} (vzťah cudej väzby na model User).
+    \item Entita je uložená prostredníctvom SQLAlchemy pomocou \texttt{db.session}
+    (commit/flush).
+    \item Backend vráti odpoveď \texttt{201 Created} s obsahom, ktorý zahŕňa ID nového príjmu
+    a správu o úspechu (napr. \texttt{\{id, message\}}).
+\end{enumerate}
+
+\paragraph{Alternatívne a chybové toky}
+\begin{itemize}
+    \item \textbf{Zlyhanie validácie:} Chýbajúce alebo neplatné polia vedú k odpovedi
+    \texttt{400 Bad Request}.
+    \item \textbf{Neplatný odkaz na používateľa:} Ak dodané \texttt{user\_id}
+    nezodpovedá existujúcemu používateľovi, backend vráti chybu
+    (najčastejšie \texttt{404 Not Found} alebo \texttt{400 Bad Request} v závislosti od implementácie).
+    \item \textbf{Zlyhanie databázy:} Chyby pri perzistencii vedú k odpovedi
+    \texttt{500 Internal Server Error} a k záznamu v aplikačnom logu.
+\end{itemize}
+
+\paragraph{Bezpečnostná poznámka (aktuálny stav)}
+Identita používateľa nie je v aktuálnej implementácii určovaná prostredníctvom relácie alebo JWT autentifikácie. Namiesto toho klient explicitne poskytuje \texttt{user\_id} v tele požiadavky a backend tejto hodnote dôveruje pri priraďovaní príjmu k používateľovi.
+Tento prístup je vhodný pre prototyp vo fáze vývoja, avšak v produkčnom prostredí by vyžadoval dodatočné zabezpečenie (napr. odvodenie identity používateľa z autentifikovaného kontextu namiesto vstupu od klienta).
+
+\subsubsection{Use-Case 2: Vytvorenie výdavku}
+\label{sec:uc-create-expense}
+
+\afterpage{%
+  \clearpage
+  \newgeometry{top=1cm,left=1cm,right=1cm,bottom=2.5cm}
+  \begin{figure}[htbp]
+  \centering
+  \adjustbox{max totalsize={\textwidth}{\textheight}}{
+      \includegraphics{figures/flow2_expense_creation.png}
+  }
+  \caption{Sekvenčný diagram znázorňujúci tok dát pri vytváraní výdavku.}
+  \label{fig:flow2-create-expense}
+  \end{figure}
+  \restoregeometry
+}%
+
+\paragraph{Cieľ}
+Umožniť používateľovi zaznamenať výdavok pomocou zovšeobecneného koncového bodu pre transakcie počas počiatočného vývoja, pred zavedením databázového modelu a služby Expense.
+
+\paragraph{Primárny aktér}
+Koncový používateľ interagujúci so stránkou \texttt{Expenses.jsx}.
+
+\Needspace{6\baselineskip}
+\paragraph{Priebeh vykonania}
+Obrázok~\ref{fig:flow2-create-expense} ilustruje tok dát:
+
+\begin{enumerate}
+    \item Používateľ vyplní inline formulár v rámci \texttt{Expenses.jsx}.
+    \item Frontend odošle požiadavku typu \texttt{POST} na \texttt{/api/receipts} s JSON
+    payloadom, ktorý obsahuje polia pre bloček a jeho položky.
+    \item Backendový obslužný handler v \texttt{app/api/receipts.py} prijme požiadavku.
+    \item Handler deleguje spracovanie na príslušnú servisnú vrstvu (napr. \texttt{receipts\_service.py}).
+    \item Služba validuje vstup a vytvorí novú entitu \texttt{Receipt} a súvisiace \texttt{ReceiptItem} entity, ktoré prepojí s príslušným používateľským účtom.
+    \item Entity sú uložené prostredníctvom SQLAlchemy pomocou \texttt{db.session} (commit/flush).
+    \item Backend vráti odpoveď \texttt{201 Created} s obsahom, ktorý zahŕňa ID nového bločka
+    a správu o úspechu (napr. \texttt{\{id, message\}}).
+\end{enumerate}
+
+
+\FloatBarrier
+\clearpage
+
+% --------------------------------------------------
+\subsection{Návrh databázy}
+
+Aplikácia využíva relačný databázový model navrhnutý pre správu osobných financií v~prostredí s viacerými používateľmi. Schéma~\ref{fig:db-current-schema} zachytáva kľúčové doménové koncepty, ako sú~používatelia, finančné príjmy a výdavky, kategorizácia a dlhodobé finančné ciele. Všetky perzistentné údaje sú jednoznačne viazané na konkrétneho používateľa, čím je zabezpečená izolácia údajov a vlastníctvo finančných záznamov.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/db1_current.png}
+  \caption{Aktuálna schéma databázy aplikácie Budget Tracker.}
+  \label{fig:db-current-schema}
+\end{figure}
+
+
+\subsubsection{Používatelia a vlastníctvo údajov}
+
+Základom dátového modelu je entita \texttt{User}, ktorá reprezentuje overeného používateľa systému a slúži ako nadradená entita pre všetky finančné údaje. Každá doménová entita súvisiaca s financiami obsahuje cudzí kľúč \texttt{user\_id}, ktorý umožňuje jednoznačné priradenie údajov ku konkrétnemu používateľovi a vytvára predpoklady pre logickú izoláciu dát a následné uplatnenie kontrolných mechanizmov na úrovni aplikácie.
+
+\subsubsection{Finančné príjmy a výdavky}
+
+Finančné príjmy sú reprezentované tabuľkou \texttt{incomes}, ktorá zaznamenáva jednotlivé záznamy o príjmoch priradené ku konkrétnemu používateľovi. Každý príjem môže voliteľne odkazovať na \texttt{tag}, čo umožňuje flexibilnú klasifikáciu zdrojov príjmov.
+
+Finančné výdavky sú modelované pomocou tabuľky \texttt{receipts}. Účtenka predstavuje jednu výdavkovú udalosť a môže obsahovať viacero položiek \texttt{receipt\_items}. Táto štruktúra umožňuje samostatnú kategorizáciu jednotlivých položiek v rámci jednej účtenky, čím sa~dosahuje detailná analýza výdavkov.
+
+\subsubsection{Kategorizácia a tagovanie}
+
+Kategorizácia výdavkov je implementovaná prostredníctvom tabuľky \texttt{categories}. Kategórie podporujú hierarchickú štruktúru so samoodkazujúcimi väzbami, čo umožňuje vytváranie vnorených stromov kategórií. Kategórie môžu byť špecifické pre používateľa alebo globálne zdieľané. Každá položka \texttt{receipt\_item} môže byť voliteľne priradená k jednej kategórii, pričom jedna kategória môže byť prepojená s viacerými položkami bločkov.
+
+Tabuľka \texttt{tags} poskytuje ortogonálny mechanizmus\footnote{Tagy existujú nezávisle od hlavnej klasifikačnej štruktúry a môžu sa používať v rôznych typoch entít bez vplyvu na ich primárnu kategorizáciu.} označovania použiteľný pre záznamy o príjmoch a výdavkoch. Značky sú vlastnené jednotlivými používateľmi a uplatňujú obmedzenie jedinečnosti na úrovni používateľa, čím sa zabraňuje ich duplicitnému vytváraniu.
+
+Hlavným účelom označovania je umožniť používateľom zoskupovať finančné záznamy podľa zdroja príjmu alebo výdavku. Keďže takéto zdroje nie sú vždy striktne viazané na jednu konkrétnu organizáciu alebo jednoznačne definovanú kategóriu, bola zavedená všeobecnejšia a flexibilnejšia entita označovania.
+
+\subsubsection{Finančné ciele}
+
+Dlhodobé finančné ciele sú reprezentované tabuľkou \texttt{financial\_targets}. Finančný cieľ definuje buď peňažný cieľ, alebo cieľ založený na percentuálnej hodnote a je explicitne priradený ku konkrétnemu používateľovi.
+
+Ciele sledujú pokrok prostredníctvom uložených aktuálnych hodnôt a stavu dokončenia, čím aplikácia môže monitorovať dosahovanie cieľov v čase bez potreby zložitých agregačných dopytov počas behu.
+
+\subsubsection{Vývoj schémy}
+\label{sec:schema-evolution}
+
+V súčasnej fáze vývoja sú migrácie databázy dočasne deaktivované, aby bola podporená rýchla iterácia. Schéma sa generuje priamo z modelov SQLAlchemy ORM počas inicializácie aplikácie. Tento prístup je vhodný pre aktívny vývoj, ale s postupným zdokonaľovaním systému bude nahradený kontrolovanými migráciami.
+
+% --------------------------------------------------
+
+\subsection{Plánované vylepšenia databázy}
+
+Hoci súčasná schéma efektívne podporuje sledovanie osobných príjmov a výdavkov, je zámerne optimalizovaná pre individuálnych používateľov a základné finančné ciele. Na podporu pokročilejších finančných prípadov použitia, ako sú úspory založené na fondoch, zdieľané účty a kolaboratívne finančné riadenie, sa plánuje rozšírenie schémy (obr. \ref{fig:db-planned-schema}).
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=\textwidth]{figures/db2_funds.png}
+  \caption{Plánovaná rozšírená schéma databázy s podporou fondov a zdieľaných účtov.}
+  \label{fig:db-planned-schema}
+\end{figure}
+
+\subsubsection{Fondy a účty}
+
+Plánovaná architektúra zavádza koncept finančných fondov a účtov. Entita \texttt{Fund} bude reprezentovať logický sporiaci kontajner s definovanými cieľovými sumami a pravidlami príspevkov. Účty budú reprezentovať peňažné zostatky a môžu byť voliteľne prepojené s fondom.
+
+Toto oddelenie umožňuje pokročilé scenáre, ako sú príspevky do fondu z viacerých účtov, samostatné sporiace účty a sledovanie postupu pri dosahovaní spoločných finančných cieľov.
+
+\subsubsection{Alokácie a prevody}
+
+Nová entita \texttt{Allocation} bude zavedená na modelovanie riadených presunov finančných prostriedkov medzi účtami a sporiacimi cieľmi. Alokácie umožňujú presné sledovanie toho, ako príjmy alebo zostatky na účtoch prispievajú ku konkrétnym finančným cieľom.
+
+\subsubsection{Zdieľaný prístup a oprávnenia}
+
+Na podporu kolaboratívnej správy financií plánovaná schéma zavádza explicitnú podporu zdieľaného prístupu prostredníctvom vzťahov medzi používateľmi a účtami. Tento prístup umožňuje viacerým používateľom pristupovať k rovnakým finančným účtom a spravovať ich s definovanými úrovňami oprávnení.
+
+Takáto funkcionalita umožňuje prípady použitia, ako je spoločné rozpočtovanie domácnosti, rodinné sporiace plány a zdieľané finančné ciele.
+
+\subsubsection{Spätná kompatibilita}
+
+Plánované rozšírenia schémy sú navrhnuté tak, aby koexistovali so súčasným dátovým modelom. Existujúce entity, ako sú príjmy, výdavky, kategórie a finančné ciele, zostanú nezmenené, čím sa zabezpečí spätná kompatibilita a minimalizuje sa zložitosť migrácie.
+
+% --------------------------------------------------
+
+\subsection{Návrh REST API}
+
+Backend sprístupňuje svoje funkcie prostredníctvom RESTful HTTP API pod predponou URL \texttt{/api}. API slúži ako jediný integračný bod pre frontendovú aplikáciu a komunikuje výlučne pomocou požiadaviek a odpovedí vo formáte JSON.
+
+Všetky koncové body API sú implementované v rámci jediného blueprintu Flask na najvyššej úrovni. Trasy sú interne organizované do modulov špecifických pre danú doménu (napr. autentifikácia, príjmy, kategórie), pričom zdieľajú jednotný priestor mien API. 
+
+\subsubsection{Príklad API kontraktu}
+
+\subsubsection*{Vytvorenie bločka}
+
+\textbf{Koncový bod:}
+\begin{itemize}
+    \item \texttt{POST /api/receipts}
+\end{itemize}
+
+\noindent\textbf{Telo požiadavky:}
+\begin{verbatim}
+{
+  "description": "Nákup potravín",
+  "issue_date": "2026-01-15",
+  "currency": "EUR",
+  "items": [
+    {
+      "name": "Mlieko",
+      "quantity": 2,
+      "unit_price": 1.20,
+      "category_id": "uuid"
+    }
+  ]
+}
+\end{verbatim}
+
+\noindent\textbf{Úspešná odpoveď} (201 Created):
+\begin{verbatim}
+{
+  "id": "uuid",
+  "total_amount": 2.40,
+  "created_at": "2026-01-15T18:42:00Z"
+}
+\end{verbatim}
+
+\subsubsection{Spracovanie chýb}
+
+API využíva centralizovanú stratégiu spracovania chýb s cieľom zabezpečiť konzistentné a predvídateľné chybové odpovede. Všetky chyby sú reprezentované prostredníctvom vhodných HTTP stavových kódov a štruktúrovaných JSON odpovedí.
+
+V súčasnosti systém používa zmiešaný prístup, pri ktorom sú niektoré chyby obchodnej logiky vracané explicitne priamo z API koncových bodov, zatiaľ čo nezachytené výnimky sú globálne spracované pomocou mechanizmov spracovania chýb frameworku Flask.
+
+\paragraph{Plánovaný model spracovania chýb založený na výnimkách}
+
+Na zlepšenie konzistencie a udržiavateľnosti systém prejde na jednotný model spracovania chýb založený na výnimkách. Budú zavedené vlastné doménovo špecifické triedy výnimiek, ktoré budú vyvolávané v servisnej vrstve na reprezentáciu chýb validácie, zlyhaní autorizácie a porušení doménových pravidiel.
+
+Obslužné mechanizmy chýb frameworku Flask budú tieto výnimky zachytávať a transformovať ich na štandardizované HTTP odpovede. Tento prístup odstraňuje logiku spracovania chýb z jednotlivých koncových bodov a zabezpečuje konzistentné správanie v rámci celého API.
+
+\paragraph{Formát chybovej odpovede}
+
+Všetky chybové odpovede majú jednotnú štruktúru JSON:
+
+\begin{verbatim}
+{
+  „error”: {
+    „code”: <http_status_code>,
+    „message”: <human_readable_message>,
+    „details”: {
+      „field”: <field_name>
+      ...
+    }
+  }
+}
+\end{verbatim}
+
+\paragraph{Kategórie chýb}
+
+API používa štandardné HTTP stavové kódy definované v oficiálnej špecifikácii HTTP (RFC~9110~\cite{rfc9110}) na vyjadrenie výsledku spracovania požiadaviek. Chyby na strane klienta (4xx) signalizujú problémy, ako sú neplatný vstup, chýbajúce overenie alebo nedostatočné oprávnenia, zatiaľ čo chyby na strane servera (5xx) označujú neočakávané zlyhania počas spracovania požiadavky. 
+
+% --------------------------------------------------
+
+\subsection{Autentizácia a \textit{Session Management}}
+
+Systém využíva overovanie založené na reláciách prostredníctvom HTTP súborov cookie. Stav overovania je udržiavaný na strane servera, zatiaľ čo klient uchováva iba súbor cookie s identifikátorom relácie. Tento návrh zabraňuje vystaveniu citlivých overovacích údajov frontendu a prirodzene sa integruje s klientmi založenými na webovom prehliadači.
+
+Logika overovania je zapuzdrená v samostatnej servisnej vrstve a je vyvolávaná prostredníctvom koncových bodov API. Koncové body, ktoré pracujú s finančnými údajmi vo vlastníctve používateľov, vyžadujú overenú reláciu, zatiaľ čo koncové body registrácie a prihlásenia zostávajú verejne prístupné.
+
+\subsubsection{Autentifikačný tok}
+
+\afterpage{%
+  \clearpage
+  \newgeometry{top=1cm,left=1cm,right=1cm,bottom=2.5cm}
+  \begin{figure}[htbp]
+  \centering
+  \adjustbox{max totalsize={\textwidth}{\textheight}}{
+      \includegraphics{figures/flow3_auth.png}
+  }
+  \caption{Sekvenčný diagram znázorňujúci tok dát pri autentifikácii používateľa.}
+  \label{fig:flow3-auth}
+  \end{figure}
+  \restoregeometry
+}%
+
+Proces autentifikácie sleduje servisne orientovaný tok (obr.~\ref{fig:flow3-auth}):
+
+\begin{enumerate}
+    \item Klient odošle prihlasovacie údaje na koncový bod \texttt{POST /api/auth/login}.
+    \item API vrstva overí štruktúru požiadavky a deleguje autentifikáciu na autentifikačnú službu.
+    \item Služba overí prihlasovacie údaje používateľa prostredníctvom prístupu k repozitáru.
+    \item V prípade úspechu je vytvorená relácia na strane servera a klientovi je vrátený
+    súbor cookie s identifikátorom relácie.
+    \item V prípade zlyhania je vrátená štandardizovaná chybová odpoveď.
+\end{enumerate}
+
+Ukončenie relácie je riešené prostredníctvom koncového bodu \texttt{POST /api/auth/logout}, ktorý zneplatní aktívnu reláciu. Koncový bod \texttt{GET /api/auth/me} umožňuje frontendu získať informácie o aktuálne overenom používateľovi a obnoviť stav relácie po opätovnom načítaní stránky.
+
+
+\subsubsection{Bezpečnosť \textit{Session Cookie}}
+
+\textit{Session cookie} sú určené na konfiguráciu s bezpečnostnými atribútmi, ktoré znižujú vystavenie bežným webovým zraniteľnostiam v produkčných prostrediach. Odporúčaná konfigurácia~\cite{owasp_session_management_cheatsheet} obsahuje nasledujúce vlastnosti:
+
+\begin{itemize}
+    \item \texttt{Secure=True}, ktorá zabezpečuje, že súbory cookie sú prenášané iba
+    prostredníctvom HTTPS spojení.
+    \item \texttt{HttpOnly=True}, ktorá zabraňuje prístupu klientskych skriptov k
+    relačným súborom cookie a znižuje dopad útokov typu cross-site scripting.
+    \item \texttt{SameSite=Lax}, ktorá zmierňuje riziká útokov typu cross-site request
+    pri zachovaní použiteľnosti pre bežné navigačné scenáre.
+\end{itemize}
+
+Ak budúce požiadavky zavedú ďalšie dôveryhodné pôvody alebo zložitejšie vzory interakcie medzi doménami, politika \texttt{SameSite} môže byť primerane prehodnotená.
+
+% --------------------------------------------------
+\clearpage
