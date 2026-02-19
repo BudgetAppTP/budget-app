@@ -15,7 +15,7 @@
 }
 
 .comparison.wrap {
-  max-width: 1350px;
+  max-width: 1500px;
   margin: 50px auto;
   padding: 0 20px;
 }
@@ -139,20 +139,21 @@
 .comparison .panel {
   background-color: #ffffff;
   border: 1px solid #d1d5db;
-  border-top-left-radius: 0px;
-  border-top-right-radius: 0px;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
+  border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  overflow-x: auto;
+
 }
 
 .comparison .card {
   padding: 16px;
+
 }
 
 .comparison .table-card {
   overflow: hidden;
   border-radius: 6px;
+
 }
 
 .comparison .section-title {
@@ -206,7 +207,7 @@
   gap: 24px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .comparison .grid {
     grid-template-columns: 1fr;
   }
@@ -415,3 +416,5 @@
 .comparison .goals-table {
   margin-top: 8px;
 }
+
+
