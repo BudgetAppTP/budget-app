@@ -6,7 +6,7 @@ import Incomes from "./pages/Incomes";
 import Budgets from "./pages/Budgets";
 import Savings from "./pages/Savings";
 import Needs from "./pages/Needs";
-import Ekasa from "./pages/EKasa";
+import Ekasa from "./pages/Ekasa";
 import Comparison from "./pages/Comparison";
 import Organisation from "./pages/Organisation";
 

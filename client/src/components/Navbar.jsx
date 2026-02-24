@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { NavLink } from "react-router-dom";
 import { useLocation } from "react-router-dom";
-import "./Navbar.css";
+import "./navbar.css";
 import logo from "../assets/logo.png";
 import { useLang } from "../i18n/LanguageContext";
 import T from "../i18n/T";
