@@ -9,7 +9,12 @@ from app.extensions import db
 from app.models import Receipt, ReceiptItem, Category, Tag
 
 
-def get_donut_data(year: int | None = None, month: int | None = None, user_id: uuid.UUID | None = None):
+def get_donut_data(
+    year: int | None = None,
+    month: int | None = None,
+    user_id: uuid.UUID | None = None,
+    account_id: uuid.UUID | None = None,
+):
     # validate (как у incomes/receipts)
     if (year is None) ^ (month is None):
         return {"error": "Both year and month must be provided together"}, 400
@@ -29,6 +34,8 @@ def get_donut_data(year: int | None = None, month: int | None = None, user_id: u
     )
     if user_id is not None:
         total_q = total_q.filter(Receipt.user_id == user_id)
+    if account_id is not None:
+        total_q = total_q.filter(Receipt.account_id == account_id)
 
     total_amount = float(total_q.scalar() or 0.0)
 
@@ -46,6 +53,8 @@ def get_donut_data(year: int | None = None, month: int | None = None, user_id: u
     )
     if user_id is not None:
         cat_q = cat_q.filter(Receipt.user_id == user_id)
+    if account_id is not None:
+        cat_q = cat_q.filter(Receipt.account_id == account_id)
 
     categories = []
     for category, amount in cat_q.all():
@@ -82,6 +91,8 @@ def get_donut_data(year: int | None = None, month: int | None = None, user_id: u
     )
     if user_id is not None:
         detail_q = detail_q.filter(Receipt.user_id == user_id)
+    if account_id is not None:
+        detail_q = detail_q.filter(Receipt.account_id == account_id)
 
     tags_by_category: dict[str, dict[str, dict[str, float]]] = {}
 

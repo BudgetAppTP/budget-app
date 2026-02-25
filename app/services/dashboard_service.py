@@ -6,7 +6,12 @@ from app.extensions import db
 from app.models import Income, Receipt
 
 
-def get_month_summary(year: int | None = None, month: int | None = None, user_id: uuid.UUID | None = None):
+def get_month_summary(
+    year: int | None = None,
+    month: int | None = None,
+    user_id: uuid.UUID | None = None,
+    account_id: uuid.UUID | None = None,
+):
     """
     Return total incomes and total expenses for selected month/year.
     If year/month are not provided -> current month.
@@ -45,6 +50,8 @@ def get_month_summary(year: int | None = None, month: int | None = None, user_id
     )
     if user_id is not None:
         receipts_q = receipts_q.filter(Receipt.user_id == user_id)
+    if account_id is not None:
+        receipts_q = receipts_q.filter(Receipt.account_id == account_id)
 
     total_incomes = float(incomes_q.scalar() or 0)
     total_expenses = float(receipts_q.scalar() or 0)

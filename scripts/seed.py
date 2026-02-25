@@ -20,6 +20,8 @@ from tabulate import tabulate
 from app import create_app
 from app.extensions import db
 from app.models import (
+    Account,
+    AccountMember,
     Category,
     FinancialTarget,
     Income,
@@ -108,6 +110,52 @@ def seed_tags(users):
     db.session.add_all(tags)
     db.session.flush()
     return tags
+
+
+def seed_accounts(users):
+    accounts_data = [
+        {"key": "john_main", "name": "John Main Budget", "balance": Decimal("1250.00"), "currency": "EUR"},
+        {"key": "jane_main", "name": "Jane Personal Budget", "balance": Decimal("820.50"), "currency": "EUR"},
+        {"key": "family_shared", "name": "Family Shared Budget", "balance": Decimal("3400.00"), "currency": "EUR"},
+        {"key": "test_solo", "name": "Test User Budget", "balance": Decimal("150.25"), "currency": "USD"},
+    ]
+
+    accounts = [
+        Account(
+            name=data["name"],
+            balance=data["balance"],
+            currency=data["currency"],
+        )
+        for data in accounts_data
+    ]
+    db.session.add_all(accounts)
+    db.session.flush()
+
+    account_map = {
+        data["key"]: account
+        for data, account in zip(accounts_data, accounts)
+    }
+
+    memberships_data = [
+        {"user_idx": 0, "account_key": "john_main", "role": "owner"},
+        {"user_idx": 1, "account_key": "jane_main", "role": "owner"},
+        {"user_idx": 2, "account_key": "test_solo", "role": "owner"},
+        {"user_idx": 0, "account_key": "family_shared", "role": "owner"},
+        {"user_idx": 1, "account_key": "family_shared", "role": "owner"},
+    ]
+
+    memberships = [
+        AccountMember(
+            user_id=users[data["user_idx"]].id,
+            account_id=account_map[data["account_key"]].id,
+            role=data["role"],
+        )
+        for data in memberships_data
+    ]
+    db.session.add_all(memberships)
+    db.session.flush()
+
+    return accounts, memberships, account_map
 
 
 def seed_categories(users):
@@ -283,7 +331,7 @@ def seed_financial_targets(users):
     return targets
 
 
-def seed_receipts(users, tags):
+def seed_receipts(users, tags, account_map):
     today = date.today()
 
     def get_user_tag(user_idx, tag_name):
@@ -295,6 +343,7 @@ def seed_receipts(users, tags):
     receipts_data = [
         {
             "user_idx": 0,
+            "account_key": "family_shared",
             "tag_name": "Quantum Mart",
             "issue_date": today - timedelta(days=2),
             "total_amount": Decimal("45.80"),
@@ -302,12 +351,14 @@ def seed_receipts(users, tags):
         },
         {
             "user_idx": 0,
+            "account_key": "john_main",
             "tag_name": "Byte & Bean Café",
             "issue_date": today - timedelta(days=5),
             "total_amount": Decimal("28.50"),
         },
         {
             "user_idx": 1,
+            "account_key": "family_shared",
             "tag_name": "The Electric Bazaar",
             "issue_date": today - timedelta(days=1),
             "total_amount": Decimal("67.20"),
@@ -315,12 +366,14 @@ def seed_receipts(users, tags):
         },
         {
             "user_idx": 0,
+            "account_key": "john_main",
             "tag_name": "Quantum Mart",
             "issue_date": today - timedelta(days=10),
             "total_amount": Decimal("102.15"),
         },
         {
             "user_idx": 2,
+            "account_key": "test_solo",
             "tag_name": "Byte & Bean Café",
             "issue_date": today,
             "total_amount": Decimal("34.90"),
@@ -335,6 +388,7 @@ def seed_receipts(users, tags):
 
         receipt = Receipt(
             user_id=users[data["user_idx"]].id,
+            account_id=account_map[data["account_key"]].id,
             tag_id=tag.id if tag else None,
             issue_date=data["issue_date"],
             total_amount=data["total_amount"],
@@ -435,17 +489,20 @@ def main():
 
         # Seeding order matters — later entities depend on earlier ones.
         users = seed_users()
+        accounts, memberships, account_map = seed_accounts(users)
         tags = seed_tags(users)
         categories = seed_categories(users)
         incomes = seed_incomes(users, tags)
         targets = seed_financial_targets(users)
-        receipts = seed_receipts(users, tags)
+        receipts = seed_receipts(users, tags, account_map)
         items = seed_receipt_items(receipts, categories, users)
 
         db.session.commit()
 
         stats = [
             ("Users", len(users)),
+            ("Accounts", len(accounts)),
+            ("Account Members", len(memberships)),
             ("Tags", len(tags)),
             ("Categories", len(categories)),
             ("Incomes", len(incomes)),

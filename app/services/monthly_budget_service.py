@@ -73,7 +73,12 @@ def get_monthly_summary(month: str | None = None) -> Tuple[Dict[str, Any], int]:
                     pass
 
     # Fetch all receipts via receipts_service
-    receipts: List[Dict[str, Any]] = receipts_service.get_all_receipts()
+    receipt_data, rec_status = receipts_service.get_all_receipts()
+    if rec_status != 200:
+        return receipt_data, rec_status
+    if not isinstance(receipt_data, list):
+        return {"error": "Invalid receipts payload"}, 500
+    receipts: List[Dict[str, Any]] = receipt_data
 
     # Filter receipts by target month
     filtered_expenses: List[Dict[str, Any]] = []

@@ -1,4 +1,6 @@
 from .base import Base
+from .account import Account
+from .account_member import AccountMember
 from .category import Category
 from .financial_target import FinancialTarget
 from .income import Income
@@ -9,6 +11,8 @@ from .user import User
 
 __all__ = [
     "Base",
+    "Account",
+    "AccountMember",
     "Category",
     "FinancialTarget",
     "Income",

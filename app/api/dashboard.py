@@ -20,10 +20,12 @@ def api_dashboard_summary():
     year_raw = request.args.get("year")
     month_raw = request.args.get("month")
     user_raw = request.args.get("user_id")
+    account_raw = request.args.get("account_id")
 
     year = None
     month = None
     user_id = None
+    account_id = None
 
     try:
         if year_raw is not None:
@@ -38,6 +40,16 @@ def api_dashboard_summary():
             user_id = uuid.UUID(user_raw)
         except ValueError:
             return make_response({"error": "Invalid user_id format"}, None, 400)
+    if account_raw:
+        try:
+            account_id = uuid.UUID(account_raw)
+        except ValueError:
+            return make_response({"error": "Invalid account_id format"}, None, 400)
 
-    data, status = dashboard_service.get_month_summary(year=year, month=month, user_id=user_id)
+    data, status = dashboard_service.get_month_summary(
+        year=year,
+        month=month,
+        user_id=user_id,
+        account_id=account_id,
+    )
     return make_response(data, None, status)
