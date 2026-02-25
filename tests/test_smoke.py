@@ -66,10 +66,11 @@ def test_goals_list_ok(client):
 
 
 def test_dashboard_ok(client):
-    r = client.get("/api/dashboard?month=2025-10")
+    r = client.get("/api/dashboard/summary?year=2025&month=10")
     data = assert_json_ok(r)
-    assert data.get("month") == "2025-10"
-    for k in ["total_exp", "total_inc", "sections", "cats_exp", "months", "series_inc", "series_exp"]:
+    assert data.get("year") == 2025
+    assert data.get("month") == 10
+    for k in ["total_incomes", "total_expenses"]:
         assert k in data
 
 
@@ -84,13 +85,9 @@ def test_import_qr_preview_ok(client):
 
 def test_auth_flow_ok(client):
     reg = client.post("/api/auth/register", json={"email": "u@test.local", "password": "pass"})
-    assert reg.status_code in (200, 201)
+    assert reg.status_code == 201
     login = client.post("/api/auth/login", json={"email": "u@test.local", "password": "pass"})
-    body = login.get_json()
-    if login.status_code != 200:
-        assert "error" in body and body["error"] is None
-    else:
-        assert_json_ok(login)
+    assert_json_ok(login)
     logout = client.post("/api/auth/logout")
     assert_json_ok(logout)
 
