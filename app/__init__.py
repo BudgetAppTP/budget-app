@@ -1,11 +1,12 @@
 import os
-from flask import Flask, jsonify
+from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 from werkzeug.exceptions import HTTPException
 from flask_swagger_ui import get_swaggerui_blueprint
 
 from app.extensions import db, migrate
+from app.services.errors import ServiceError
 from app.services import init_services
 
 load_dotenv()
@@ -55,7 +56,9 @@ def _register_api(flask_app: Flask):
     import app.api.auth          # noqa: F401
     import app.api.transactions  # noqa: F401
     import app.api.budgets       # noqa: F401
+    import app.api.account       # noqa: F401
     import app.api.goals         # noqa: F401
+    import app.api.savings_funds # noqa: F401
     import app.api.importqr      # noqa: F401
     import app.api.export        # noqa: F401
     import app.api.dashboard     # noqa: F401
@@ -80,14 +83,19 @@ def _register_swagger(flask_app: Flask):
 
 
 def _register_error_handlers(flask_app: Flask):
+    @flask_app.errorhandler(ServiceError)
+    def handle_service_error(e: ServiceError):
+        return e.to_flask_response()
+
     @flask_app.errorhandler(HTTPException)
     def handle_http_error(e):
-        return jsonify({"data": None, "error": {"code": str(e.code), "message": e.description}}), e.code
+        error = ServiceError(message=e.description, code=str(e.code), status_code=e.code)
+        return error.to_flask_response()
 
     @flask_app.errorhandler(Exception)
     def handle_unexpected_error(e):
         flask_app.logger.exception(e)
-        return jsonify({"data": None, "error": {"code": "internal_error", "message": "Internal Server Error"}}), 500
+        return ServiceError().to_flask_response()
 
 
 def _register_legacy_guard(flask_app: Flask):

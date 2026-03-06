@@ -15,7 +15,7 @@ def get_donut_data(
     user_id: uuid.UUID | None = None,
     account_id: uuid.UUID | None = None,
 ):
-    # validate (как у incomes/receipts)
+    # validate (similar to incomes/receipts)
     if (year is None) ^ (month is None):
         return {"error": "Both year and month must be provided together"}, 400
     if year is None or month is None:

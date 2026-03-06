@@ -64,7 +64,11 @@ class Account(Base):
         nullable=False
     )
     account_type: Mapped[AccountType] = mapped_column(
-        Enum(AccountType, native_enum=False),
+        Enum(
+            AccountType,
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+            native_enum=False
+        ),
         nullable=False,
         default=AccountType.ACCOUNT,
         server_default=AccountType.ACCOUNT.value,
