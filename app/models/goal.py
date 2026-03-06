@@ -4,7 +4,7 @@ import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Numeric
+from sqlalchemy import Boolean, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -45,6 +45,12 @@ class Goal(Base):
         Numeric(14, 2),
         nullable=False,
         default=Decimal('0.00'),
+        server_default='0'
+    )
+    is_completed: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
         server_default='0'
     )
 

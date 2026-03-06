@@ -7,6 +7,7 @@ class BaseConfig:
     TESTING = False
     DEFAULT_CURRENCY = os.getenv("DEFAULT_CURRENCY", "EUR")
     IMPORT_XLSX_PATH = os.getenv("IMPORT_XLSX_PATH", "/mnt/data/BugetAppTP.xlsx")
+    MAX_SAVINGS_FUNDS = int(os.getenv("MAX_SAVINGS_FUNDS", "10"))
 
     SWAGGER_URL = "/api/docs"
     API_URL = "/static/swagger.json"
