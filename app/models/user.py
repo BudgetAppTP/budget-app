@@ -12,6 +12,7 @@ from .base import Base
 if TYPE_CHECKING:
     from .account import Account
     from .account_member import AccountMember
+    from .goal import Goal
     from .income import Income
     from .receipt import Receipt
     from .financial_target import FinancialTarget
@@ -104,6 +105,10 @@ class User(Base):
 
     tags: Mapped[list["Tag"]] = relationship(
         "Tag", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    goals: Mapped[list["Goal"]] = relationship(
+        "Goal", back_populates="user", cascade="all, delete-orphan"
     )
 
     account_memberships: Mapped[list['AccountMember']] = relationship(
