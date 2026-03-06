@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import enum
 import uuid
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Numeric, String
+from sqlalchemy import Enum, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -14,6 +15,12 @@ if TYPE_CHECKING:
     from .account_member import AccountMember
     from .receipt import Receipt
     from .user import User
+
+
+@enum.unique
+class AccountType(str, enum.Enum):
+    ACCOUNT = 'account'
+    SAVINGS_FUND = 'savings_fund'
 
 
 class Account(Base):
@@ -56,6 +63,12 @@ class Account(Base):
         String(3),
         nullable=False
     )
+    account_type: Mapped[AccountType] = mapped_column(
+        Enum(AccountType, native_enum=False),
+        nullable=False,
+        default=AccountType.ACCOUNT,
+        server_default=AccountType.ACCOUNT.value,
+    )
 
     """ Relationships """
     memberships: Mapped[list['AccountMember']] = relationship(
@@ -72,3 +85,8 @@ class Account(Base):
     receipts: Mapped[list['Receipt']] = relationship(
         'Receipt', back_populates='account'
     )
+
+    __mapper_args__ = {
+        'polymorphic_identity': AccountType.ACCOUNT,
+        'polymorphic_on': account_type,
+    }
