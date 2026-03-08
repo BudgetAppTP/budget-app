@@ -15,7 +15,20 @@ if TYPE_CHECKING:
 
 
 class SavingsFund(Account):
-    """Goal-oriented account extension with a target and monthly contribution."""
+    """Represents a specialized account used for savings planning.
+
+    This model extends :class:`Account` using SQLAlchemy polymorphic inheritance
+    and adds optional savings-specific targets.
+
+    Attributes:
+        id (uuid.UUID): Primary key and foreign key referencing the base account row.
+        target_amount (Decimal | None): Optional long-term target amount for the savings fund.
+        monthly_contribution (Decimal | None): Optional planned monthly contribution amount.
+
+    Relationships:
+        goals (list[Goal]): One-to-Many relationship (cascade delete).
+            All goals tracked under this savings fund.
+    """
 
     __tablename__ = 'savings_funds'
 

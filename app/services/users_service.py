@@ -2,6 +2,7 @@ import uuid
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core.validators import is_valid_iso4217
 from app.extensions import db
 from app.models import Account, AccountMember, AccountType, User
 from app.services.errors import BadRequestError, ConflictError
@@ -84,8 +85,8 @@ def create_user(data):
 
     if not all([username, email, password_hash]):
         raise BadRequestError("Missing required fields")
-    if len(currency) != 3:
-        raise BadRequestError("currency must be 3 characters")
+    if not is_valid_iso4217(currency):
+        raise BadRequestError("currency must be a valid ISO 4217 code")
 
     exists = db.session.query(User).filter(User.email == email).first()
     if exists:

@@ -1,6 +1,7 @@
 import uuid
 
 from app.extensions import db
+from app.core.validators import is_valid_iso4217
 from app.models import Account, AccountMember, AccountType
 from app.services.errors import BadRequestError, NotFoundError
 from app.services.responses import OkResult
@@ -48,8 +49,8 @@ def update_main_account(user_id: uuid.UUID, data: dict):
 
     if "currency" in data:
         currency = str(data.get("currency") or "").strip().upper()
-        if len(currency) != 3:
-            raise BadRequestError("currency must be 3 characters")
+        if not is_valid_iso4217(currency):
+            raise BadRequestError("currency must be a valid ISO 4217 code")
         account.currency = currency
 
     if "balance" in data:
