@@ -31,6 +31,7 @@ class Account(Base):
         name (str): The name of the account, up to 255 characters.
         balance (Decimal): Current account balance.
         currency (str): ISO-like 3-character currency code (e.g. EUR, USD).
+        account_type (AccountType): Discriminator used for polymorphic account inheritance.
 
     Relationships:
         memberships (list[AccountMember]): One-to-Many relationship (cascade delete).

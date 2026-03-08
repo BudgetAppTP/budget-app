@@ -16,7 +16,25 @@ if TYPE_CHECKING:
 
 
 class AccountMember(Base):
-    """Association model linking users and accounts (many-to-many)."""
+    """Represents membership of a user in an account.
+
+    This is the association model backing the many-to-many relationship
+    between users and accounts, enriched with role and creation metadata.
+
+    Attributes:
+        id (uuid.UUID): Unique identifier for the membership row.
+        user_id (uuid.UUID): Foreign key referencing the related user.
+        account_id (uuid.UUID): Foreign key referencing the related account.
+        role (str): Membership role within the account (for example, "owner").
+        created_at (datetime): Timestamp when the membership was created.
+
+    Relationships:
+        user (User): Many-to-One relationship.
+            The user participating in the account.
+
+        account (Account): Many-to-One relationship.
+            The account this membership belongs to.
+    """
 
     __tablename__ = 'account_members'
     __table_args__ = (

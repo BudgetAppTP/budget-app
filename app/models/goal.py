@@ -16,7 +16,23 @@ if TYPE_CHECKING:
 
 
 class Goal(Base):
-    """Represents a goal tracked within a specific savings fund."""
+    """Represents a savings goal owned by a user inside a savings fund.
+
+    Attributes:
+        id (uuid.UUID): Unique identifier for the goal.
+        user_id (uuid.UUID): Foreign key referencing the user who owns this goal.
+        savings_fund_id (uuid.UUID): Foreign key referencing the savings fund this goal belongs to.
+        target_amount (Decimal): Target amount to reach for this goal.
+        current_amount (Decimal): Current accumulated amount toward the target.
+        is_completed (bool): Indicates whether the goal has already been completed.
+
+    Relationships:
+        user (User): Many-to-One relationship.
+            The user who owns this goal.
+
+        savings_fund (SavingsFund): Many-to-One relationship.
+            The savings fund that tracks this goal.
+    """
 
     __tablename__ = 'goals'
 

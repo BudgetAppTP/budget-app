@@ -1,6 +1,9 @@
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Optional
+
+from babel.numbers import UnknownCurrencyError, get_currency_name
+
 from .domain import Section, TransactionKind
 
 
@@ -44,3 +47,11 @@ def try_decimal(value) -> Optional[Decimal]:
         return parse_decimal(value)
     except (InvalidOperation, ValueError):
         return None
+
+
+def is_valid_iso4217(currency: str) -> bool:
+    """Validates if the provided currency code is a valid ISO 4217 code."""
+    try:
+        return bool(get_currency_name(currency.strip().upper()))
+    except (UnknownCurrencyError, AttributeError):
+        return False

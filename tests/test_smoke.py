@@ -94,7 +94,6 @@ def test_goals_list_ok(client):
 
     allocate_resp = client.post(
         f"/api/goals/{goal_id}/allocate",
-        headers=headers,
         json={"delta_amount": "300.00"},
     )
     assert_json_ok(allocate_resp)

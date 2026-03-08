@@ -2,6 +2,7 @@ import uuid
 
 from sqlalchemy.exc import IntegrityError
 
+from app.core.validators import is_valid_iso4217
 from app.extensions import db
 from app.models import Account, AccountMember, AccountType, User
 from app.services.errors import BadRequestError, ConflictError
@@ -82,10 +83,6 @@ def create_user(data):
     if err:
         raise BadRequestError(err.get("error") or "Invalid user payload")
 
-    currency = str(data.get("currency") or "EUR").strip().upper()
-    if len(currency) != 3:
-        raise BadRequestError("currency must be 3 characters")
-
     existing_user = db.session.query(User).filter_by(username=validated["username"]).first()
     if existing_user:
         raise ConflictError("Username already exists")
@@ -103,7 +100,7 @@ def create_user(data):
 
         db.session.add(new_user)
         db.session.flush()
-        _create_main_account_for_user(new_user.id, currency)
+        _create_main_account_for_user(new_user.id, validated.get("currency", "EUR"))
         db.session.commit()
 
         return CreatedResult({"id": str(new_user.id), "message": "User created successfully"})

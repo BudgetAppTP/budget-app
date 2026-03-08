@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import func
 
+from app.core.validators import is_valid_iso4217
 from app.extensions import db
 from app.models import AccountMember, AccountType, Goal, SavingsFund
 from app.services.errors import BadRequestError, NotFoundError
@@ -93,8 +94,8 @@ def create_fund(user_id: uuid.UUID, data: dict, max_savings_funds: int = 10):
     currency = str(data.get("currency") or "").strip().upper()
     if not name:
         raise BadRequestError("Missing name")
-    if len(currency) != 3:
-        raise BadRequestError("currency must be 3 characters")
+    if not is_valid_iso4217(currency):
+        raise BadRequestError("currency must be a valid ISO 4217 code")
 
     target_amount = data.get("target_amount")
     target_amount = _to_decimal(target_amount, "target_amount") if target_amount is not None else None
@@ -142,8 +143,8 @@ def update_fund(user_id: uuid.UUID, fund_id: uuid.UUID, data: dict):
 
     if "currency" in data:
         currency = str(data.get("currency") or "").strip().upper()
-        if len(currency) != 3:
-            raise BadRequestError("currency must be 3 characters")
+        if not is_valid_iso4217(currency):
+            raise BadRequestError("currency must be a valid ISO 4217 code")
         fund.currency = currency
 
     if "target_amount" in data:
