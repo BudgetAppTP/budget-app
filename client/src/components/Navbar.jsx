@@ -62,7 +62,7 @@ export default function Navbar() {
   }, [location.pathname]);
 
 
-  const AUTH_ROUTES = ["/login", "/signin", "/registration"];
+  const AUTH_ROUTES = ["/signup", "/signin"];
   const isAuthPage = AUTH_ROUTES.includes(location.pathname);
 
 
