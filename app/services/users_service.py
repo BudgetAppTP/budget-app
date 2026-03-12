@@ -1,9 +1,14 @@
+import re
+
 from app.extensions import db
 from app.models import User
 import uuid
 
+from app.validators.user_validators import validate_user_create_data
+
+EMAIL_REGEX = r"^[^@]+@[^@]+\.[^@]+$"
+
 def get_all_users():
-    """Возвращает всех пользователей."""
     users = db.session.query(User).all()
     return [
         {
@@ -18,17 +23,22 @@ def get_all_users():
 
 def create_user(data):
     try:
-        username = data.get("username")
-        email = data.get("email")
-        password_hash = data.get("password_hash")
+        validated, err, status = validate_user_create_data(data)
+        if err:
+            return err, status
 
-        if not all([username, email, password_hash]):
-            return {"error": "Missing required fields"}, 400
+        existing_user = db.session.query(User).filter_by(username=validated["username"]).first()
+        if existing_user:
+            return {"error": "Username already exists"}, 400
+
+        existing_email = db.session.query(User).filter_by(email=validated["email"]).first()
+        if existing_email:
+            return {"error": "Email already exists"}, 400
 
         new_user = User(
-            username=username,
-            email=email,
-            password_hash=password_hash
+            username=validated["username"],
+            email=validated["email"],
+            password_hash=validated["password_hash"]
         )
 
         db.session.add(new_user)
