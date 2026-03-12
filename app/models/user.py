@@ -10,6 +10,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
+    from .account import Account
+    from .account_member import AccountMember
+    from .goal import Goal
     from .income import Income
     from .receipt import Receipt
     from .financial_target import FinancialTarget
@@ -46,6 +49,12 @@ class User(Base):
 
         tags (list[Tag]): One-to-Many relationship (cascade delete).
             All tags created by this user for categorizing transactions.
+
+        account_memberships (list[AccountMember]): One-to-Many relationship (cascade delete).
+            Association rows linking this user to accounts.
+
+        accounts (list[Account]): Many-to-Many relationship via AccountMember.
+            Accounts this user can access/own.
     """
     __tablename__ = 'users'
 
@@ -96,6 +105,21 @@ class User(Base):
 
     tags: Mapped[list["Tag"]] = relationship(
         "Tag", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    goals: Mapped[list["Goal"]] = relationship(
+        "Goal", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    account_memberships: Mapped[list['AccountMember']] = relationship(
+        'AccountMember', back_populates='user', cascade='all, delete-orphan'
+    )
+
+    accounts: Mapped[list['Account']] = relationship(
+        'Account',
+        secondary='account_members',
+        back_populates='users',
+        overlaps='account,memberships,user,account_memberships'
     )
 
     def __repr__(self):

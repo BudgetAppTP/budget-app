@@ -4,13 +4,21 @@ from decimal import Decimal
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.models import Receipt, Tag, ReceiptItem
+from app.models import AccountMember, Receipt, ReceiptItem, Tag
 from datetime import date, datetime
 
 from app.services import tags_service, ekasa_service
 
 
-def get_all_receipts(year: int | None = None, month: int | None = None):
+def _receipt_currency(receipt: Receipt) -> str | None:
+    return receipt.account.currency if receipt.account is not None else None
+
+
+def get_all_receipts(
+    year: int | None = None,
+    month: int | None = None,
+    account_id: uuid.UUID | None = None,
+):
     """
     Get all receipts.
 
@@ -30,7 +38,10 @@ def get_all_receipts(year: int | None = None, month: int | None = None):
           ...
         ]
     """
-    query = db.session.query(Receipt)
+    query = db.session.query(Receipt).options(
+        joinedload(Receipt.account),
+        joinedload(Receipt.tag),
+    )
 
     # Filter by month/year (both must be provided together)
     if (year is None) ^ (month is None):
@@ -51,6 +62,9 @@ def get_all_receipts(year: int | None = None, month: int | None = None):
             Receipt.issue_date < end
         )
 
+    if account_id is not None:
+        query = query.filter(Receipt.account_id == account_id)
+
     receipts = query.all()
 
     result = []
@@ -62,10 +76,11 @@ def get_all_receipts(year: int | None = None, month: int | None = None):
             "tag_id": str(r.tag_id) if r.tag_id else None,
             "description": getattr(r, "description", None),
             "issue_date": r.issue_date.isoformat() if r.issue_date else None,
-            "currency": r.currency,
+            "currency": _receipt_currency(r),
             "total_amount": float(r.total_amount) if r.total_amount is not None else None,
             "extra_metadata": r.extra_metadata,
             "user_id": str(r.user_id),
+            "account_id": str(r.account_id),
             "created_at": r.created_at.isoformat() if r.created_at else None
         })
 
@@ -123,11 +138,72 @@ def _load_tag_for_user(user_id: uuid.UUID, raw_tag_id: str | None):
     return tag, None, None
 
 
+def _parse_account_id(raw_account_id):
+    if not raw_account_id:
+        return None, {"error": "Missing account_id"}, 400
+
+    if isinstance(raw_account_id, uuid.UUID):
+        return raw_account_id, None, None
+
+    if isinstance(raw_account_id, str):
+        try:
+            return uuid.UUID(raw_account_id), None, None
+        except ValueError:
+            return None, {"error": "Invalid account_id format"}, 400
+
+    return None, {"error": "Invalid account_id type"}, 400
+
+
+def _ensure_account_membership(user_id: uuid.UUID, account_id: uuid.UUID):
+    membership = (
+        db.session.query(AccountMember)
+        .filter(
+            AccountMember.user_id == user_id,
+            AccountMember.account_id == account_id,
+        )
+        .first()
+    )
+    if membership is None:
+        return {"error": "User is not a member of this account"}, 403
+    return None
+
+
+def _resolve_account_for_user(
+    user_id: uuid.UUID,
+    raw_account_id: str | uuid.UUID | None,
+):
+    if raw_account_id:
+        account_id, err, status = _parse_account_id(raw_account_id)
+        if err:
+            return None, err, status
+        membership_error = _ensure_account_membership(user_id, account_id)
+        if membership_error:
+            return None, membership_error, 403
+        return account_id, None, None
+
+    default_membership = (
+        db.session.query(AccountMember)
+        .filter(AccountMember.user_id == user_id)
+        .order_by(AccountMember.created_at.asc())
+        .first()
+    )
+    if default_membership is None:
+        return None, {"error": f"Missing account_id and user has no account membership"}, 400
+
+    return default_membership.account_id, None, None
+
+
 
 def create_receipt(data: dict):
     try:
         # user_id
         user_id, err, status = _parse_user_id(data.get("user_id"))
+        if err:
+            return err, status
+        account_id, err, status = _resolve_account_for_user(
+            user_id,
+            data.get("account_id") or data.get("accountId")
+        )
         if err:
             return err, status
 
@@ -151,10 +227,10 @@ def create_receipt(data: dict):
 
         receipt = Receipt(
             user_id=user_id,
+            account_id=account_id,
             tag=tag,
             description=description,
             issue_date=issue_date,
-            currency=data.get("currency", "EUR"),
             total_amount=data.get("total_amount") or 0.0,
             external_uid=data.get("external_uid"),
             extra_metadata=data.get("extra_metadata")
@@ -187,10 +263,11 @@ def get_receipt_by_id(receipt_id: uuid.UUID):
         "tag_id": str(receipt.tag_id) if receipt.tag_id else None,
         "description": receipt.description,
         "issue_date": receipt.issue_date.isoformat() if receipt.issue_date else None,
-        "currency": receipt.currency,
+        "currency": _receipt_currency(receipt),
         "total_amount": float(receipt.total_amount) if receipt.total_amount is not None else None,
         "extra_metadata": receipt.extra_metadata,
         "user_id": str(receipt.user_id),
+        "account_id": str(receipt.account_id),
         "created_at": receipt.created_at.isoformat() if receipt.created_at else None
     }, 200
 
@@ -240,8 +317,14 @@ def update_receipt(receipt_id: uuid.UUID, data: dict):
         # issue_date
         if "issue_date" in data:
             receipt.issue_date = date.fromisoformat(data["issue_date"])
-        if "currency" in data:
-            receipt.currency = data["currency"]
+        if "account_id" in data:
+            new_account_id, err, status = _parse_account_id(data["account_id"])
+            if err:
+                return err, status
+            membership_error = _ensure_account_membership(receipt.user_id, new_account_id)
+            if membership_error:
+                return membership_error, 403
+            receipt.account_id = new_account_id
         if "total_amount" in data:
             receipt.total_amount = float(data["total_amount"])
         if "external_uid" in data:
@@ -281,7 +364,11 @@ def delete_receipt(receipt_id: uuid.UUID):
         return {"error": str(e)}, 400
 
 
-def import_receipt_from_ekasa(receipt_id: str, user_id: str):
+def import_receipt_from_ekasa(
+    receipt_id: str,
+    user_id: str,
+    account_id: str | None = None,
+):
     """Fetch receipt data from eKasa API and store it in local DB."""
     try:
         ekasa_data = ekasa_service.fetch_receipt_data(receipt_id)
@@ -294,7 +381,12 @@ def import_receipt_from_ekasa(receipt_id: str, user_id: str):
         issue_date = datetime.strptime(r["issueDate"], "%d.%m.%Y %H:%M:%S").date()
         total_price = float(r.get("totalPrice", 0))
 
-        user_uuid = uuid.UUID(user_id)
+        user_uuid, err, status = _parse_user_id(user_id)
+        if err:
+            return err, status
+        account_uuid, err, status = _resolve_account_for_user(user_uuid, account_id)
+        if err:
+            return err, status
 
         tag = None
         if org_data:
@@ -309,10 +401,10 @@ def import_receipt_from_ekasa(receipt_id: str, user_id: str):
 
         receipt = Receipt(
             user_id=user_uuid,
+            account_id=account_uuid,
             tag=tag,
             description=description,
             issue_date=issue_date,
-            currency="EUR",
             total_amount=total_price,
             external_uid=r.get("receiptId"),
             extra_metadata={
@@ -363,7 +455,12 @@ def import_receipt_from_ekasa(receipt_id: str, user_id: str):
         db.session.rollback()
         return {"error": f"Import failed: {str(e)}"}, 400
 
-def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: uuid.UUID | None = None):
+def get_ekasa_items(
+    year: int | None = None,
+    month: int | None = None,
+    user_id: uuid.UUID | None = None,
+    account_id: uuid.UUID | None = None,
+):
     """
     Return eKasa receipt items grouped under their receipt (check) for a given month/year.
 
@@ -390,6 +487,7 @@ def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: 
         .options(
             joinedload(Receipt.items),
             joinedload(Receipt.tag),
+            joinedload(Receipt.account),
         )
         .filter(Receipt.external_uid.isnot(None))  # eKasa-import marker
     )
@@ -404,6 +502,8 @@ def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: 
     # optional user filter
     if user_id is not None:
         query = query.filter(Receipt.user_id == user_id)
+    if account_id is not None:
+        query = query.filter(Receipt.account_id == account_id)
 
     receipts = query.order_by(Receipt.issue_date.asc(), Receipt.created_at.asc()).all()
 
@@ -430,11 +530,12 @@ def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: 
             "external_uid": r.external_uid,  # eKasa receiptId
             "issue_date": r.issue_date.isoformat() if r.issue_date else None,
             "description": r.description,
-            "currency": r.currency,
+            "currency": _receipt_currency(r),
             "total_amount": float(r.total_amount) if r.total_amount is not None else None,
             "tag": r.tag.name if r.tag else None,
             "tag_id": str(r.tag_id) if r.tag_id else None,
             "user_id": str(r.user_id),
+            "account_id": str(r.account_id),
             "items": items,
         })
 
