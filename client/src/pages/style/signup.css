@@ -298,9 +298,9 @@
 }
 
 .signup .login-google {
-  height: 42px;
+  /*height: 42px;
   border-radius: 12px;
-  border: 2px solid #d7dbe2;
+  border: 2px solid #d7dbe2;*/
   background: #fff;
   cursor: pointer;
   display: flex;
@@ -309,6 +309,15 @@
   gap: 10px;
   font-weight: 700;
   color: #2b3440;
+  width: 100%
+}
+
+.signup .login-google > div {
+  width: 100% !important;
+}
+
+.signup .login-google iframe {
+  width: 100% !important;
 }
 
 .signup .login-google:hover {

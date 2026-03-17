@@ -39,7 +39,7 @@ export default function Expenses() {
 
   const fetchExpenseTags = async () => {
   try {
-    const res = await fetch(`/api/tags/expense`);
+    const res = await fetch(`/api/receipts/tags`);
     const json = await res.json();
     const data = json?.data ?? json;
     const list = Array.isArray(data?.tags) ? data.tags : [];

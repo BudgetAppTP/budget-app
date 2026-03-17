@@ -104,7 +104,7 @@ export default function Incomes() {
 
   const fetchIncomeTags = async () => {
   try {
-    const res = await fetch(`${API_BASE}/tags/income`);
+    const res = await fetch(`${API_BASE}/incomes/tags`);
     const json = await res.json();
     const data = json?.data ?? json;
     const list = Array.isArray(data?.tags) ? data.tags : [];

@@ -89,10 +89,10 @@ export default function Needs() {
     setLoading(true);
     setError("");
 
-    const inc = await apiFetch("/tags/income");
+    const inc = await apiFetch("/incomes/tags");
     if (inc.ok) setIncomeCategories(inc.data?.tags || []);
 
-    const exp = await apiFetch("/tags/expense");
+    const exp = await apiFetch("/receipts/tags");
     if (exp.ok) setExpenseCategories(exp.data?.tags || []);
 
     if (!inc.ok || !exp.ok) {
@@ -112,7 +112,7 @@ export default function Needs() {
       setLoading(true);
       setError("");
 
-      const inc = await apiFetch("/tags/income");
+      const inc = await apiFetch("/incomes/tags");
       if (!alive) return;
       if (!inc.ok) {
         setError(inc.error?.message || (lang === "sk" ? "Nepodarilo sa načítať príjmové tagy." : "Failed to load income tags."));
@@ -121,7 +121,7 @@ export default function Needs() {
       }
       setIncomeCategories(inc.data?.tags || []);
 
-      const exp = await apiFetch("/tags/expense");
+      const exp = await apiFetch("/receipts/tags");
       if (!alive) return;
       if (!exp.ok) {
         setError(exp.error?.message || (lang === "sk" ? "Nepodarilo sa načítať výdavkové tagy." : "Failed to load expense tags."));

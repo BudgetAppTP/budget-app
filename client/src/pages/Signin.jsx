@@ -3,9 +3,12 @@ import "./style/signin.css";
 import { Link } from "react-router-dom";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
+import {GoogleLogin} from "@react-oauth/google";
+import { useNavigate } from "react-router-dom";
 
 export default function Signin() {
   const { lang } = useLang();
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.title = lang === "sk" ? "BudgetApp · Prihlásiť sa" : "BudgetApp · Sign in";
@@ -72,6 +75,73 @@ export default function Signin() {
       )}
     </svg>
   );
+
+    const handleGoogleSignupSuccess = async (credentialResponse) => {
+  try {
+    setError(null);
+
+    console.log("Google credential response:", credentialResponse);
+
+    const credential = credentialResponse?.credential;
+
+    if (!credential) {
+      setError(
+        lang === "sk"
+          ? "Google registrácia zlyhala."
+          : "Google sign up failed."
+      );
+      return;
+    }
+
+    console.log("Google ID token:", credential);
+
+
+    /*
+    const res = await fetch("/api/auth/google/signup", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        credential,
+      }),
+    });
+
+    const json = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(
+        json?.error?.message ||
+        (lang === "sk"
+          ? "Google registrácia zlyhala."
+          : "Google sign up failed.")
+      );
+    }
+    */
+
+    navigate("/");
+  } catch (e) {
+    console.error(e);
+    setError(
+      e?.message ||
+        (lang === "sk"
+          ? "Google registrácia zlyhala"
+          : "Google sign up failed")
+    );
+  }
+};
+
+const handleGoogleSignupError = () => {
+  setError(
+    lang === "sk"
+      ? "Google registrácia zlyhala"
+      : "Google sign up failed"
+  );
+};
+
+
 
   return (
     <div className="wrap signin">
@@ -162,15 +232,20 @@ export default function Signin() {
                   <span className="line" />
                 </div>
 
-               <button type="button" className="signin-google">
-  <svg className="google-icon" viewBox="0 0 48 48">
-    <path fill="#EA4335" d="M24 9.5c3.54 0 6.34 1.46 8.25 3.22l6.16-6.16C34.64 2.52 29.74 0 24 0 14.62 0 6.44 5.38 2.56 13.22l7.18 5.58C11.5 13.06 17.23 9.5 24 9.5z"/>
-    <path fill="#4285F4" d="M46.5 24c0-1.64-.15-3.22-.43-4.74H24v9h12.7c-.55 2.96-2.22 5.47-4.73 7.15l7.27 5.64C43.73 36.88 46.5 30.95 46.5 24z"/>
-    <path fill="#FBBC05" d="M9.74 28.8a14.5 14.5 0 010-9.6l-7.18-5.58a23.98 23.98 0 000 20.76l7.18-5.58z"/>
-    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.77l-7.27-5.64c-2.02 1.36-4.6 2.16-8.63 2.16-6.77 0-12.5-4.56-14.26-10.74l-7.18 5.58C6.44 42.62 14.62 48 24 48z"/>
-  </svg>
-  <span>Google</span>
-</button>
+
+                    <div className="login-google">
+                    <GoogleLogin
+                      onSuccess={handleGoogleSignupSuccess}
+                      onError={handleGoogleSignupError}
+                      text="signup_with"
+                      shape="rectangular"
+                      theme="outline"
+                      size="large"
+                      width="300"
+                      locale={lang === "sk" ? "sk" : "en"}
+                      auto_select={true}
+                    />
+                  </div>
 
                 <div className="signin-bottom">
                   <span className="line" />
