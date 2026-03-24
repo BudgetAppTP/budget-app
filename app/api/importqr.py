@@ -2,116 +2,83 @@
 Import QR / eKasa API
 
 Paths:
-  - POST /api/import-qr/preview
-  - POST /api/import-qr/confirm
+  - POST /api/import-qr/extract-id
 """
 
-import uuid
-from datetime import datetime
-from decimal import Decimal
-from flask import current_app, request
+from flask import request
 from app.api import bp, make_response
-from app.core.domain import Transaction, TransactionKind
+import time
+from functools import wraps
+from app.services.qr_service import QrService
 
+# Rate limiting dictionary (in production, use Redis or similar)
+rate_limit_store = {}
 
-def _services():
-    return current_app.extensions["services"]
+def rate_limit(limit=10, per=60):
+    """Simple rate limiter: limit requests per IP per time period"""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            ip = request.remote_addr
+            key = f"{ip}:{f.__name__}"
+            now = time.time()
+            
+            # Clean old entries
+            if key in rate_limit_store:
+                rate_limit_store[key] = [t for t in rate_limit_store[key] if now - t < per]
+            
+            # Check rate limit
+            if key in rate_limit_store and len(rate_limit_store[key]) >= limit:
+                return make_response(None, f"Rate limit exceeded. Try again later.", 429)
+            
+            # Add current request
+            if key not in rate_limit_store:
+                rate_limit_store[key] = []
+            rate_limit_store[key].append(now)
+            
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
+qr_service = QrService()
 
-def _parse_date_any(s):
-    s = (s or "").strip()
-    if not s:
-        return None
-    try:
-        return datetime.fromisoformat(s).date()
-    except Exception:
-        try:
-            return datetime.strptime(s, "%Y-%m-%d").date()
-        except Exception:
-            try:
-                return datetime.strptime(s, "%d.%m.%Y").date()
-            except Exception:
-                return None
-
-
-@bp.post("/import-qr/preview", strict_slashes=False)
-def api_importqr_preview():
+@bp.post("/import-qr/extract-id", strict_slashes=False)
+@rate_limit(limit=10, per=60)
+def api_importqr_extract_id():
     """
-    POST /api/import-qr/preview
-    Summary: Parse and validate QR/eKasa payload
-
-    Request:
-      {
-        "payload": "<raw string>" | [ { "OPD":"...", "date":"YYYY-MM-DD", "item":"...", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks" }, ... ]
-      }
-
-    Responses:
-      200:
-        data: { "items":[{ "valid": true|false, "opd":"...", "date":"YYYY-MM-DD", "category":"...", "item":"...", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks" }], "count": n }
-        error: null
+    POST /api/import-qr/extract-id
+    Accept an image file, decode the QR code, and return the extracted eKasa receipt ID.
     """
-    body = request.get_json(silent=True) or {}
-    payload = body.get("payload")
-    items = []
-    if isinstance(payload, list):
-        items = payload
-    elif isinstance(payload, str):
-        items = _services().qr_parser.parse(payload)
-    parsed = []
-    for it in items:
-        vd = _services().ekasa.validate(it.get("OPD", ""))
-        dt = _parse_date_any(it.get("date") or "")
-        parsed.append({
-            "valid": bool(vd.get("valid")),
-            "opd": it.get("OPD", ""),
-            "date": dt.isoformat() if dt else "",
-            "category": it.get("category", "Jedlo"),
-            "item": it.get("item", ""),
-            "qnt": str(it.get("qnt", "1")),
-            "price": str(it.get("price", "0")),
-            "vat": str(it.get("vat", "0")),
-            "seller": it.get("seller", ""),
-            "unit": it.get("unit", "ks"),
-        })
-    return make_response({"items": parsed, "count": len(parsed)})
+    # Validate file presence
+    if "image" not in request.files:
+        return make_response(None, "Missing image file", 400)
 
+    file = request.files["image"]
+    
+    # Validate filename
+    if file.filename == "":
+        return make_response(None, "Invalid image file", 400)
+    
+    # Validate file size (max 5MB)
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    
+    if size > 5 * 1024 * 1024:
+        return make_response(None, "File too large. Maximum size is 5MB.", 400)
+    
+    # Validate file type
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp'}
+    filename_lower = file.filename.lower()
+    if not any(filename_lower.endswith(ext) for ext in allowed_extensions):
+        return make_response(None, "Invalid file type. Please upload an image.", 400)
 
-@bp.post("/import-qr/confirm", strict_slashes=False)
-def api_importqr_confirm():
-    """
-    POST /api/import-qr/confirm
-    Summary: Create expense transactions from previewed items
+    receipt_id, error = qr_service.extract_ekasa_id(file.stream)
+    if error:
+        return make_response(None, error, 400)
+    
+    # Validate extracted ID format
+    if not receipt_id or len(receipt_id) < 10:
+        return make_response(None, "Invalid receipt ID extracted", 400)
 
-    Request:
-      { "items": [ { "date":"YYYY-MM-DD", "category":"Jedlo", "item":"Mlieko", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks", "opd":"..." }, ... ] }
-
-    Responses:
-      200:
-        data: {"created": n}
-        error: null
-    """
-    body = request.get_json(silent=True) or {}
-    items = body.get("items") or []
-    created = 0
-    for it in items:
-        try:
-            tx = Transaction(
-                id=str(uuid.uuid4()),
-                kind=TransactionKind.expense,
-                date=_parse_date_any(it.get("date")) or datetime.utcnow().date(),
-                category=it.get("category") or "Jedlo",
-                subcategory=None,
-                item=it.get("item") or None,
-                qty=Decimal(str(it.get("qnt", "1"))),
-                unit_price=Decimal(str(it.get("price", "0"))),
-                vat=Decimal(str(it.get("vat"))) if it.get("vat") else Decimal("0"),
-                seller=it.get("seller") or None,
-                unit=it.get("unit") or None,
-                note=it.get("opd") or None,
-                source="qr",
-            )
-            _services().transactions.add(tx)
-            created += 1
-        except Exception:
-            continue
-    return make_response({"created": created})
+    return make_response({"receiptId": receipt_id})
