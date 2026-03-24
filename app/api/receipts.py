@@ -69,9 +69,11 @@ def api_receipts_list():
 
     year_raw = request.args.get("year")
     month_raw = request.args.get("month")
+    account_raw = request.args.get("account_id")
 
     year = None
     month = None
+    account_id = None
 
     # Parse year/month if provided
     try:
@@ -82,7 +84,13 @@ def api_receipts_list():
     except ValueError:
         return make_response({"error": "Invalid year/month format"}, None, 400)
 
-    data, status = receipts_service.get_all_receipts(year=year, month=month)
+    if account_raw:
+        try:
+            account_id = uuid.UUID(account_raw)
+        except ValueError:
+            return make_response({"error": "Invalid account_id format"}, None, 400)
+
+    data, status = receipts_service.get_all_receipts(year=year, month=month, account_id=account_id)
     if status != 200:
         return make_response(data, None, status)
     try:
@@ -150,7 +158,6 @@ def api_receipts_create():
         "user_id": "<uuid>",               # required
         "issue_date": "YYYY-MM-DD",        # optional (can be null/omitted)
         "description": "Tesco groceries",  # required, non-empty string
-        "currency": "EUR",                 # optional, default: "EUR"
         "total_amount": 23.45,             # optional, default: 0.0
         "tag_id": "<uuid>",                # optional, must belong to the same user
         "external_uid": "<str>",           # optional, external receipt id
@@ -242,7 +249,6 @@ def api_receipts_update(receipt_id):
       {
         "issue_date": "YYYY-MM-DD",        # optional
         "description": "Updated text",     # optional, if present must be non-empty
-        "currency": "EUR",                 # optional
         "total_amount": 25.00,             # optional
         "tag_id": "<uuid>",                # optional, null to detach tag
         "external_uid": "<str>",           # optional
@@ -360,19 +366,20 @@ def api_receipts_import_ekasa():
     """
     payload = request.get_json() or {}
 
+    receipt_id = payload.get("receiptId") or payload.get("receipt_id")
+    user_id = payload.get("user_id") or payload.get("userId")
+    account_id = payload.get("account_id") or payload.get("accountId")
+
     # Basic validation of required fields
-    if "receiptId" not in payload or "user_id" not in payload:
+    if not receipt_id or not user_id:
         return make_response(
             None,
             {"code": "bad_request", "message": "Missing receiptId or user_id"},
             400,
         )
 
-    receipt_id = payload["receiptId"]
-    user_id = payload["user_id"]
-
     service_payload, status = receipts_service.import_receipt_from_ekasa(
-        receipt_id, user_id
+        receipt_id, user_id, account_id
     )
 
     # receipts_service.import_receipt_from_ekasa returns (payload, status)
@@ -456,12 +463,19 @@ def api_receipts_ekasa_items():
 
     # optional user filter
     raw_user_id = request.args.get("user_id")
+    raw_account_id = request.args.get("account_id")
     user_id = None
+    account_id = None
     if raw_user_id:
         try:
             user_id = uuid.UUID(raw_user_id)
         except ValueError:
             return make_response({"error": "Invalid user_id format"}, None, 400)
+    if raw_account_id:
+        try:
+            account_id = uuid.UUID(raw_account_id)
+        except ValueError:
+            return make_response({"error": "Invalid account_id format"}, None, 400)
 
     # Parse year/month (both optional, но должны быть вместе)
     year = None
@@ -474,5 +488,10 @@ def api_receipts_ekasa_items():
     except ValueError:
         return make_response({"error": "Invalid year/month format"}, None, 400)
 
-    data, status = receipts_service.get_ekasa_items(year=year, month=month, user_id=user_id)
+    data, status = receipts_service.get_ekasa_items(
+        year=year,
+        month=month,
+        user_id=user_id,
+        account_id=account_id,
+    )
     return make_response(data, None, status)

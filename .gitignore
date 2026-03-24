@@ -36,3 +36,7 @@ build/
 # Logs and Runtime Files
 *.log
 *.tmp
+
+# Temp directories
+tmp/
+temp/

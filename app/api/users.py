@@ -11,7 +11,8 @@ Notes:
 """
 
 from flask import request
-from app.api import bp, make_response
+from app.api import bp
+from app.services.errors import BadRequestError
 from app.services import users_service
 
 
@@ -31,8 +32,8 @@ def api_users_list():
         }
         error: null
     """
-    users = users_service.get_all_users()
-    return make_response(users, None, 200)
+    result = users_service.get_all_users()
+    return result.to_flask_response()
 
 
 @bp.post("/users", strict_slashes=False)
@@ -54,6 +55,6 @@ def api_users_create():
     """
     payload = request.get_json() or {}
     if not payload:
-        return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = users_service.create_user(payload)
-    return make_response(response, None, status)
+        raise BadRequestError("Missing JSON body")
+    result = users_service.create_user(payload)
+    return result.to_flask_response()

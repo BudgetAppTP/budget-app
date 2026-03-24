@@ -4,6 +4,7 @@ Smoke tests for the Budget Tracker application.
 These tests verify that the application can start and basic infrastructure works.
 """
 import os
+import uuid
 import pytest
 
 from app import create_app
@@ -59,10 +60,76 @@ def test_budgets_get_ok(client):
 
 
 def test_goals_list_ok(client):
-    r = client.get("/api/goals")
-    data = assert_json_ok(r)
+    user_email = f"user_{uuid.uuid4().hex[:8]}@test.local"
+    create = client.post(
+        "/api/users",
+        json={"username": f"user_{uuid.uuid4().hex[:8]}", "email": user_email, "password_hash": "hash"},
+    )
+    assert create.status_code == 201
+
+    account_resp = client.get("/api/account")
+    account_data = assert_json_ok(account_resp)
+    assert account_data["account_type"] == "account"
+
+    fund_resp = client.post(
+        "/api/savings-funds",
+        json={"name": "Vacation Fund", "currency": "EUR", "target_amount": "1000.00", "monthly_contribution": "100.00"},
+    )
+    assert fund_resp.status_code == 201
+    fund_id = fund_resp.get_json()["data"]["id"]
+
+    adjust_resp = client.post(
+        f"/api/savings-funds/{fund_id}/balance-adjustments",
+        json={"delta_amount": "500.00"},
+    )
+    assert_json_ok(adjust_resp)
+
+    goal_resp = client.post(
+        "/api/goals",
+        json={"savings_fund_id": fund_id, "target_amount": "300.00"},
+    )
+    assert goal_resp.status_code == 201
+    goal_id = goal_resp.get_json()["data"]["id"]
+    assert goal_resp.get_json()["data"]["current_amount"] == 0.0
+
+    allocate_resp = client.post(
+        f"/api/goals/{goal_id}/allocate",
+        json={"delta_amount": "300.00"},
+    )
+    assert_json_ok(allocate_resp)
+
+    second_goal_resp = client.post(
+        "/api/goals",
+        json={"savings_fund_id": fund_id, "target_amount": "300.00"},
+    )
+    assert second_goal_resp.status_code == 201
+    second_goal_id = second_goal_resp.get_json()["data"]["id"]
+
+    over_allocate_resp = client.post(
+        f"/api/goals/{second_goal_id}/allocate",
+        json={"delta_amount": "250.00"},
+    )
+    assert over_allocate_resp.status_code == 400
+    over_allocate_body = over_allocate_resp.get_json()
+    assert over_allocate_body["error"]["message"] == "Insufficient unallocated savings fund balance"
+
+    complete_resp = client.post(
+        f"/api/goals/{goal_id}/complete",
+    )
+    complete_data = assert_json_ok(complete_resp)
+    assert complete_data["is_completed"] is True
+
+    reopen_resp = client.post(
+        f"/api/goals/{goal_id}/reopen",
+    )
+    reopen_data = assert_json_ok(reopen_resp)
+    assert reopen_data["is_completed"] is False
+
+    list_resp = client.get("/api/goals")
+    data = assert_json_ok(list_resp)
     assert "items" in data
     assert "count" in data
+    assert data["count"] >= 1
 
 
 def test_dashboard_ok(client):
@@ -72,6 +139,19 @@ def test_dashboard_ok(client):
     assert data.get("month") == 10
     for k in ["total_incomes", "total_expenses"]:
         assert k in data
+
+
+def test_goals_without_mock_header_use_fallback_user(client):
+    user_email = f"user_{uuid.uuid4().hex[:8]}@test.local"
+    create = client.post(
+        "/api/users",
+        json={"username": f"user_{uuid.uuid4().hex[:8]}", "email": user_email, "password_hash": "hash"},
+    )
+    assert create.status_code == 201
+
+    r = client.get("/api/goals")
+    data = assert_json_ok(r)
+    assert "warning" not in data
 
 
 def test_import_qr_preview_ok(client):
