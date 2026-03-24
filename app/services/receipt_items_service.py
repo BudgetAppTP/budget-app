@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 from app.extensions import db
 from app.models import Receipt, ReceiptItem
+from app.validators.receipt_item_validators import validate_receipt_item_create_data, validate_receipt_item_update_data
 
 
 def get_items_by_receipt(receipt_id: uuid.UUID):
@@ -32,15 +33,19 @@ def create_item(receipt_id: uuid.UUID, data: dict):
         if not receipt:
             return {"error": "Receipt not found"}, 404
 
+        validated, err, status = validate_receipt_item_create_data(data)
+        if err:
+            return err, status
+
         item = ReceiptItem(
             receipt_id=receipt.id,
             user_id=receipt.user_id,
-            category_id=data.get("category_id"),
-            name=data.get("name"),
-            quantity=Decimal(str(data.get("quantity", 1))),
-            unit_price=Decimal(str(data.get("unit_price", 0))),
-            total_price=Decimal(str(data.get("quantity", 1))) * Decimal(str(data.get("unit_price", 0))),
-            extra_metadata=data.get("extra_metadata")
+            category_id=validated["category_id"],
+            name=validated["name"],
+            quantity=validated["quantity"],
+            unit_price=validated["unit_price"],
+            total_price=validated["quantity"] * validated["unit_price"],
+            extra_metadata=validated["extra_metadata"]
         )
 
         db.session.add(item)
@@ -58,18 +63,21 @@ def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict):
         return {"error": "Item not found"}, 404
 
     try:
-        if "name" in data:
-            item.name = data["name"]
-        if "quantity" in data:
-            item.quantity = Decimal(str(data["quantity"]))
-        if "unit_price" in data:
-            item.unit_price = Decimal(str(data["unit_price"]))
-        if "category_id" in data:
-            item.category_id = data["category_id"]
-        if "extra_metadata" in data:
-            item.extra_metadata = data["extra_metadata"]
+        validated, err, status = validate_receipt_item_update_data(data)
+        if err:
+            return err, status
 
-        # always recalc total_price
+        if "name" in validated:
+            item.name = validated["name"]
+        if "quantity" in validated:
+            item.quantity = validated["quantity"]
+        if "unit_price" in validated:
+            item.unit_price = validated["unit_price"]
+        if "category_id" in validated:
+            item.category_id = validated["category_id"]
+        if "extra_metadata" in validated:
+            item.extra_metadata = validated["extra_metadata"]
+
         item.total_price = item.quantity * item.unit_price
 
         db.session.commit()
@@ -92,3 +100,16 @@ def delete_item(receipt_id: uuid.UUID, item_id: uuid.UUID):
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
+
+
+# TODO: Use this method to ensure that users only have access to their own receipt and prevent them from using other users' receipt.
+def _get_receipt_for_user(receipt_id: uuid.UUID, user_id: uuid.UUID):
+    receipt = db.session.get(Receipt, receipt_id)
+
+    if not receipt:
+        return None, {"error": "Receipt not found"}, 404
+
+    if receipt.user_id != user_id:
+        return None, {"error": "Forbidden"}, 403
+
+    return receipt, None, None

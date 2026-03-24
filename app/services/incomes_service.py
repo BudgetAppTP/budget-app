@@ -3,10 +3,13 @@ from datetime import date
 from decimal import Decimal
 
 from app.extensions import db
-from app.models import Income, Tag
+from app.models import Income, Tag, User
 from app.services import tags_service
+from app.validators.common_validators import validate_month_year_filter
+from app.validators.income_validators import validate_income_create_data, validate_income_update_data
 
 
+#TODO Add user filtering.
 def get_all_incomes(year: int | None = None, month: int | None = None):
     """
     Get all incomes.
@@ -30,20 +33,11 @@ def get_all_incomes(year: int | None = None, month: int | None = None):
     """
     query = db.session.query(Income)
 
-    # Filter by month/year (both must be provided together)
-    if (year is None) ^ (month is None):
-        return {"error": "Both year and month must be provided together"}, 400
+    start, end, err, status = validate_month_year_filter(year, month)
+    if err:
+        return err, status
 
-    if year is not None and month is not None:
-        if month < 1 or month > 12:
-            return {"error": "Month must be between 1 and 12"}, 400
-
-        start = date(year, month, 1)
-        if month == 12:
-            end = date(year + 1, 1, 1)
-        else:
-            end = date(year, month + 1, 1)
-
+    if start is not None and end is not None:
         query = query.filter(
             Income.income_date.isnot(None),
             Income.income_date >= start,
@@ -111,23 +105,27 @@ def _load_tag_for_income(user_id: uuid.UUID, raw_tag_id: str | None):
 
 def create_income(data: dict):
     try:
-        user_id = _parse_user_id(data.get("user_id"))
-
-        tag, err, status = _load_tag_for_income(user_id, data.get("tag_id"))
+        validated, err, status = validate_income_create_data(data)
         if err:
             return err, status
 
-        description = (data.get("description") or "").strip()
-        if not description:
-            return {"error": "Missing description"}, 400
+        user_id = validated["user_id"]
+
+        user = db.session.get(User, user_id)
+        if not user:
+            return {"error": "User not found"}, 404
+
+        tag, err, status = _load_tag_for_income(user_id, validated.get("tag_id"))
+        if err:
+            return err, status
 
         income = Income(
             user_id=user_id,
             tag=tag,
-            description=description,
-            amount=Decimal(str(data.get("amount", 0))),
-            income_date=date.fromisoformat(data["income_date"]) if data.get("income_date") else None,
-            extra_metadata=data.get("extra_metadata")
+            description=validated["description"],
+            amount=validated["amount"],
+            income_date=validated["income_date"],
+            extra_metadata=validated["extra_metadata"]
         )
 
         db.session.add(income)
@@ -139,14 +137,11 @@ def create_income(data: dict):
 
         return {"id": str(income.id), "message": "Income created successfully"}, 201
 
-    except ValueError as e:
-        db.session.rollback()
-        return {"error": f"Invalid data format: {str(e)}"}, 400
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
 
-
+#TODO use _get_income_for_user()
 def get_income_by_id(income_id: uuid.UUID):
     income = db.session.get(Income, income_id)
     if not income:
@@ -163,19 +158,22 @@ def get_income_by_id(income_id: uuid.UUID):
         "extra_metadata": income.extra_metadata
     }, 200
 
-
+#TODO use _get_income_for_user()
 def update_income(income_id: uuid.UUID, data: dict):
     try:
         income = db.session.get(Income, income_id)
         if not income:
             return {"error": "Income not found"}, 404
 
+        validated, err, status = validate_income_update_data(data)
+        if err:
+            return err, status
+
         old_tag = income.tag
         new_tag = old_tag
 
-        # Tag update
-        if "tag_id" in data:
-            raw_tag_id = data["tag_id"]
+        if "tag_id" in validated:
+            raw_tag_id = validated["tag_id"]
             if raw_tag_id:
                 tag, err, status = _load_tag_for_income(income.user_id, raw_tag_id)
                 if err:
@@ -193,20 +191,14 @@ def update_income(income_id: uuid.UUID, data: dict):
                 income.tag = new_tag
                 tags_service.register_tag_assigned(new_tag)
 
-        if "description" in data:
-            desc = (data["description"] or "").strip()
-            if not desc:
-                return {"error": "Description cannot be empty"}, 400
-            income.description = desc
-
-        if "amount" in data:
-            income.amount = Decimal(str(data["amount"]))
-
-        if "income_date" in data:
-            income.income_date = date.fromisoformat(data["income_date"])
-
-        if "extra_metadata" in data:
-            income.extra_metadata = data["extra_metadata"]
+        if "description" in validated:
+            income.description = validated["description"]
+        if "amount" in validated:
+            income.amount = validated["amount"]
+        if "income_date" in validated:
+            income.income_date = validated["income_date"]
+        if "extra_metadata" in validated:
+            income.extra_metadata = validated["extra_metadata"]
 
         db.session.commit()
         return {"id": str(income.id), "message": "Income updated successfully"}, 200
@@ -215,7 +207,7 @@ def update_income(income_id: uuid.UUID, data: dict):
         db.session.rollback()
         return {"error": str(e)}, 400
 
-
+#TODO use _get_income_for_user()
 def delete_income(income_id: uuid.UUID):
     income = db.session.get(Income, income_id)
     if not income:
@@ -234,3 +226,15 @@ def delete_income(income_id: uuid.UUID):
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
+
+
+# TODO: Use this method to ensure that users only have access to their own income and prevent them from using other users' income.
+def _get_income_for_user(income_id: uuid.UUID, user_id: uuid.UUID):
+    income = db.session.get(Income, income_id)
+    if not income:
+        return None, {"error": "Income not found"}, 404
+
+    if income.user_id != user_id:
+        return None, {"error": "Forbidden"}, 403
+
+    return income, None, None

@@ -5,10 +5,11 @@ from __future__ import annotations
 import uuid
 
 from app.extensions import db
-from app.models import Tag
+from app.models import Tag, User
 from app.models.tag import TagType
 from typing import List, Dict, Any, Tuple
 
+from app.validators.tag_validators import validate_tag_create_data, validate_tag_update_data
 
 
 def get_or_create_user_tag(user_id: uuid.UUID, name: str) -> Tag:
@@ -124,34 +125,27 @@ def create_tag(data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
         A tuple of (payload dict, status). On success the payload contains
         ``id`` and a success ``message``.
     """
-    import uuid
     try:
-        raw_user_id = data.get("user_id")
-        if not raw_user_id:
-            return {"error": "Missing user_id"}, 400
-        try:
-            user_uuid = uuid.UUID(str(raw_user_id))
-        except Exception:
-            return {"error": "Invalid user_id format"}, 400
-        name = (data.get("name") or "").strip()
-        if not name:
-            return {"error": "Tag name cannot be empty"}, 400
-        raw_type = data.get("type")
-        tag_type = None
-        if raw_type is not None:
-            try:
-                tag_type = TagType(raw_type)
-            except ValueError:
-                return {"error": "Invalid tag type"}, 400
-        tag = get_or_create_user_tag(user_uuid, name)
-        if tag_type is not None:
-            tag.type = tag_type
+        validated, err, status = validate_tag_create_data(data)
+        if err:
+            return err, status
+
+        user_uuid = validated["user_id"]
+        user = db.session.get(User, user_uuid)
+        if not user:
+            return {"error": "User not found"}, 404
+
+        tag = get_or_create_user_tag(user_uuid, validated["name"])
+
+        if validated["type"] is not None:
+            tag.type = validated["type"]
+
         db.session.commit()
         return {"id": str(tag.id), "message": "Tag created successfully"}, 201
+
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
-
 
 def update_tag(tag_id: uuid.UUID, data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
     """
@@ -169,30 +163,27 @@ def update_tag(tag_id: uuid.UUID, data: Dict[str, Any]) -> Tuple[Dict[str, Any],
         A tuple of (payload dict, status). On success the payload contains
         ``id`` and a success ``message``.
     """
-    import uuid
     tag = db.session.get(Tag, tag_id)
     if not tag:
         return {"error": "Tag not found"}, 404
     try:
-        if "name" in data:
-            new_name = (data.get("name") or "").strip()
-            if not new_name:
-                return {"error": "Tag name cannot be empty"}, 400
-            # ensure no duplicate names for the same user
+        validated, err, status = validate_tag_update_data(data)
+        if err:
+            return err, status
+
+        if "name" in validated:
             other = (
                 db.session.query(Tag)
-                .filter(Tag.user_id == tag.user_id, Tag.name == new_name, Tag.id != tag.id)
+                .filter(Tag.user_id == tag.user_id, Tag.name == validated["name"], Tag.id != tag.id)
                 .first()
             )
             if other:
                 return {"error": "Tag name already exists for this user"}, 400
-            tag.name = new_name
-        if "type" in data and data.get("type") is not None:
-            raw_type = data.get("type")
-            try:
-                tag.type = TagType(raw_type)
-            except ValueError:
-                return {"error": "Invalid tag type"}, 400
+            tag.name = validated["name"]
+
+        if "type" in validated:
+            tag.type = validated["type"]
+
         db.session.commit()
         return {"id": str(tag.id), "message": "Tag updated successfully"}, 200
     except Exception as e:

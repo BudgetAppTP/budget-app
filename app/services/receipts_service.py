@@ -4,12 +4,15 @@ from decimal import Decimal
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.models import Receipt, Tag, ReceiptItem
+from app.models import Receipt, Tag, ReceiptItem, User
 from datetime import date, datetime
 
 from app.services import tags_service, ekasa_service
+from app.validators.common_validators import validate_month_year_filter
+from app.validators.receipt_validators import validate_receipt_create_data, validate_receipt_update_data
 
 
+#TODO Add user filtering.
 def get_all_receipts(year: int | None = None, month: int | None = None):
     """
     Get all receipts.
@@ -32,20 +35,11 @@ def get_all_receipts(year: int | None = None, month: int | None = None):
     """
     query = db.session.query(Receipt)
 
-    # Filter by month/year (both must be provided together)
-    if (year is None) ^ (month is None):
-        return {"error": "Both year and month must be provided together"}, 400
+    start, end, err, status = validate_month_year_filter(year, month)
+    if err:
+        return err, status
 
-    if year is not None and month is not None:
-        if month < 1 or month > 12:
-            return {"error": "Month must be between 1 and 12"}, 400
-
-        start = date(year, month, 1)
-        if month == 12:
-            end = date(year + 1, 1, 1)
-        else:
-            end = date(year, month + 1, 1)
-
+    if start is not None and end is not None:
         query = query.filter(
             Receipt.issue_date >= start,
             Receipt.issue_date < end
@@ -126,38 +120,29 @@ def _load_tag_for_user(user_id: uuid.UUID, raw_tag_id: str | None):
 
 def create_receipt(data: dict):
     try:
-        # user_id
-        user_id, err, status = _parse_user_id(data.get("user_id"))
+        validated, err, status = validate_receipt_create_data(data)
         if err:
             return err, status
 
-        # tag (optional, but must belong to user)
-        tag, err, status = _load_tag_for_user(user_id, data.get("tag_id"))
+        user_id = validated["user_id"]
+
+        user = db.session.get(User, user_id)
+        if not user:
+            return {"error": "User not found"}, 404
+
+        tag, err, status = _load_tag_for_user(user_id, validated.get("tag_id"))
         if err:
             return err, status
-
-        # description (required)
-        description = (data.get("description") or "").strip()
-        if not description:
-            return {"error": "Missing description"}, 400
-
-        # issue_date
-        issue_date = None
-        if data.get("issue_date"):
-            try:
-                issue_date = date.fromisoformat(data["issue_date"])
-            except ValueError:
-                return {"error": "Invalid issue_date format, expected YYYY-MM-DD"}, 400
 
         receipt = Receipt(
             user_id=user_id,
             tag=tag,
-            description=description,
-            issue_date=issue_date,
-            currency=data.get("currency", "EUR"),
-            total_amount=data.get("total_amount") or 0.0,
-            external_uid=data.get("external_uid"),
-            extra_metadata=data.get("extra_metadata")
+            description=validated["description"],
+            issue_date=validated["issue_date"],
+            currency=validated["currency"],
+            total_amount=validated["total_amount"],
+            external_uid=validated["external_uid"],
+            extra_metadata=validated["extra_metadata"]
         )
 
         db.session.add(receipt)
@@ -201,13 +186,15 @@ def update_receipt(receipt_id: uuid.UUID, data: dict):
         if not receipt:
             return {"error": "Receipt not found"}, 404
 
-        # Track old tag for proper counter/type updates
+        validated, err, status = validate_receipt_update_data(data)
+        if err:
+            return err, status
+
         old_tag = receipt.tag
         new_tag = old_tag
 
-        # Tag update
-        if "tag_id" in data:
-            raw_tag_id = data["tag_id"]
+        if "tag_id" in validated:
+            raw_tag_id = validated["tag_id"]
             if raw_tag_id:
                 # tag must belong to the same user as receipt
                 tag, err, status = _load_tag_for_user(receipt.user_id, raw_tag_id)
@@ -230,24 +217,18 @@ def update_receipt(receipt_id: uuid.UUID, data: dict):
                 receipt.tag = new_tag
                 tags_service.register_tag_assigned(new_tag)
 
-        # description
-        if "description" in data:
-            desc = (data["description"] or "").strip()
-            if not desc:
-                return {"error": "Description cannot be empty"}, 400
-            receipt.description = desc
-
-        # issue_date
-        if "issue_date" in data:
-            receipt.issue_date = date.fromisoformat(data["issue_date"])
-        if "currency" in data:
-            receipt.currency = data["currency"]
-        if "total_amount" in data:
-            receipt.total_amount = float(data["total_amount"])
-        if "external_uid" in data:
-            receipt.external_uid = data["external_uid"]
-        if "extra_metadata" in data:
-            receipt.extra_metadata = data["extra_metadata"]
+        if "description" in validated:
+            receipt.description = validated["description"]
+        if "issue_date" in validated:
+            receipt.issue_date = validated["issue_date"]
+        if "currency" in validated:
+            receipt.currency = validated["currency"]
+        if "total_amount" in validated:
+            receipt.total_amount = validated["total_amount"]
+        if "external_uid" in validated:
+            receipt.external_uid = validated["external_uid"]
+        if "extra_metadata" in validated:
+            receipt.extra_metadata = validated["extra_metadata"]
 
         db.session.commit()
 
@@ -258,7 +239,6 @@ def update_receipt(receipt_id: uuid.UUID, data: dict):
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
-
 
 def delete_receipt(receipt_id: uuid.UUID):
     receipt = db.session.get(Receipt, receipt_id)
@@ -289,6 +269,17 @@ def import_receipt_from_ekasa(receipt_id: str, user_id: str):
             return ekasa_data, 400
 
         r = ekasa_data["receipt"]
+        external_uid = r.get("receiptId")
+        existing = (
+            db.session.query(Receipt)
+            .filter(Receipt.external_uid == external_uid)
+            .first()
+        )
+
+        if existing:
+            return {"error": "Receipt already imported"}, 409
+
+
         org_data = r.get("organization")
 
         issue_date = datetime.strptime(r["issueDate"], "%d.%m.%Y %H:%M:%S").date()
@@ -373,17 +364,9 @@ def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: 
       - only eKasa-imported receipts are included (Receipt.external_uid != null)
       - optional user_id filter
     """
-    # month/year validation (same messages as other endpoints)
-    if (year is None) ^ (month is None):
-        return {"error": "Both year and month must be provided together"}, 400
-
-    start = end = None
-    if year is not None and month is not None:
-        if month < 1 or month > 12:
-            return {"error": "Month must be between 1 and 12"}, 400
-
-        start = date(year, month, 1)
-        end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    start, end, err, status = validate_month_year_filter(year, month)
+    if err:
+        return err, status
 
     query = (
         db.session.query(Receipt)
@@ -444,3 +427,15 @@ def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: 
         "total_checks": len(checks),
         "total_items": total_items,
     }, 200
+
+# TODO: Use this method to ensure that users only have access to their own receipt and prevent them from using other users' receipt.
+def _get_receipt_for_user(receipt_id: uuid.UUID, user_id: uuid.UUID):
+    receipt = db.session.get(Receipt, receipt_id)
+
+    if not receipt:
+        return None, {"error": "Receipt not found"}, 404
+
+    if receipt.user_id != user_id:
+        return None, {"error": "Forbidden"}, 403
+
+    return receipt, None, None
