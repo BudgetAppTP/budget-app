@@ -1,5 +1,6 @@
 from .base import Base
 from .account import Account, AccountType
+from .allocation import Allocation
 from .account_member import AccountMember
 from .category import Category
 from .financial_target import FinancialTarget
@@ -15,6 +16,7 @@ __all__ = [
     "Base",
     "Account",
     "AccountType",
+    "Allocation",
     "SavingsFund",
     "AccountMember",
     "Category",

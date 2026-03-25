@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
+    from .allocation import Allocation
     from .account_member import AccountMember
     from .receipt import Receipt
     from .user import User
@@ -89,6 +90,16 @@ class Account(Base):
     )
     receipts: Mapped[list['Receipt']] = relationship(
         'Receipt', back_populates='account'
+    )
+    outgoing_allocations: Mapped[list['Allocation']] = relationship(
+        'Allocation',
+        foreign_keys='Allocation.source_account_id',
+        back_populates='source_account'
+    )
+    incoming_allocations: Mapped[list['Allocation']] = relationship(
+        'Allocation',
+        foreign_keys='Allocation.target_account_id',
+        back_populates='target_account'
     )
 
     __mapper_args__ = {
