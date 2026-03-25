@@ -59,6 +59,7 @@ def _register_api(flask_app: Flask):
     import app.api.account       # noqa: F401
     import app.api.goals         # noqa: F401
     import app.api.savings_funds # noqa: F401
+    import app.api.allocations   # noqa: F401
     import app.api.importqr      # noqa: F401
     import app.api.export        # noqa: F401
     import app.api.dashboard     # noqa: F401
