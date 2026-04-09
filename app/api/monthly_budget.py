@@ -1,19 +1,4 @@
-"""
-Monthly Budget API
-
-Provides an endpoint to retrieve all incomes and expenses for a specific
-month. This endpoint aggregates data from the income and receipt
-services and returns both the individual records and their totals for
-the given month.
-
-Path:
-  - GET /api/monthly-budget?month=YYYY-MM
-
-If the ``month`` query parameter is omitted, the current month is used.
-"""
-
-from __future__ import annotations
-
+import uuid
 from flask import request
 from app.api import bp, make_response
 from app.services import monthly_budget_service
@@ -23,29 +8,35 @@ from app.services import monthly_budget_service
 def api_monthly_budget_get():
     """
     GET /api/monthly-budget
-    Summary: Get all incomes and expenses for a month
+    Query (optional):
+      - month: YYYY-MM
+      - user_id: uuid (optional)
 
-    Query:
-      - month: "YYYY-MM" (optional; defaults to the current month)
-
-    Responses:
-      200:
-        data:
-          {
-            "month": "YYYY-MM",
-            "incomes": [...],
-            "expenses": [...],
-            "total_income": number,
-            "total_expense": number
-          }
-        error: null
-      400:
-        data: {"error": "Invalid month format, expected YYYY-MM"}
-        error: null
+    Behavior:
+      - if month missing -> use current month
     """
-    month_param = request.args.get("month")
-    data, status = monthly_budget_service.get_monthly_summary(month_param)
-    # If service returns error, wrap in error envelope
-    if "error" in data:
-        return make_response(None, {"code": "bad_request", "message": data["error"]}, status)
+    month = request.args.get("month")
+    user_raw = request.args.get("user_id")
+
+    user_id = None
+
+    if user_raw:
+        try:
+            user_id = uuid.UUID(user_raw)
+        except ValueError:
+            return make_response(
+                None,
+                {"code": "validation_error", "message": "Invalid user_id format"},
+                400,
+            )
+
+    data, status = monthly_budget_service.get_month_summary_budget(month=month, user_id=user_id)
+
+    if status != 200:
+        return make_response(
+            None,
+            {"code": "validation_error", "message": data.get("error", "Validation error")},
+            status,
+        )
+
     return make_response(data, None, status)
