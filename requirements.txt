@@ -34,3 +34,8 @@ flask_cors>=5.0.0
 requests~=2.32.5
 pandas~=2.3.3
 WTForms~=3.2.1
+
+pypng== 0.20220715.0
+pyzbar==0.1.9
+pillow==12.1.1
+opencv-python~=4.11.0
