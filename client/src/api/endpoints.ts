@@ -6,7 +6,16 @@ export type RegisterBody = { email: string; password: string };
 export const authApi = {
   login: (body: LoginBody) => unwrap(http.post("/auth/login", body)),
   register: (body: RegisterBody) => unwrap(http.post("/auth/register", body)),
-  logout: () => unwrap(http.post("/auth/logout"))
+  logout: () => unwrap(http.post("/auth/logout")),
+  me: () =>
+    unwrap<{
+      id: string;
+      username: string;
+      email: string;
+      is_verified: boolean;
+      created_at: string | null;
+    }>(http.get("/auth/me")),
+  googleLogin: (body: { token: string }) => unwrap(http.post("/auth/google", body))
 };
 
 export type Transaction = {

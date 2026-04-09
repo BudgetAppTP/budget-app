@@ -10,7 +10,7 @@ Notes:
 - Для согласованности со Swagger включён strict_slashes=False.
 """
 
-from flask import request
+from flask import request, g
 from app.api import bp, make_response
 from app.services import users_service
 
@@ -31,8 +31,16 @@ def api_users_list():
         }
         error: null
     """
-    users = users_service.get_all_users()
-    return make_response(users, None, 200)
+    return make_response(
+        [{
+            "id": str(g.current_user.id),
+            "username": g.current_user.username,
+            "email": g.current_user.email,
+            "created_at": g.current_user.created_at.isoformat() if g.current_user.created_at else None,
+        }],
+        None,
+        200,
+    )
 
 
 @bp.post("/users", strict_slashes=False)

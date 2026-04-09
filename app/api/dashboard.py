@@ -1,5 +1,5 @@
 import uuid
-from flask import request
+from flask import request, g
 from app.api import bp, make_response
 from app.services import dashboard_service
 
@@ -19,11 +19,8 @@ def api_dashboard_summary():
     """
     year_raw = request.args.get("year")
     month_raw = request.args.get("month")
-    user_raw = request.args.get("user_id")
-
     year = None
     month = None
-    user_id = None
 
     try:
         if year_raw is not None:
@@ -33,11 +30,9 @@ def api_dashboard_summary():
     except ValueError:
         return make_response({"error": "Invalid year/month format"}, None, 400)
 
-    if user_raw:
-        try:
-            user_id = uuid.UUID(user_raw)
-        except ValueError:
-            return make_response({"error": "Invalid user_id format"}, None, 400)
-
-    data, status = dashboard_service.get_month_summary(year=year, month=month, user_id=user_id)
+    data, status = dashboard_service.get_month_summary(
+        year=year,
+        month=month,
+        user_id=g.current_user.id,
+    )
     return make_response(data, None, status)
