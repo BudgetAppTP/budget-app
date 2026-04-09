@@ -25,8 +25,10 @@ Notes:
   separate verification endpoint is provided for production flows.
 """
 
-from flask import request, current_app
+from flask import request, current_app, g
 from app.api import bp, make_response
+import requests
+from app.utils.auth import login_required
 
 
 def _auth_service():
@@ -40,6 +42,10 @@ def _services():
     non-auth logic (transactions, budgets, etc.).
     """
     return current_app.extensions.get("services")
+
+
+def _cookie_secure() -> bool:
+    return bool(current_app.config.get("SESSION_COOKIE_SECURE") or request.is_secure)
 
 
 @bp.post("/auth/login", strict_slashes=False)
@@ -74,7 +80,7 @@ def api_login():
         samesite="Lax",
         max_age=_auth_service().TOKEN_LIFETIME,
         path="/",
-        secure=False,
+        secure=_cookie_secure(),
     )
     return resp
 
@@ -135,6 +141,22 @@ def api_verify_email():
     return make_response({"verified": True})
 
 
+@bp.get("/auth/me", strict_slashes=False)
+@login_required
+def api_auth_me():
+    """Return the currently authenticated user."""
+    user = g.current_user
+    return make_response(
+        {
+            "id": str(user.id),
+            "username": user.username,
+            "email": user.email,
+            "is_verified": bool(user.is_verified),
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        }
+    )
+
+
 @bp.post("/auth/logout", strict_slashes=False)
 def api_logout():
     """
@@ -166,5 +188,74 @@ def api_logout():
         path="/",
         httponly=True,
         samesite="Lax",
+        secure=_cookie_secure(),
+    )
+    return resp
+
+
+# ----------------------------------------------------------------------
+# Google OAuth login endpoint
+# ----------------------------------------------------------------------
+@bp.post("/auth/google", strict_slashes=False)
+def api_login_google():
+    """
+    POST /api/auth/google
+    Summary: Log in or register a user via Google OAuth
+
+    Request:
+      {"token": "<google id_token>"}
+
+    Responses:
+      200: {"data": {"ok": true}, "error": null}
+      400/401: Appropriate error codes for missing or invalid token
+
+    This endpoint accepts an ID token obtained from Google Sign-In on the
+    client. It verifies the token using Google's tokeninfo endpoint,
+    extracts the email address, and either logs in an existing user or
+    creates a new one. A session token is returned via the
+    ``Set-Cookie`` header on success.
+    """
+    payload = request.get_json(silent=True) or {}
+    id_token = (payload.get("token") or payload.get("id_token") or "").strip()
+    if not id_token:
+        return make_response(None, {"code": "bad_request", "message": "token required"}, 400)
+    # Call Google's tokeninfo endpoint to validate the token. According to
+    # Google documentation, this endpoint returns the decoded claims if the
+    # token is valid and has not expired. See:
+    # https://developers.google.com/identity/gsi/web/guides/verify-google-id-token
+    try:
+        verify_resp = requests.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": id_token},
+            timeout=5,
+        )
+        if verify_resp.status_code != 200:
+            return make_response(None, {"code": "auth_failed", "message": "Invalid Google token"}, 401)
+        claims = verify_resp.json()
+    except Exception:
+        return make_response(None, {"code": "auth_failed", "message": "Failed to verify Google token"}, 401)
+    # Ensure the token is intended for our application
+    aud = claims.get("aud") or claims.get("azp")  # Some responses use "azp"
+    client_id_expected = current_app.config.get("GOOGLE_CLIENT_ID")
+    if client_id_expected and aud != client_id_expected:
+        return make_response(None, {"code": "auth_failed", "message": "Token audience mismatch"}, 401)
+    email = claims.get("email")
+    email_verified = claims.get("email_verified")
+    if not email or str(email_verified).lower() not in {"true", "1"}:
+        return make_response(None, {"code": "auth_failed", "message": "Email not verified"}, 401)
+    # Delegate to the auth service to log in or create the user
+    token = _auth_service().login_with_google(email)
+    if not token:
+        return make_response(None, {"code": "auth_failed", "message": "Unable to authenticate user"}, 401)
+    resp, status_code = make_response({"ok": True}, None, 200)
+    resp.status_code = status_code
+    resp.set_cookie(
+        "auth_token",
+        token,
+        httponly=True,
+        samesite="Lax",
+        max_age=_auth_service().TOKEN_LIFETIME,
+        path="/",
+        secure=_cookie_secure(),
     )
     return resp

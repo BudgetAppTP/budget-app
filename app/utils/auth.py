@@ -14,9 +14,9 @@ from __future__ import annotations
 from functools import wraps
 from typing import Callable, Any, TypeVar, cast
 
-from flask import current_app, request, g
+from flask import current_app, g
 
-from app.api import make_response
+from app.api import make_response, extract_auth_token
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -38,8 +38,7 @@ def login_required(f: F) -> F:
     @wraps(f)
     def wrapper(*args: Any, **kwargs: Any):
         auth_service = current_app.extensions.get("auth_service")
-        # Allow tokens via Authorization header in addition to cookies
-        token = request.cookies.get("auth_token") or request.headers.get("Authorization")
+        token = extract_auth_token()
         user = auth_service.verify_token(token) if token else None
         if user is None:
             return make_response(None, {"code": "unauthenticated", "message": "Authentication required"}, 401)

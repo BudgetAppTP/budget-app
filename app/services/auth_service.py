@@ -205,6 +205,60 @@ class AuthService:
         return False
 
     # ------------------------------------------------------------------
+    # Google OAuth login
+    # ------------------------------------------------------------------
+    def login_with_google(self, email: str) -> Optional[str]:
+        """
+        Authenticate or create a user using a verified Google email address.
+
+        This helper is used by the Google OAuth endpoint to either
+        authenticate an existing account or create a new one when a user
+        logs in with their Google account. The provided email must be
+        verified by Google prior to invoking this method.
+
+        Args:
+            email (str): The Google account's email address (normalized to lower-case).
+
+        Returns:
+            Optional[str]: A newly issued opaque session token if the login
+            succeeds. Returns ``None`` if the email is missing or some
+            unexpected error occurs.
+        """
+        email_normalized = (email or "").strip().lower()
+        if not email_normalized:
+            return None
+        # Look up existing user by email
+        user = db.session.execute(db.select(User).filter_by(email=email_normalized)).scalar()
+        if user is None:
+            # Create a new user record. Use the local part of the email as the
+            # base for the username and ensure uniqueness. Because the user
+            # authenticated via Google, we mark them as verified and assign a
+            # random password hash to satisfy the non-null constraint. The
+            # password will not be used for login and can be reset later.
+            username = self._derive_username(email_normalized)
+            random_password = secrets.token_urlsafe(16)
+            password_hash = self.hash_password(random_password)
+            user = User(
+                username=username,
+                email=email_normalized,
+                password_hash=password_hash,
+                is_verified=True,
+            )
+            db.session.add(user)
+            db.session.flush()
+        else:
+            # For an existing user, ensure the account is marked as verified.
+            if not user.is_verified:
+                user.is_verified = True
+        # Issue a new session token, similar to the normal login flow
+        token_value = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(seconds=self.TOKEN_LIFETIME)
+        token = AuthToken(user_id=user.id, token=token_value, expires_at=expires_at)
+        db.session.add(token)
+        db.session.commit()
+        return token_value
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
     def _generate_verification_code(self) -> str:

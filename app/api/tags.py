@@ -18,7 +18,7 @@ Request/Response examples are documented inline with each view function.
 from __future__ import annotations
 
 import uuid
-from flask import request
+from flask import request, g
 from app.api import bp, make_response
 from app.services import tags_service
 from app.models.tag import TagType
@@ -38,7 +38,7 @@ def api_tags_income_list():
         data: {"error": "Invalid tag type"}
         error: null
     """
-    data, status = tags_service.get_tags_by_type(TagType.INCOME)
+    data, status = tags_service.get_tags_by_type(TagType.INCOME, user_id=g.current_user.id)
     if "error" in data:
         return make_response(data, None, status)
     return make_response(data, None, status)
@@ -52,7 +52,7 @@ def api_tags_expense_list():
 
     Responses are similar to /api/tags/income.
     """
-    data, status = tags_service.get_tags_by_type(TagType.EXPENSE)
+    data, status = tags_service.get_tags_by_type(TagType.EXPENSE, user_id=g.current_user.id)
     if "error" in data:
         return make_response(data, None, status)
     return make_response(data, None, status)
@@ -80,7 +80,7 @@ def api_tags_create():
         error: null
     """
     payload = request.get_json(force=True) or {}
-    data, status = tags_service.create_tag(payload)
+    data, status = tags_service.create_tag(payload, user_id=g.current_user.id)
     return make_response(data if "error" not in data else None, None if "error" not in data else data, status)
 
 
@@ -108,7 +108,7 @@ def api_tags_update(tag_id: uuid.UUID):
         error: null
     """
     payload = request.get_json() or {}
-    data, status = tags_service.update_tag(tag_id, payload)
+    data, status = tags_service.update_tag(tag_id, payload, user_id=g.current_user.id)
     # errors come in data['error']; unify envelope accordingly
     if "error" in data:
         return make_response(None, {"code": "bad_request" if status == 400 else str(status), "message": data["error"]}, status)
@@ -132,7 +132,7 @@ def api_tags_delete(tag_id: uuid.UUID):
         data: {"error": "..."}
         error: null
     """
-    data, status = tags_service.delete_tag(tag_id)
+    data, status = tags_service.delete_tag(tag_id, user_id=g.current_user.id)
     if "error" in data:
         return make_response(None, {"code": "bad_request" if status == 400 else str(status), "message": data["error"]}, status)
     return make_response(data, None, status)
