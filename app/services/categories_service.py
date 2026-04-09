@@ -2,8 +2,10 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import func
+
 from app.extensions import db
-from app.models import Category
+from app.models import Category, Receipt, ReceiptItem
 
 def get_all_categories():
     # Order pinned categories first, then unpinned; within each group sort by usage count (highest first)
@@ -21,7 +23,8 @@ def get_all_categories():
             "name": category.name,
             "created_at": category.created_at.isoformat() if category.created_at else None,
             "count": category.count,
-            "is_pinned": category.is_pinned
+            "is_pinned": category.is_pinned,
+            "limit": float(category.limit) if category.limit is not None else None,
         })
 
     return {
@@ -43,13 +46,17 @@ def create_category(data: dict):
         count = data.get("count", 0)
 
         is_pinned = data.get("is_pinned", False)
+        limit = data.get("limit")
+        if limit is not None:
+            limit = Decimal(str(limit))
 
         category = Category(
             user_id=user_id,
             parent_id=parent_id,
             name=data.get("name"),
             count=count,
-            is_pinned=is_pinned
+            is_pinned=is_pinned,
+            limit=limit,
         )
 
         db.session.add(category)
@@ -72,11 +79,46 @@ def update_category(category_id: uuid.UUID, data: dict):
             category.is_pinned = data["is_pinned"]
         if "count" in data:
             category.count = int(data["count"])
+        if "limit" in data:
+            raw_limit = data["limit"]
+            category.limit = Decimal(str(raw_limit)) if raw_limit is not None else None
         db.session.commit()
         return {"message": "Category updated successfully"}, 200
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
+
+
+def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int):
+    if month < 1 or month > 12:
+        return {"error": "Month must be between 1 and 12"}, 400
+
+    category = db.session.get(Category, category_id)
+    if not category:
+        return {"error": "Category not found"}, 404
+
+    start = date(year, month, 1)
+    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+
+    spent_q = (
+        db.session.query(func.coalesce(func.sum(ReceiptItem.total_price), 0))
+        .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
+        .filter(
+            ReceiptItem.category_id == category_id,
+            Receipt.issue_date >= start,
+            Receipt.issue_date < end,
+        )
+    )
+
+    spent = round(float(spent_q.scalar() or 0), 2)
+
+    return {
+        "year": year,
+        "month": month,
+        "category_id": str(category_id),
+        "spent": spent,
+        "limit": float(category.limit) if category.limit is not None else None,
+    }, 200
     
 def delete_category(category_id: uuid.UUID):
     category = db.session.get(Category, category_id)
