@@ -1,11 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./style/signin.css";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
+import { authApi } from "../api/endpoints";
+import { useAuth } from "../auth/AuthContext";
+
+// Google client ID for OAuth. Provided via VITE_GOOGLE_CLIENT_ID.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function Signin() {
   const { lang } = useLang();
+  const { refreshAuth } = useAuth();
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.title = lang === "sk" ? "BudgetApp · Registrácia" : "BudgetApp · Registration";
@@ -34,6 +42,45 @@ export default function Signin() {
   const [showPass2, setShowPass2] = useState(false);
   const [error, setError] = useState(null);
 
+  // Google Sign-In initialization. When the component mounts, set up
+  // the Google Identity Services client to handle sign-in. On success
+  // we forward the credential to the backend via authApi.googleLogin.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const google = window.google;
+    if (!google || !GOOGLE_CLIENT_ID) {
+      return;
+    }
+    const handleCredentialResponse = (response) => {
+      const idToken = response.credential;
+      if (!idToken) {
+        setError(
+          lang === "sk"
+            ? "Google prihlásenie zlyhalo."
+            : "Google sign-in failed."
+        );
+        return;
+      }
+      authApi
+        .googleLogin({ token: idToken })
+        .then(async () => {
+          await refreshAuth();
+          navigate("/");
+        })
+        .catch((err) => {
+          setError(err.message || (lang === "sk" ? "Chyba prihlásenia." : "Login error."));
+        });
+    };
+    try {
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+      });
+    } catch (e) {
+      // ignore errors
+    }
+  }, [navigate, lang]);
+
   const canSubmit = useMemo(() => {
     if (!form.firstName.trim()) return false;
     if (!form.lastName.trim()) return false;
@@ -41,7 +88,6 @@ export default function Signin() {
     if (!form.password.trim()) return false;
     if (!form.password2.trim()) return false;
     if (form.password !== form.password2) return false;
-    if (!form.agree) return false;
     return true;
   }, [form]);
 
@@ -60,7 +106,45 @@ export default function Signin() {
       return;
     }
 
-    alert(lang === "sk" ? "Registrácia (demo)." : "Registration (demo).");
+    // Attempt to register via the API. Only email and password are sent to the backend.
+    authApi
+      .register({ email: form.email.trim(), password: form.password })
+      .then(() => {
+        // Show a message instructing the user to check their email for a verification code
+        const msg =
+          lang === "sk"
+            ? "Registrácia bola úspešná. Skontrolujte svoj email pre overovací kód."
+            : "Registration successful. Check your email for the verification code.";
+        setError(msg);
+        // Optionally navigate back to the login page so the user can sign in after verifying
+        // navigate("/login");
+      })
+      .catch((err) => {
+        setError(err.message || (lang === "sk" ? "Chyba registrácie." : "Registration error."));
+      });
+  };
+
+  // Trigger the Google sign-in prompt
+  const onGoogleClick = () => {
+    if (typeof window === "undefined") return;
+    const google = window.google;
+    if (!google || !GOOGLE_CLIENT_ID) {
+      setError(
+        lang === "sk"
+          ? "Google prihlásenie nie je dostupné."
+          : "Google sign-in is not available."
+      );
+      return;
+    }
+    try {
+      google.accounts.id.prompt();
+    } catch (e) {
+      setError(
+        lang === "sk"
+          ? "Google prihlásenie zlyhalo."
+          : "Google sign-in failed."
+      );
+    }
   };
 
   const EyeIcon = ({ open }) => (
@@ -246,8 +330,7 @@ export default function Signin() {
                   <span className="text"><T sk="alebo" en="or" /></span>
                   <span className="line" />
                 </div>
-
-               <button type="button" className="login-google">
+               <button type="button" className="login-google" onClick={onGoogleClick}>
   <svg className="google-icon" viewBox="0 0 48 48">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.34 1.46 8.25 3.22l6.16-6.16C34.64 2.52 29.74 0 24 0 14.62 0 6.44 5.38 2.56 13.22l7.18 5.58C11.5 13.06 17.23 9.5 24 9.5z"/>
     <path fill="#4285F4" d="M46.5 24c0-1.64-.15-3.22-.43-4.74H24v9h12.7c-.55 2.96-2.22 5.47-4.73 7.15l7.27 5.64C43.73 36.88 46.5 30.95 46.5 24z"/>
@@ -255,7 +338,7 @@ export default function Signin() {
     <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.77l-7.27-5.64c-2.02 1.36-4.6 2.16-8.63 2.16-6.77 0-12.5-4.56-14.26-10.74l-7.18 5.58C6.44 42.62 14.62 48 24 48z"/>
   </svg>
   <span>Google</span>
-</button>
+ </button>
 
                   <div className="signin-divider">
                     <span className="line"/>

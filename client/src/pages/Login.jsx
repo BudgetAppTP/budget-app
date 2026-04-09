@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from "react";
 import "./style/login.css";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
+import { authApi } from "../api/endpoints";
+import { useAuth } from "../auth/AuthContext";
+
+// Access Vite environment variables. The Google client ID must be
+// provided via VITE_GOOGLE_CLIENT_ID in the frontend environment.
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function Login() {
   const { lang } = useLang();
+  const navigate = useNavigate();
+  const { refreshAuth } = useAuth();
 
   useEffect(() => {
     document.title = lang === "sk" ? "BudgetApp · Prihlásiť sa" : "BudgetApp · Sign in";
@@ -20,6 +28,48 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState(null);
 
+  // Initialise the Google Identity Services client when the component
+  // mounts. The library script is loaded in index.html. We register
+  // a callback that receives the ID token when the user completes the
+  // sign-in flow. Once a token is received, we forward it to the
+  // backend via the new googleLogin endpoint.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const google = window.google;
+    if (!google || !GOOGLE_CLIENT_ID) {
+      return;
+    }
+    const handleCredentialResponse = (response) => {
+      const idToken = response.credential;
+      if (!idToken) {
+        setError(
+          lang === "sk"
+            ? "Google prihlásenie zlyhalo."
+            : "Google sign-in failed."
+        );
+        return;
+      }
+      // Send the token to our backend; on success, navigate to home.
+      authApi
+        .googleLogin({ token: idToken })
+        .then(async () => {
+          await refreshAuth();
+          navigate("/");
+        })
+        .catch((err) => {
+          setError(err.message || (lang === "sk" ? "Chyba prihlásenia." : "Login error."));
+        });
+    };
+    try {
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredentialResponse,
+      });
+    } catch (e) {
+      // Ignore initialization errors; user will not be able to use Google login
+    }
+  }, [navigate, lang]);
+
   const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
   const submit = (e) => {
@@ -32,7 +82,41 @@ export default function Login() {
     }
 
 
-    alert(lang === "sk" ? "Prihlásenie (demo)." : "Login (demo).");
+    // Attempt to log in via the API. On success navigate to the dashboard root.
+    authApi
+      .login({ email: form.email.trim(), password: form.password })
+      .then(async () => {
+        await refreshAuth();
+        // Navigate to the home/dashboard page after successful login
+        navigate("/");
+      })
+      .catch((err) => {
+        // Show the API error message
+        setError(err.message || (lang === "sk" ? "Chyba prihlásenia." : "Login error."));
+      });
+  };
+
+  // Trigger the Google sign-in prompt when the user clicks the button.
+  const onGoogleClick = () => {
+    if (typeof window === "undefined") return;
+    const google = window.google;
+    if (!google || !GOOGLE_CLIENT_ID) {
+      setError(
+        lang === "sk"
+          ? "Google prihlásenie nie je dostupné."
+          : "Google sign-in is not available."
+      );
+      return;
+    }
+    try {
+      google.accounts.id.prompt();
+    } catch (e) {
+      setError(
+        lang === "sk"
+          ? "Google prihlásenie zlyhalo."
+          : "Google sign-in failed."
+      );
+    }
   };
 
   const EyeIcon = ({ open }) => (
@@ -162,7 +246,7 @@ export default function Login() {
                   <span className="line" />
                 </div>
 
-               <button type="button" className="login-google">
+               <button type="button" className="login-google" onClick={onGoogleClick}>
   <svg className="google-icon" viewBox="0 0 48 48">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.34 1.46 8.25 3.22l6.16-6.16C34.64 2.52 29.74 0 24 0 14.62 0 6.44 5.38 2.56 13.22l7.18 5.58C11.5 13.06 17.23 9.5 24 9.5z"/>
     <path fill="#4285F4" d="M46.5 24c0-1.64-.15-3.22-.43-4.74H24v9h12.7c-.55 2.96-2.22 5.47-4.73 7.15l7.27 5.64C43.73 36.88 46.5 30.95 46.5 24z"/>
@@ -170,7 +254,7 @@ export default function Login() {
     <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.77l-7.27-5.64c-2.02 1.36-4.6 2.16-8.63 2.16-6.77 0-12.5-4.56-14.26-10.74l-7.18 5.58C6.44 42.62 14.62 48 24 48z"/>
   </svg>
   <span>Google</span>
-</button>
+ </button>
 
                 <div className="login-bottom">
                   <span className="line" />
