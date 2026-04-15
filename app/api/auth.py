@@ -26,7 +26,7 @@ Notes:
 """
 
 from flask import request, current_app, g
-from app.api import bp, make_response
+from app.api import bp, make_response, extract_auth_token
 import requests
 from app.utils.auth import login_required
 
@@ -174,7 +174,7 @@ def api_logout():
     exists, logout is a no-op. The cookie is removed from the client's
     browser to prevent reuse.
     """
-    token = request.cookies.get("auth_token")
+    token = extract_auth_token()
     if token:
         _auth_service().logout(token)
     resp, status_code = make_response({"ok": True}, None, 200)
