@@ -310,6 +310,28 @@ Exact versions are pinned in `requirements.txt`.
 
 ---
 
+## Email Verification & SMTP Configuration
+
+The authentication system sends a six‑digit verification code to new users during registration. In development and test modes the backend auto‑verifies accounts (controlled by the `DEBUG`/`TESTING` flags) to simplify local work. In production you should disable these flags and configure SMTP so that users receive a code via email and must verify their address before logging in.
+
+To enable email delivery:
+
+1. Copy `.env.example` to `.env` if you haven't already: this file now includes blank `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASSWORD` variables.
+2. Fill these variables with your SMTP provider settings. For example, Gmail would use:
+
+   ```env
+   SMTP_SERVER=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your_address@gmail.com
+   SMTP_PASSWORD=your_app_password
+   ```
+
+3. Set `APP_ENV=production` and ensure `DEBUG`/`TESTING` are not set so users must verify their email before they can log in.
+
+If the SMTP configuration is incomplete, the server logs the verification code instead of sending it. This allows you to sign up locally without a running mail server. Check the console output where the backend is running to retrieve the code.
+
+---
+
 ## Development Notes
 
 * Controllers in `app/api/*` must return the unified JSON shape `{ data, error }`.
