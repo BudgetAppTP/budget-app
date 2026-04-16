@@ -7,8 +7,6 @@ const API_BASE = "/api";
 const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
 
 
-const CATEGORIES = ["📌 Bývanie", "📌 Jedlo", "Doprava", "Lieky", "Ostatné"];
-
 export default function Ekasa() {
   const { lang } = useLang();
 
@@ -106,7 +104,7 @@ export default function Ekasa() {
             const cleaned =
               typeof raw === "string" && raw.trim() ? raw.trim() : "Jedlo";
 
-            next[id] = cleaned.replace("📌 ", "");
+            next[id] = cleaned;
           }
         }
         return next;
@@ -132,6 +130,31 @@ export default function Ekasa() {
     fetchEkasaItems(currentDate);
   }, [currentDate, lang]);
 
+      const [categories, setCategories] = useState([]);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`/api/categories`);
+      const json = await res.json();
+
+      const data = json.data ?? json;
+      const list = Array.isArray(data?.categories) ? data.categories : [];
+
+      setCategories(
+        list.map((c) => ({
+          name: c.name,
+          pinned: c.is_pinned === true || c.is_pinned === "true",
+        }))
+      );
+    } catch (e) {
+      console.error("Failed to load categories", e);
+    }
+  };
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+
   const sortedChecks = useMemo(() => {
     const list = [...checks];
     const { field, order } = sortChecksBy;
@@ -153,9 +176,24 @@ export default function Ekasa() {
 
 
 
-  const handleCategoryChange = (itemId, valueWithPin) => {
-    const v = (valueWithPin || "").replace("📌 ", "");
-    setItemCategory((prev) => ({ ...prev, [itemId]: v }));
+  const handleCategoryChange = async (receiptId, itemId, category) => {
+    setItemCategory((prev) => ({ ...prev, [itemId]: category }));
+
+    try {
+      await fetch(`/api/receipts/${receiptId}/items/${itemId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          extra_metadata: {
+            category: category,
+          },
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to update category", err);
+    }
   };
 
       const [ekasaReceiptId, setEkasaReceiptId] = useState("");
@@ -346,7 +384,8 @@ export default function Ekasa() {
                             const totalPrice =
                               safeNum(it.total_price) || unitPrice * qty;
 
-                            const selected = itemCategory[it.id] || "Jedlo";
+                            const defaultCategory =categories.find((c) => c.pinned)?.name ||categories[0]?.name ||"";
+                            const selected = itemCategory[it.id] || defaultCategory;
 
                             return (
                               <tr key={it.id}>
@@ -355,21 +394,15 @@ export default function Ekasa() {
                                 <td>
                                   <select
                                     className="category"
-                                    value={
-                                      CATEGORIES.find((c) => c.replace("📌 ", "") === selected) ||
-                                      "📌 Jedlo"
-                                    }
-                                    onChange={(e) => handleCategoryChange(it.id, e.target.value)}
+                                    value={selected}
+                                    onChange={(e) =>handleCategoryChange(check.receipt_id, it.id, e.target.value)}
                                   >
-                                    {CATEGORIES.map((c) => (
-                                      <option
-                                        key={c}
-                                        value={c}
-                                        className={c.includes("📌") ? "pinned" : ""}
-                                      >
-                                        {c.replace("📌 ", "")}
-                                      </option>
-                                    ))}
+                                  {categories.map((c) => (
+                                    <option key={c.name} value={c.name}>
+                                      {c.pinned ? "📌 " : ""}
+                                      {c.name}
+                                    </option>
+                                  ))}
                                   </select>
                                 </td>
 
