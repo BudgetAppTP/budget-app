@@ -14,7 +14,7 @@ Notes:
 """
 import uuid
 
-from flask import request
+from flask import request, g
 from app.api import bp, make_response
 from app.services import receipts_service, tags_service
 
@@ -134,16 +134,7 @@ def api_expense_tags_list():
             { "error": "Invalid user_id format" }
           error: null
     """
-    raw_user_id = request.args.get("user_id")
-    user_id = None
-
-    if raw_user_id:
-        try:
-            user_id = uuid.UUID(raw_user_id)
-        except ValueError:
-            return make_response({"error": "Invalid user_id format"}, None, 400)
-
-    data, status = tags_service.get_expense_tags(user_id=user_id)
+    data, status = tags_service.get_expense_tags(user_id=g.current_user.id)
     return make_response(data, None, status)
 
 
@@ -158,6 +149,7 @@ def api_receipts_create():
         "user_id": "<uuid>",               # required
         "issue_date": "YYYY-MM-DD",        # optional (can be null/omitted)
         "description": "Tesco groceries",  # required, non-empty string
+        "currency": "EUR",                 # optional, default: "EUR"
         "total_amount": 23.45,             # optional, default: 0.0
         "tag_id": "<uuid>",                # optional, must belong to the same user
         "external_uid": "<str>",           # optional, external receipt id
@@ -194,7 +186,7 @@ def api_receipts_create():
     payload = request.get_json() or {}
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = receipts_service.create_receipt(payload)
+    response, status = receipts_service.create_receipt(payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -232,7 +224,7 @@ def api_receipts_get(receipt_id):
           }
         error: null
     """
-    receipt, status = receipts_service.get_receipt_by_id(receipt_id)
+    receipt, status = receipts_service.get_receipt_by_id(receipt_id, user_id=g.current_user.id)
     return make_response(receipt, None, status)
 
 
@@ -249,6 +241,7 @@ def api_receipts_update(receipt_id):
       {
         "issue_date": "YYYY-MM-DD",        # optional
         "description": "Updated text",     # optional, if present must be non-empty
+        "currency": "EUR",                 # optional
         "total_amount": 25.00,             # optional
         "tag_id": "<uuid>",                # optional, null to detach tag
         "external_uid": "<str>",           # optional
@@ -290,7 +283,7 @@ def api_receipts_update(receipt_id):
     payload = request.get_json() or {}
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = receipts_service.update_receipt(receipt_id, payload)
+    response, status = receipts_service.update_receipt(receipt_id, payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -318,7 +311,7 @@ def api_receipts_delete(receipt_id):
           }
         error: null
     """
-    response, status = receipts_service.delete_receipt(receipt_id)
+    response, status = receipts_service.delete_receipt(receipt_id, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 @bp.post("/receipts/import-ekasa", strict_slashes=False)
@@ -374,7 +367,7 @@ def api_receipts_import_ekasa():
     if not receipt_id or not user_id:
         return make_response(
             None,
-            {"code": "bad_request", "message": "Missing receiptId or user_id"},
+            {"code": "bad_request", "message": "Missing receiptId"},
             400,
         )
 

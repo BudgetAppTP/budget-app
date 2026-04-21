@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import List
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Text, DateTime, ForeignKey, func
+from sqlalchemy import Boolean, Integer, Numeric, Text, DateTime, ForeignKey, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,6 +30,9 @@ class Category(Base):
         parent_id (uuid.UUID | None): Optional foreign key referencing the parent category.
         name (str): The name of the category.
         created_at (datetime): Timestamp indicating when the category was created.
+        count (int): Number of receipt items assigned to this category. 
+        is_pinned (boolean): Indicates whether the category is pinned for prioritized display in dropdown lists.
+        limit (Decimal | None): Optional monthly informational spending limit for this category.
 
     Relationships:
         parent (Category | None): Many-to-One self-referential relationship.
@@ -56,10 +60,31 @@ class Category(Base):
     )
 
     name: Mapped[str] = mapped_column(Text, nullable=False)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now()
     )
+
+    count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0"
+    )
+
+    is_pinned: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false")
+    )
+
+    limit: Mapped[Decimal | None] = mapped_column(
+        Numeric(14, 2),
+        nullable=True
+    )
+
 
     """ Relationships """
     user: Mapped["User | None"] = relationship(

@@ -11,6 +11,8 @@ from .receipt_item import ReceiptItem
 from .savings_fund import SavingsFund
 from .tag import Tag
 from .user import User
+from .auth_token import AuthToken
+from .email_verification import EmailVerification
 
 __all__ = [
     "Base",
@@ -27,4 +29,6 @@ __all__ = [
     "ReceiptItem",
     "Tag",
     "User",
+    "AuthToken",
+    "EmailVerification",
 ]

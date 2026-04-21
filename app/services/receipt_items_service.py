@@ -4,6 +4,7 @@ from app.extensions import db
 from app.models import Receipt, ReceiptItem
 from app.validators.receipt_item_validators import validate_receipt_item_create_data, validate_receipt_item_update_data
 
+from app.models.category import Category
 
 def get_items_by_receipt(receipt_id: uuid.UUID):
     receipt = db.session.get(Receipt, receipt_id)
@@ -47,7 +48,11 @@ def create_item(receipt_id: uuid.UUID, data: dict):
             total_price=validated["quantity"] * validated["unit_price"],
             extra_metadata=validated["extra_metadata"]
         )
-
+        if item.category_id:
+            category = db.session.get(Category, item.category_id)
+            if not category:
+                return {"error": "Category not found"}, 404
+            category.count = (category.count or 0) + 1
         db.session.add(item)
         db.session.commit()
         return {"item_id": str(item.id), "message": "Item created successfully"}, 201
@@ -66,6 +71,7 @@ def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict):
         validated, err, status = validate_receipt_item_update_data(data)
         if err:
             return err, status
+        old_category_id = item.category_id  # likely uuid.UUID or None
 
         if "name" in validated:
             item.name = validated["name"]
@@ -79,6 +85,19 @@ def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict):
             item.extra_metadata = validated["extra_metadata"]
 
         item.total_price = item.quantity * item.unit_price
+
+        if "category_id" in data and old_category_id != item.category_id:
+            # decrement old category
+            if old_category_id:
+                old_category = db.session.get(Category, old_category_id)
+                if old_category and old_category.count > 0:
+                    old_category.count -= 1
+
+            # increment new category
+            if item.category_id:
+                new_category = db.session.get(Category, item.category_id)
+                if new_category:
+                    new_category.count = (new_category.count or 0) + 1
 
         db.session.commit()
         return {"item_id": str(item.id), "message": "Item updated successfully"}, 200
@@ -94,6 +113,12 @@ def delete_item(receipt_id: uuid.UUID, item_id: uuid.UUID):
         return {"error": "Item not found"}, 404
 
     try:
+
+        if item.category_id:
+            category = db.session.get(Category,item.category_id)
+            if category and category.count > 0:
+                    category.count -= 1
+
         db.session.delete(item)
         db.session.commit()
         return {"message": "Item deleted successfully"}, 200

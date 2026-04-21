@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import DateTime, String, func, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +19,9 @@ if TYPE_CHECKING:
     from .category import Category
     from .receipt_item import ReceiptItem
     from .tag import Tag
+    # Imported for type checking of relationships added below
+    from .auth_token import AuthToken
+    from .email_verification import EmailVerification
 
 
 class User(Base):
@@ -82,6 +85,14 @@ class User(Base):
         server_default=func.now()
     )
 
+    # Indicates whether the user has completed email verification. New
+    # accounts are initially unverified until a confirmation code is
+    # validated. In test and development environments this can be set to
+    # True automatically to simplify authentication during development.
+    is_verified: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+
     """ Relationships """
     incomes: Mapped[list["Income"]] = relationship(
         "Income", back_populates="user", cascade="all, delete-orphan"
@@ -105,6 +116,20 @@ class User(Base):
 
     tags: Mapped[list["Tag"]] = relationship(
         "Tag", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    # Authentication tokens issued to the user. Each login generates a
+    # unique token row that is tracked until it expires or is explicitly
+    # revoked. Tokens are deleted on cascade when the user is removed.
+    auth_tokens: Mapped[list["AuthToken"]] = relationship(
+        "AuthToken", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    # Email verification codes associated with this user. Multiple
+    # verification codes can exist concurrently if multiple registration
+    # attempts are made; unused or expired codes may be cleaned up.
+    email_verifications: Mapped[list["EmailVerification"]] = relationship(
+        "EmailVerification", back_populates="user", cascade="all, delete-orphan"
     )
 
     goals: Mapped[list["Goal"]] = relationship(

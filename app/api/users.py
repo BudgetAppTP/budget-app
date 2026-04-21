@@ -10,6 +10,8 @@ Notes:
 - Для согласованности со Swagger включён strict_slashes=False.
 """
 
+from flask import request, g
+from app.api import bp, make_response
 from flask import request
 from app.api import bp
 from app.services.errors import BadRequestError

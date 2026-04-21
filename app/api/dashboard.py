@@ -1,5 +1,5 @@
 import uuid
-from flask import request
+from flask import request, g
 from app.api import bp, make_response
 from app.services import dashboard_service
 

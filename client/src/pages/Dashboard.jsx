@@ -9,81 +9,14 @@ const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
 
 export default function Dashboard() {
   const { lang, setLang } = useLang();
-      useEffect(() => {
+
+  useEffect(() => {
     document.title = "BudgetApp · Dashboard";
   }, []);
 
   useEffect(() => {
     document.body.classList.add("dashboard-body");
     return () => document.body.classList.remove("dashboard-body");
-    const grid = document.querySelector(".grid");
-    if (!grid) return;
-    let dragged = null;
-
-    const restoreDragHandles = (grid) => {
-      grid.querySelectorAll(".panel").forEach((p) => {
-        const handle = p.querySelector(".drag-handle");
-        if (!handle) return;
-        handle.setAttribute("title", "Presuň sekciu");
-      });
-    };
-
-    grid.querySelectorAll(".panel").forEach((panel) => {
-      const handle = panel.querySelector(".drag-handle");
-      if (!handle) return;
-
-      handle.addEventListener("mousedown", () =>
-        panel.setAttribute("draggable", "true")
-      );
-      handle.addEventListener("mouseup", () =>
-        panel.removeAttribute("draggable")
-      );
-
-      panel.addEventListener("dragstart", (e) => {
-        dragged = panel;
-        panel.classList.add("dragging");
-        e.dataTransfer.setData("text/plain", "panel");
-        e.dataTransfer.effectAllowed = "move";
-      });
-
-      panel.addEventListener("dragend", () => {
-        panel.classList.remove("dragging");
-        dragged = null;
-      });
-
-      panel.addEventListener("dragover", (e) => e.preventDefault());
-
-      panel.addEventListener("dragenter", (e) => {
-        e.preventDefault();
-        if (panel !== dragged) panel.classList.add("drop-target");
-      });
-      panel.addEventListener("dragleave", () =>
-        panel.classList.remove("drop-target")
-      );
-
-      panel.addEventListener("drop", (e) => {
-        e.preventDefault();
-        const target = panel;
-        if (!dragged || dragged === target) return;
-
-        const temp = dragged.innerHTML;
-        dragged.innerHTML = target.innerHTML;
-        target.innerHTML = temp;
-
-        restoreDragHandles(grid);
-
-        target.classList.remove("drop-target");
-        dragged.classList.remove("dragging");
-        dragged = null;
-      });
-    });
-
-
-    return () => {
-      document.querySelectorAll(".panel").forEach((p) => {
-        p.replaceWith(p.cloneNode(true));
-      });
-    };
   }, []);
 
   const [ekasaReceiptId, setEkasaReceiptId] = useState("");
@@ -91,75 +24,162 @@ export default function Dashboard() {
   const [ekasaSuccess, setEkasaSuccess] = useState("");
   const [ekasaLoading, setEkasaLoading] = useState(false);
 
-  const handleImportEkasa = async () => {
-  const rid = (ekasaReceiptId || "").trim();
+  const [qrFile, setQrFile] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState("");
+  const [qrSuccess, setQrSuccess] = useState("");
 
-  if (!rid) {
-    setEkasaError(
-      lang === "sk" ? "Zadajte ID bločku." : "Please enter receipt ID."
-    );
-    return;
-  }
+  const handleQrFileChange = (e) => {
+    setQrFile(e.target.files[0]);
+    setQrError("");
+    setQrSuccess("");
+  };
 
-  setEkasaError("");
-  setEkasaLoading(true);
-
-  try {
-    const res = await fetch(`${API_BASE}/receipts/import-ekasa`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        receiptId: rid,
-        user_id: USER_ID,
-      }),
-    });
-
-    const json = await res.json();
-
-    if (!res.ok || json?.error) {
-      const backendMsg =
-        json?.error?.message ||
-        json?.error?.details?.error ||
-        json?.data?.error ||
-        (lang === "sk"
-          ? "Import z eKasa zlyhal."
-          : "Import from eKasa failed.");
-
-      setEkasaError(backendMsg);
+  const handleQrImport = async () => {
+    if (!qrFile) {
+      setQrError(
+        lang === "sk" ? "Vyberte obrázok QR kódu." : "Select a QR code image."
+      );
       return;
     }
 
-    setEkasaReceiptId("");
+    setQrLoading(true);
+    setQrError("");
+    setQrSuccess("");
+
+    const formData = new FormData();
+    formData.append("image", qrFile);
+
+    try {
+      const extractRes = await fetch(`${API_BASE}/import-qr/extract-id`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const extractJson = await extractRes.json();
+
+      if (!extractRes.ok || extractJson?.error) {
+        setQrError(
+          extractJson?.error ||
+            (lang === "sk"
+              ? "Nepodarilo sa extrahovať ID."
+              : "Failed to extract ID.")
+        );
+        return;
+      }
+
+      const receiptId = extractJson.data.receiptId;
+
+      const importRes = await fetch(`${API_BASE}/receipts/import-ekasa`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          receiptId: receiptId,
+          user_id: USER_ID,
+        }),
+      });
+
+      const importJson = await importRes.json();
+
+      if (!importRes.ok || importJson?.error) {
+        const errorMsg =
+          importJson?.error?.message ||
+          importJson?.error ||
+          (lang === "sk" ? "Import zlyhal." : "Import failed.");
+        setQrError(errorMsg);
+        return;
+      }
+
+      setQrSuccess(
+        lang === "sk"
+          ? "Bloček bol úspešne importovaný ✓"
+          : "Receipt imported successfully ✓"
+      );
+
+      setQrFile(null);
+      const fileInput = document.querySelector('input[type="file"]');
+      if (fileInput) fileInput.value = null;
+    } catch (err) {
+      console.error(err);
+      setQrError(lang === "sk" ? "Chyba spojenia." : "Connection error.");
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleImportEkasa = async () => {
+    const rid = (ekasaReceiptId || "").trim();
+
+    if (!rid) {
+      setEkasaError(
+        lang === "sk" ? "Zadajte ID bločku." : "Please enter receipt ID."
+      );
+      return;
+    }
+
     setEkasaError("");
-    setEkasaSuccess(
-      lang === "sk" ? "Bloček bol importovaný ✔" : "Receipt imported ✔"
-    );
-  } catch (err) {
-    console.error(err);
-    setEkasaError(
-      lang === "sk"
-        ? "Chyba spojenia so serverom."
-        : "Server connection error."
-    );
-  } finally {
-    setEkasaLoading(false);
-  }
-};
+    setEkasaLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/receipts/import-ekasa`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          receiptId: rid,
+          user_id: USER_ID,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || json?.error) {
+        const backendMsg =
+          json?.error?.message ||
+          json?.error?.details?.error ||
+          json?.data?.error ||
+          (lang === "sk"
+            ? "Import z eKasa zlyhal."
+            : "Import from eKasa failed.");
+
+        setEkasaError(backendMsg);
+        return;
+      }
+
+      setEkasaReceiptId("");
+      setEkasaError("");
+      setEkasaSuccess(
+        lang === "sk" ? "Bloček bol importovaný ✔" : "Receipt imported ✔"
+      );
+    } catch (err) {
+      console.error(err);
+      setEkasaError(
+        lang === "sk"
+          ? "Chyba spojenia so serverom."
+          : "Server connection error."
+      );
+    } finally {
+      setEkasaLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!ekasaSuccess) return;
-    const t = setTimeout(() => setEkasaSuccess(""), 2500); // 2.5s
+    const t = setTimeout(() => setEkasaSuccess(""), 2500);
     return () => clearTimeout(t);
   }, [ekasaSuccess]);
 
-
+  useEffect(() => {
+    if (!qrSuccess) return;
+    const t = setTimeout(() => setQrSuccess(""), 2500);
+    return () => clearTimeout(t);
+  }, [qrSuccess]);
 
   return (
     <main className="wrap dashboard">
       <div className="section-title">
         <span className="marker"></span>
         <div>
-           <T sk="Mesačný prehľad" en="Monthly Overview" /> ·{" "}
+          <T sk="Mesačný prehľad" en="Monthly Overview" /> ·{" "}
           <span id="monthTitle">Október 2025</span>
         </div>
       </div>
@@ -169,7 +189,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">💶</div>
             <div>
-              <small> <T sk="Príjmy" en="Incomes" /></small>
+              <small><T sk="Príjmy" en="Incomes" /></small>
               <div className="value" id="kpiIncome">€ 2 350</div>
             </div>
           </div>
@@ -189,7 +209,7 @@ export default function Dashboard() {
           <div className="kpi">
             <div className="icon" aria-hidden="true">🧾</div>
             <div>
-              <small> <T sk="Zostatok" en="Balance" /></small>
+              <small><T sk="Zostatok" en="Balance" /></small>
               <div className="value" id="kpiBalance">€ 510</div>
             </div>
           </div>
@@ -211,7 +231,7 @@ export default function Dashboard() {
           <div className="panel" draggable="true">
             <div className="drag-handle" title="Presuň sekciu"></div>
             <header>
-              <h3> <T sk="Rozloženie výdavkov" en="Expense Distribution" /></h3>
+              <h3><T sk="Rozloženie výdavkov" en="Expense Distribution" /></h3>
             </header>
 
             <div className="donut-wrap">
@@ -280,90 +300,133 @@ export default function Dashboard() {
           <header>
             <h2>Import eKasa</h2>
           </header>
+
           <div className="import-boxes">
             <div className="import-card" draggable="true">
-              <strong> <T sk="QR kód eKasa" en="QR Code eKasa" /></strong>
+              <strong><T sk="QR kód eKasa" en="QR Code eKasa" /></strong>
               <p>
-
-                <T sk="Naskenujte QR kód z bločku"
-	                  en="Scan the QR code from your receipt"/>
-
+                <T
+                  sk="Naskenujte QR kód z bločku"
+                  en="Scan the QR code from your receipt"
+                />
               </p>
-              <button><T sk="Nahrať QR" en="Upload QR" /></button>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleQrFileChange}
+                style={{ marginBottom: "8px" }}
+              />
+
+              <button
+                type="button"
+                onClick={handleQrImport}
+                disabled={qrLoading}
+                style={{
+                  cursor: qrLoading ? "not-allowed" : "pointer",
+                  opacity: qrLoading ? 0.7 : 1,
+                  width: "100%",
+                }}
+              >
+                {qrLoading
+                  ? lang === "sk"
+                    ? "Spracovávam..."
+                    : "Processing..."
+                  : lang === "sk"
+                  ? "Importovať z QR"
+                  : "Import from QR"}
+              </button>
+
+              {qrSuccess && (
+                <div style={{ marginTop: "8px", color: "#2e7d32", fontSize: "13px" }}>
+                  {qrSuccess}
+                </div>
+              )}
+
+              {qrError && (
+                <div style={{ marginTop: "8px", color: "#e53935", fontSize: "13px" }}>
+                  {qrError}
+                </div>
+              )}
             </div>
+
             <div className="import-card" draggable="true">
               <strong><T sk="PDF alebo JSON" en="PDF or JSON" /></strong>
-              <p><T sk="Importujte súbor z eKasa"
-	                  en="Import an eKasa file"
-                /></p>
-              <button> <T sk="Vybrať súbor" en="Choose File" /></button>
+              <p>
+                <T
+                  sk="Importujte súbor z eKasa"
+                  en="Import an eKasa file"
+                />
+              </p>
+              <button><T sk="Vybrať súbor" en="Choose File" /></button>
             </div>
 
             <div className="import-card import-ekasa">
-  <strong>
-    <T sk="Import z eKasa" en="Import from eKasa" />
-  </strong>
+              <strong>
+                <T sk="Import z eKasa" en="Import from eKasa" />
+              </strong>
 
-  <p>
-    <T
-      sk="Zadajte ID bločku (receiptId) z eKasa a importujte výdavok."
-      en="Enter eKasa receipt ID (receiptId) to import an expense."
-    />
-  </p>
+              <p>
+                <T
+                  sk="Zadajte ID bločku (receiptId) z eKasa a importujte výdavok."
+                  en="Enter eKasa receipt ID (receiptId) to import an expense."
+                />
+              </p>
 
-  <input
-    type="text"
-    value={ekasaReceiptId}
-    onChange={(e) => {
-      setEkasaReceiptId(e.target.value);
-      setEkasaError("");
-      setEkasaSuccess("");
-    }}
-    placeholder={lang === "sk" ? "ID bločku (receiptId)" : "Receipt ID (receiptId)"}
-    style={{
-      border: ekasaError ? "1px solid #e53935" : "1px solid #d0d0d0",
-    }}
-  />
+              <input
+                type="text"
+                value={ekasaReceiptId}
+                onChange={(e) => {
+                  setEkasaReceiptId(e.target.value);
+                  setEkasaError("");
+                  setEkasaSuccess("");
+                }}
+                placeholder={
+                  lang === "sk" ? "ID bločku (receiptId)" : "Receipt ID (receiptId)"
+                }
+                style={{
+                  border: ekasaError ? "1px solid #e53935" : "1px solid #d0d0d0",
+                }}
+              />
 
+              <button
+                type="button"
+                onClick={handleImportEkasa}
+                disabled={ekasaLoading}
+                style={{
+                  cursor: ekasaLoading ? "not-allowed" : "pointer",
+                  opacity: ekasaLoading ? 0.7 : 1,
+                }}
+              >
+                {ekasaLoading
+                  ? lang === "sk"
+                    ? "Importujem..."
+                    : "Importing..."
+                  : lang === "sk"
+                  ? "Importovať"
+                  : "Import"}
+              </button>
 
-  <button
-    type="button"
-    onClick={handleImportEkasa}
-    disabled={ekasaLoading}
-    style={{
-      cursor: ekasaLoading ? "not-allowed" : "pointer",
-      opacity: ekasaLoading ? 0.7 : 1,
-    }}
-  >
-    {ekasaLoading
-      ? lang === "sk"
-        ? "Importujem..."
-        : "Importing..."
-      : lang === "sk"
-      ? "Importovať"
-      : "Import"}
-  </button>
+              {ekasaError && (
+                <div style={{ marginTop: "8px", color: "#e53935", fontSize: "13px" }}>
+                  {ekasaError}
+                </div>
+              )}
 
-  {ekasaError && (
-    <div style={{ marginTop: "8px", color: "#e53935", fontSize: "13px" }}>
-      {ekasaError}
-    </div>
-  )}
+              {ekasaSuccess && (
+                <div style={{ marginTop: "8px", color: "#2e7d32", fontSize: "13px" }}>
+                  {ekasaSuccess}
+                </div>
+              )}
+            </div>
 
-  {ekasaSuccess && (
-  <div style={{ marginTop: "8px", color: "#2e7d32", fontSize: "13px" }}>
-    {ekasaSuccess}
-  </div>
-)}
-</div>
-
-
-           <Link
+            <Link
               to="/Ekasa"
               className="btn"
-              style={{ textDecoration: "none", textAlign: "center" }}>
+              style={{ textDecoration: "none", textAlign: "center" }}
+            >
               <T sk="Otvoriť eKasa" en="Open eKasa" />
-           </Link>
+            </Link>
           </div>
         </div>
       </section>

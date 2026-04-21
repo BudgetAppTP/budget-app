@@ -9,6 +9,13 @@ class BaseConfig:
     IMPORT_XLSX_PATH = os.getenv("IMPORT_XLSX_PATH", "/mnt/data/BugetAppTP.xlsx")
     MAX_SAVINGS_FUNDS = int(os.getenv("MAX_SAVINGS_FUNDS", "10"))
 
+    # Google OAuth configuration. Set ``GOOGLE_CLIENT_ID`` to the client ID
+    # obtained from the Google Developer Console. When provided, the
+    # application will validate ID tokens sent from the client against this
+    # value. See https://developers.google.com/identity/sign-in/web/sign-in
+    # for details on obtaining a client ID.
+    GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+
     SWAGGER_URL = "/api/docs"
     API_URL = "/static/swagger.json"
 

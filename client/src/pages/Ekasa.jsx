@@ -7,8 +7,6 @@ const API_BASE = "/api";
 const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
 
 
-const CATEGORIES = ["📌 Bývanie", "📌 Jedlo", "Doprava", "Lieky", "Ostatné"];
-
 export default function Ekasa() {
   const { lang } = useLang();
 
@@ -106,7 +104,7 @@ export default function Ekasa() {
             const cleaned =
               typeof raw === "string" && raw.trim() ? raw.trim() : "Jedlo";
 
-            next[id] = cleaned.replace("📌 ", "");
+            next[id] = cleaned;
           }
         }
         return next;
@@ -132,6 +130,31 @@ export default function Ekasa() {
     fetchEkasaItems(currentDate);
   }, [currentDate, lang]);
 
+      const [categories, setCategories] = useState([]);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`/api/categories`);
+      const json = await res.json();
+
+      const data = json.data ?? json;
+      const list = Array.isArray(data?.categories) ? data.categories : [];
+
+      setCategories(
+        list.map((c) => ({
+          name: c.name,
+          pinned: c.is_pinned === true || c.is_pinned === "true",
+        }))
+      );
+    } catch (e) {
+      console.error("Failed to load categories", e);
+    }
+  };
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+
   const sortedChecks = useMemo(() => {
     const list = [...checks];
     const { field, order } = sortChecksBy;
@@ -153,10 +176,112 @@ export default function Ekasa() {
 
 
 
-  const handleCategoryChange = (itemId, valueWithPin) => {
-    const v = (valueWithPin || "").replace("📌 ", "");
-    setItemCategory((prev) => ({ ...prev, [itemId]: v }));
+  const handleCategoryChange = async (receiptId, itemId, category) => {
+    setItemCategory((prev) => ({ ...prev, [itemId]: category }));
+
+    try {
+      await fetch(`/api/receipts/${receiptId}/items/${itemId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          extra_metadata: {
+            category: category,
+          },
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to update category", err);
+    }
   };
+
+  const [qrFile, setQrFile] = useState(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState("");
+  const [qrSuccess, setQrSuccess] = useState("");
+  const handleQrFileChange = (e) => {
+    setQrFile(e.target.files[0]);
+    setQrError("");
+    setQrSuccess("");
+  };
+
+const handleQrImport = async () => {
+  if (!qrFile) {
+    setQrError(lang === "sk" ? "Vyberte obrázok QR kódu." : "Select a QR code image.");
+    return;
+  }
+
+  setQrLoading(true);
+  setQrError("");
+  setQrSuccess("");
+
+  const formData = new FormData();
+  formData.append("image", qrFile);
+
+  try {
+    
+    const extractRes = await fetch(`${API_BASE}/import-qr/extract-id`, {
+      method: "POST",
+      body: formData,
+    });
+    
+    const extractJson = await extractRes.json();
+
+    if (!extractRes.ok || extractJson?.error) {
+      setQrError(extractJson?.error || (lang === "sk" ? "Nepodarilo sa extrahovať ID." : "Failed to extract ID."));
+      return;
+    }
+
+    const receiptId = extractJson.data.receiptId;
+
+    console.log("Receipt ID to import:", receiptId);
+    console.log("User ID:", USER_ID);
+    const requestBody = {
+      receiptId: receiptId,
+      user_id: USER_ID,
+    };
+    console.log("Sending to /receipts/import-ekasa:", requestBody);
+
+    
+    
+    const importRes = await fetch(`${API_BASE}/receipts/import-ekasa`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        receiptId: receiptId,
+        user_id: USER_ID,
+      }),
+    });
+
+    const importJson = await importRes.json();
+
+    if (!importRes.ok || importJson?.error) {
+      const errorMsg = importJson?.error?.message || 
+                       importJson?.error ||
+                       (lang === "sk" ? "Import zlyhal." : "Import failed.");
+      setQrError(errorMsg);
+      return;
+    }
+
+    // Success
+    setQrSuccess(
+      lang === "sk" 
+        ? `Bloček bol úspešne importovaný ✓` 
+        : `Receipt imported successfully ✓`
+    );
+    
+    // Clear the file input
+    setQrFile(null);
+    document.querySelector('input[type="file"]').value = null;
+    
+  } catch (err) {
+    console.error(err);
+    setQrError(lang === "sk" ? "Chyba spojenia." : "Connection error.");
+  } finally {
+    setQrLoading(false);
+  }
+};
 
       const [ekasaReceiptId, setEkasaReceiptId] = useState("");
       const [ekasaError, setEkasaError] = useState("");
@@ -346,7 +471,8 @@ export default function Ekasa() {
                             const totalPrice =
                               safeNum(it.total_price) || unitPrice * qty;
 
-                            const selected = itemCategory[it.id] || "Jedlo";
+                            const defaultCategory =categories.find((c) => c.pinned)?.name ||categories[0]?.name ||"";
+                            const selected = itemCategory[it.id] || defaultCategory;
 
                             return (
                               <tr key={it.id}>
@@ -355,21 +481,15 @@ export default function Ekasa() {
                                 <td>
                                   <select
                                     className="category"
-                                    value={
-                                      CATEGORIES.find((c) => c.replace("📌 ", "") === selected) ||
-                                      "📌 Jedlo"
-                                    }
-                                    onChange={(e) => handleCategoryChange(it.id, e.target.value)}
+                                    value={selected}
+                                    onChange={(e) =>handleCategoryChange(check.receipt_id, it.id, e.target.value)}
                                   >
-                                    {CATEGORIES.map((c) => (
-                                      <option
-                                        key={c}
-                                        value={c}
-                                        className={c.includes("📌") ? "pinned" : ""}
-                                      >
-                                        {c.replace("📌 ", "")}
-                                      </option>
-                                    ))}
+                                  {categories.map((c) => (
+                                    <option key={c.name} value={c.name}>
+                                      {c.pinned ? "📌 " : ""}
+                                      {c.name}
+                                    </option>
+                                  ))}
                                   </select>
                                 </td>
 
@@ -417,16 +537,62 @@ export default function Ekasa() {
       </div>
 
       <div className="panel">
-                <div className="import-card" draggable="true">
-                  <strong> <T sk="QR kód eKasa" en="QR Code eKasa" /></strong>
-                  <p>
-
-                    <T sk="Naskenujte QR kód z bločku"
-                          en="Scan the QR code from your receipt"/>
-
-                  </p>
-                  <button><T sk="Nahrať QR" en="Upload QR" /></button>
+          <div className="import-card" draggable="true">
+             <strong>
+                <T sk="QR kód eKasa" en="QR Code eKasa" />
+              </strong>
+              <p>
+                <T
+                  sk="Naskenujte QR kód z bločku"
+                  en="Scan the QR code from your receipt"
+                />
+              </p>
+                
+              {/* File input */}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleQrFileChange}
+                style={{ marginBottom: "8px" }}
+              />
+                
+              {/* Single import button */}
+              <button
+                type="button"
+                onClick={handleQrImport}
+                disabled={qrLoading}
+                style={{
+                  cursor: qrLoading ? "not-allowed" : "pointer",
+                  opacity: qrLoading ? 0.7 : 1,
+                  width: "100%",
+                  background: "var(--gold)",
+                  color: "white",
+                  padding: "8px",
+                  border: "none",
+                  borderRadius: "4px",
+                }}
+              >
+                {qrLoading
+                  ? lang === "sk"
+                  ? "Spracovávam..."
+                  : "Processing..."
+                  : lang === "sk"
+                  ? "Importovať z QR"
+                  : "Import from QR"}
+              </button>
+                
+              {/* Success/Error messages */}
+              {qrSuccess && (
+                <div style={{ marginTop: "8px", color: "#2e7d32", fontSize: "13px" }}>
+                  {qrSuccess}
                 </div>
+              )}
+              {qrError && (
+                <div style={{ marginTop: "8px", color: "#e53935", fontSize: "13px" }}>
+                  {qrError}
+                </div>
+              )}
+            </div>
                 <div className="import-card" draggable="true">
                   <strong><T sk="PDF alebo JSON" en="PDF or JSON" /></strong>
                   <p><T sk="Importujte súbor z eKasa"

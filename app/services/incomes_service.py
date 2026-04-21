@@ -9,8 +9,7 @@ from app.validators.common_validators import validate_month_year_filter
 from app.validators.income_validators import validate_income_create_data, validate_income_update_data
 
 
-#TODO Add user filtering.
-def get_all_incomes(year: int | None = None, month: int | None = None):
+def get_all_incomes(year: int | None = None, month: int | None = None, user_id: uuid.UUID | None = None):
     """
     Get all incomes.
 
@@ -32,6 +31,8 @@ def get_all_incomes(year: int | None = None, month: int | None = None):
         }
     """
     query = db.session.query(Income)
+    if user_id is not None:
+        query = query.filter(Income.user_id == user_id)
 
     start, end, err, status = validate_month_year_filter(year, month)
     if err:
@@ -103,7 +104,7 @@ def _load_tag_for_income(user_id: uuid.UUID, raw_tag_id: str | None):
     return tag, None, None
 
 
-def create_income(data: dict):
+def create_income(data: dict, user_id: uuid.UUID | None = None):
     try:
         validated, err, status = validate_income_create_data(data)
         if err:
@@ -141,10 +142,12 @@ def create_income(data: dict):
         db.session.rollback()
         return {"error": str(e)}, 400
 
-#TODO use _get_income_for_user()
-def get_income_by_id(income_id: uuid.UUID):
+
+def get_income_by_id(income_id: uuid.UUID, user_id: uuid.UUID | None = None):
     income = db.session.get(Income, income_id)
     if not income:
+        return {"error": "Income not found"}, 404
+    if user_id is not None and income.user_id != user_id:
         return {"error": "Income not found"}, 404
 
     return {
@@ -158,11 +161,13 @@ def get_income_by_id(income_id: uuid.UUID):
         "extra_metadata": income.extra_metadata
     }, 200
 
-#TODO use _get_income_for_user()
-def update_income(income_id: uuid.UUID, data: dict):
+
+def update_income(income_id: uuid.UUID, data: dict, user_id: uuid.UUID | None = None):
     try:
         income = db.session.get(Income, income_id)
         if not income:
+            return {"error": "Income not found"}, 404
+        if user_id is not None and income.user_id != user_id:
             return {"error": "Income not found"}, 404
 
         validated, err, status = validate_income_update_data(data)
@@ -207,10 +212,12 @@ def update_income(income_id: uuid.UUID, data: dict):
         db.session.rollback()
         return {"error": str(e)}, 400
 
-#TODO use _get_income_for_user()
-def delete_income(income_id: uuid.UUID):
+
+def delete_income(income_id: uuid.UUID, user_id: uuid.UUID | None = None):
     income = db.session.get(Income, income_id)
     if not income:
+        return {"error": "Income not found"}, 404
+    if user_id is not None and income.user_id != user_id:
         return {"error": "Income not found"}, 404
 
     try:
@@ -226,15 +233,3 @@ def delete_income(income_id: uuid.UUID):
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
-
-
-# TODO: Use this method to ensure that users only have access to their own income and prevent them from using other users' income.
-def _get_income_for_user(income_id: uuid.UUID, user_id: uuid.UUID):
-    income = db.session.get(Income, income_id)
-    if not income:
-        return None, {"error": "Income not found"}, 404
-
-    if income.user_id != user_id:
-        return None, {"error": "Forbidden"}, 403
-
-    return income, None, None
