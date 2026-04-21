@@ -10,7 +10,7 @@ from datetime import date, datetime
 from app.services import tags_service, ekasa_service
 
 
-def get_all_receipts(year: int | None = None, month: int | None = None):
+def get_all_receipts(year: int | None = None, month: int | None = None, user_id: uuid.UUID | None = None):
     """
     Get all receipts.
 
@@ -31,6 +31,8 @@ def get_all_receipts(year: int | None = None, month: int | None = None):
         ]
     """
     query = db.session.query(Receipt)
+    if user_id is not None:
+        query = query.filter(Receipt.user_id == user_id)
 
     # Filter by month/year (both must be provided together)
     if (year is None) ^ (month is None):
@@ -124,12 +126,13 @@ def _load_tag_for_user(user_id: uuid.UUID, raw_tag_id: str | None):
 
 
 
-def create_receipt(data: dict):
+def create_receipt(data: dict, user_id: uuid.UUID | None = None):
     try:
         # user_id
-        user_id, err, status = _parse_user_id(data.get("user_id"))
-        if err:
-            return err, status
+        if user_id is None:
+            user_id, err, status = _parse_user_id(data.get("user_id"))
+            if err:
+                return err, status
 
         # tag (optional, but must belong to user)
         tag, err, status = _load_tag_for_user(user_id, data.get("tag_id"))
@@ -175,9 +178,11 @@ def create_receipt(data: dict):
         return {"error": str(e)}, 400
 
 
-def get_receipt_by_id(receipt_id: uuid.UUID):
+def get_receipt_by_id(receipt_id: uuid.UUID, user_id: uuid.UUID | None = None):
     receipt = db.session.get(Receipt, receipt_id)
     if not receipt:
+        return {"error": "Receipt not found"}, 404
+    if user_id is not None and receipt.user_id != user_id:
         return {"error": "Receipt not found"}, 404
 
     return {
@@ -195,10 +200,12 @@ def get_receipt_by_id(receipt_id: uuid.UUID):
     }, 200
 
 
-def update_receipt(receipt_id: uuid.UUID, data: dict):
+def update_receipt(receipt_id: uuid.UUID, data: dict, user_id: uuid.UUID | None = None):
     try:
         receipt = db.session.get(Receipt, receipt_id)
         if not receipt:
+            return {"error": "Receipt not found"}, 404
+        if user_id is not None and receipt.user_id != user_id:
             return {"error": "Receipt not found"}, 404
 
         # Track old tag for proper counter/type updates
@@ -260,9 +267,11 @@ def update_receipt(receipt_id: uuid.UUID, data: dict):
         return {"error": str(e)}, 400
 
 
-def delete_receipt(receipt_id: uuid.UUID):
+def delete_receipt(receipt_id: uuid.UUID, user_id: uuid.UUID | None = None):
     receipt = db.session.get(Receipt, receipt_id)
     if not receipt:
+        return {"error": "Receipt not found"}, 404
+    if user_id is not None and receipt.user_id != user_id:
         return {"error": "Receipt not found"}, 404
 
     try:
@@ -281,7 +290,7 @@ def delete_receipt(receipt_id: uuid.UUID):
         return {"error": str(e)}, 400
 
 
-def import_receipt_from_ekasa(receipt_id: str, user_id: str):
+def import_receipt_from_ekasa(receipt_id: str, user_id: str | uuid.UUID):
     """Fetch receipt data from eKasa API and store it in local DB."""
     try:
         ekasa_data = ekasa_service.fetch_receipt_data(receipt_id)
@@ -294,7 +303,7 @@ def import_receipt_from_ekasa(receipt_id: str, user_id: str):
         issue_date = datetime.strptime(r["issueDate"], "%d.%m.%Y %H:%M:%S").date()
         total_price = float(r.get("totalPrice", 0))
 
-        user_uuid = uuid.UUID(user_id)
+        user_uuid = user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(str(user_id))
 
         tag = None
         if org_data:

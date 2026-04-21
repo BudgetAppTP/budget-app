@@ -7,7 +7,7 @@ from app.models import Income, Tag
 from app.services import tags_service
 
 
-def get_all_incomes(year: int | None = None, month: int | None = None):
+def get_all_incomes(year: int | None = None, month: int | None = None, user_id: uuid.UUID | None = None):
     """
     Get all incomes.
 
@@ -29,6 +29,8 @@ def get_all_incomes(year: int | None = None, month: int | None = None):
         }
     """
     query = db.session.query(Income)
+    if user_id is not None:
+        query = query.filter(Income.user_id == user_id)
 
     # Filter by month/year (both must be provided together)
     if (year is None) ^ (month is None):
@@ -109,9 +111,9 @@ def _load_tag_for_income(user_id: uuid.UUID, raw_tag_id: str | None):
     return tag, None, None
 
 
-def create_income(data: dict):
+def create_income(data: dict, user_id: uuid.UUID | None = None):
     try:
-        user_id = _parse_user_id(data.get("user_id"))
+        user_id = user_id or _parse_user_id(data.get("user_id"))
 
         tag, err, status = _load_tag_for_income(user_id, data.get("tag_id"))
         if err:
@@ -147,9 +149,11 @@ def create_income(data: dict):
         return {"error": str(e)}, 400
 
 
-def get_income_by_id(income_id: uuid.UUID):
+def get_income_by_id(income_id: uuid.UUID, user_id: uuid.UUID | None = None):
     income = db.session.get(Income, income_id)
     if not income:
+        return {"error": "Income not found"}, 404
+    if user_id is not None and income.user_id != user_id:
         return {"error": "Income not found"}, 404
 
     return {
@@ -164,10 +168,12 @@ def get_income_by_id(income_id: uuid.UUID):
     }, 200
 
 
-def update_income(income_id: uuid.UUID, data: dict):
+def update_income(income_id: uuid.UUID, data: dict, user_id: uuid.UUID | None = None):
     try:
         income = db.session.get(Income, income_id)
         if not income:
+            return {"error": "Income not found"}, 404
+        if user_id is not None and income.user_id != user_id:
             return {"error": "Income not found"}, 404
 
         old_tag = income.tag
@@ -216,9 +222,11 @@ def update_income(income_id: uuid.UUID, data: dict):
         return {"error": str(e)}, 400
 
 
-def delete_income(income_id: uuid.UUID):
+def delete_income(income_id: uuid.UUID, user_id: uuid.UUID | None = None):
     income = db.session.get(Income, income_id)
     if not income:
+        return {"error": "Income not found"}, 404
+    if user_id is not None and income.user_id != user_id:
         return {"error": "Income not found"}, 404
 
     try:

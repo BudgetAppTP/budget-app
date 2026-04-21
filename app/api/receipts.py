@@ -14,7 +14,7 @@ Notes:
 """
 import uuid
 
-from flask import request
+from flask import request, g
 from app.api import bp, make_response
 from app.services import receipts_service, tags_service
 
@@ -82,7 +82,11 @@ def api_receipts_list():
     except ValueError:
         return make_response({"error": "Invalid year/month format"}, None, 400)
 
-    data, status = receipts_service.get_all_receipts(year=year, month=month)
+    data, status = receipts_service.get_all_receipts(
+        year=year,
+        month=month,
+        user_id=g.current_user.id,
+    )
     if status != 200:
         return make_response(data, None, status)
     try:
@@ -126,16 +130,7 @@ def api_expense_tags_list():
             { "error": "Invalid user_id format" }
           error: null
     """
-    raw_user_id = request.args.get("user_id")
-    user_id = None
-
-    if raw_user_id:
-        try:
-            user_id = uuid.UUID(raw_user_id)
-        except ValueError:
-            return make_response({"error": "Invalid user_id format"}, None, 400)
-
-    data, status = tags_service.get_expense_tags(user_id=user_id)
+    data, status = tags_service.get_expense_tags(user_id=g.current_user.id)
     return make_response(data, None, status)
 
 
@@ -187,7 +182,7 @@ def api_receipts_create():
     payload = request.get_json() or {}
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = receipts_service.create_receipt(payload)
+    response, status = receipts_service.create_receipt(payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -225,7 +220,7 @@ def api_receipts_get(receipt_id):
           }
         error: null
     """
-    receipt, status = receipts_service.get_receipt_by_id(receipt_id)
+    receipt, status = receipts_service.get_receipt_by_id(receipt_id, user_id=g.current_user.id)
     return make_response(receipt, None, status)
 
 
@@ -284,7 +279,7 @@ def api_receipts_update(receipt_id):
     payload = request.get_json() or {}
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = receipts_service.update_receipt(receipt_id, payload)
+    response, status = receipts_service.update_receipt(receipt_id, payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -312,7 +307,7 @@ def api_receipts_delete(receipt_id):
           }
         error: null
     """
-    response, status = receipts_service.delete_receipt(receipt_id)
+    response, status = receipts_service.delete_receipt(receipt_id, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 @bp.post("/receipts/import-ekasa", strict_slashes=False)
@@ -361,18 +356,17 @@ def api_receipts_import_ekasa():
     payload = request.get_json() or {}
 
     # Basic validation of required fields
-    if "receiptId" not in payload or "user_id" not in payload:
+    if "receiptId" not in payload:
         return make_response(
             None,
-            {"code": "bad_request", "message": "Missing receiptId or user_id"},
+            {"code": "bad_request", "message": "Missing receiptId"},
             400,
         )
 
     receipt_id = payload["receiptId"]
-    user_id = payload["user_id"]
 
     service_payload, status = receipts_service.import_receipt_from_ekasa(
-        receipt_id, user_id
+        receipt_id, g.current_user.id
     )
 
     # receipts_service.import_receipt_from_ekasa returns (payload, status)
@@ -455,14 +449,6 @@ def api_receipts_ekasa_items():
     month_raw = request.args.get("month")
 
     # optional user filter
-    raw_user_id = request.args.get("user_id")
-    user_id = None
-    if raw_user_id:
-        try:
-            user_id = uuid.UUID(raw_user_id)
-        except ValueError:
-            return make_response({"error": "Invalid user_id format"}, None, 400)
-
     # Parse year/month (both optional, но должны быть вместе)
     year = None
     month = None
@@ -474,5 +460,5 @@ def api_receipts_ekasa_items():
     except ValueError:
         return make_response({"error": "Invalid year/month format"}, None, 400)
 
-    data, status = receipts_service.get_ekasa_items(year=year, month=month, user_id=user_id)
+    data, status = receipts_service.get_ekasa_items(year=year, month=month, user_id=g.current_user.id)
     return make_response(data, None, status)

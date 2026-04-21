@@ -16,7 +16,7 @@ Actual API returns the same payload in "data" field:
 """
 import uuid
 
-from flask import request
+from flask import request, g
 from app.api import bp, make_response
 from app.services import incomes_service, tags_service
 
@@ -73,7 +73,11 @@ def api_incomes_list():
     except ValueError:
         return make_response({"error": "Invalid year/month format"}, None, 400)
 
-    data, status = incomes_service.get_all_incomes(year=year, month=month)
+    data, status = incomes_service.get_all_incomes(
+        year=year,
+        month=month,
+        user_id=g.current_user.id,
+    )
 
     if status != 200:
         return make_response(data, None, status)
@@ -125,7 +129,7 @@ def api_incomes_create():
         error: null
     """
     payload = request.get_json(force=True) or {}
-    response, status = incomes_service.create_income(payload)
+    response, status = incomes_service.create_income(payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -160,7 +164,7 @@ def api_incomes_get(income_id):
           }
         error: null
     """
-    response, status = incomes_service.get_income_by_id(income_id)
+    response, status = incomes_service.get_income_by_id(income_id, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -216,7 +220,7 @@ def api_incomes_update(income_id):
     payload = request.get_json() or {}
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
-    response, status = incomes_service.update_income(income_id, payload)
+    response, status = incomes_service.update_income(income_id, payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -244,7 +248,7 @@ def api_incomes_delete(income_id):
           }
         error: null
     """
-    response, status = incomes_service.delete_income(income_id)
+    response, status = incomes_service.delete_income(income_id, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -281,14 +285,5 @@ def api_income_tags_list():
             { "error": "Invalid user_id format" }
           error: null
     """
-    raw_user_id = request.args.get("user_id")
-    user_id = None
-
-    if raw_user_id:
-        try:
-            user_id = uuid.UUID(raw_user_id)
-        except ValueError:
-            return make_response({"error": "Invalid user_id format"}, None, 400)
-
-    data, status = tags_service.get_income_tags(user_id=user_id)
+    data, status = tags_service.get_income_tags(user_id=g.current_user.id)
     return make_response(data, None, status)

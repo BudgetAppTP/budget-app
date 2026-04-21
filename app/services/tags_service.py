@@ -77,7 +77,7 @@ def register_tag_unassigned(tag: Tag) -> None:
 # corresponding API endpoints. They complement the existing helper functions
 # above without affecting legacy behavior.
 
-def get_tags_by_type(tag_type: TagType) -> Tuple[Dict[str, Any], int]:
+def get_tags_by_type(tag_type: TagType, user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
     """
     Retrieve all tags filtered by type.
 
@@ -94,7 +94,10 @@ def get_tags_by_type(tag_type: TagType) -> Tuple[Dict[str, Any], int]:
     """
     if tag_type not in (TagType.INCOME, TagType.EXPENSE):
         return {"error": "Invalid tag type"}, 400
-    tags = db.session.query(Tag).all()
+    query = db.session.query(Tag)
+    if user_id is not None:
+        query = query.filter(Tag.user_id == user_id)
+    tags = query.all()
     items: List[Dict[str, Any]] = []
     for t in tags:
         if t.type == tag_type or t.type == TagType.BOTH:
@@ -108,7 +111,7 @@ def get_tags_by_type(tag_type: TagType) -> Tuple[Dict[str, Any], int]:
     return {"tags": items, "count": len(items)}, 200
 
 
-def create_tag(data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
+def create_tag(data: Dict[str, Any], user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
     """
     Create a new tag for a user.
 
@@ -126,13 +129,16 @@ def create_tag(data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
     """
     import uuid
     try:
-        raw_user_id = data.get("user_id")
-        if not raw_user_id:
-            return {"error": "Missing user_id"}, 400
-        try:
-            user_uuid = uuid.UUID(str(raw_user_id))
-        except Exception:
-            return {"error": "Invalid user_id format"}, 400
+        if user_id is not None:
+            user_uuid = user_id
+        else:
+            raw_user_id = data.get("user_id")
+            if not raw_user_id:
+                return {"error": "Missing user_id"}, 400
+            try:
+                user_uuid = uuid.UUID(str(raw_user_id))
+            except Exception:
+                return {"error": "Invalid user_id format"}, 400
         name = (data.get("name") or "").strip()
         if not name:
             return {"error": "Tag name cannot be empty"}, 400
@@ -153,7 +159,7 @@ def create_tag(data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
         return {"error": str(e)}, 400
 
 
-def update_tag(tag_id: uuid.UUID, data: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
+def update_tag(tag_id: uuid.UUID, data: Dict[str, Any], user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
     """
     Update an existing tag.
 
@@ -172,6 +178,8 @@ def update_tag(tag_id: uuid.UUID, data: Dict[str, Any]) -> Tuple[Dict[str, Any],
     import uuid
     tag = db.session.get(Tag, tag_id)
     if not tag:
+        return {"error": "Tag not found"}, 404
+    if user_id is not None and tag.user_id != user_id:
         return {"error": "Tag not found"}, 404
     try:
         if "name" in data:
@@ -200,7 +208,7 @@ def update_tag(tag_id: uuid.UUID, data: Dict[str, Any]) -> Tuple[Dict[str, Any],
         return {"error": str(e)}, 400
 
 
-def delete_tag(tag_id: uuid.UUID) -> Tuple[Dict[str, Any], int]:
+def delete_tag(tag_id: uuid.UUID, user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
     """
     Delete a tag.
 
@@ -217,6 +225,8 @@ def delete_tag(tag_id: uuid.UUID) -> Tuple[Dict[str, Any], int]:
     import uuid
     tag = db.session.get(Tag, tag_id)
     if not tag:
+        return {"error": "Tag not found"}, 404
+    if user_id is not None and tag.user_id != user_id:
         return {"error": "Tag not found"}, 404
     try:
         # detach tag from incomes
