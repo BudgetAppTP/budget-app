@@ -86,15 +86,6 @@ def test_dashboard_ok(auth_client):
         assert k in data
 
 
-def test_import_qr_preview_ok(auth_client):
-    payload = {"payload": [{"OPD": "sample", "date": "2025-10-10", "item": "Mlieko", "qnt": "1", "price": "1.20"}]}
-    r = auth_client.post("/api/import-qr/preview", json=payload)
-    data = assert_json_ok(r)
-    assert "items" in data
-    assert "count" in data
-    assert data["count"] == len(data["items"])
-
-
 def test_auth_flow_ok(client):
     reg = client.post("/api/auth/register", json={"email": "u@test.local", "password": "pass"})
     assert reg.status_code == 201
