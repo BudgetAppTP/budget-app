@@ -187,7 +187,7 @@ def _resolve_account_for_user(
 
 
 
-def create_receipt(data: dict):
+def create_receipt(data: dict, user_id: uuid.UUID | None = None):
     try:
         validated, err, status = validate_receipt_create_data(data)
         if err:
