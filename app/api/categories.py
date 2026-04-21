@@ -3,6 +3,7 @@ Categories API
 
 Paths (Swagger-aligned):
   - GET    /api/categories/      (list)   [strict_slashes=False]
+  - GET    /api/categories/monthly-limit  (spent vs limit by month/category)
   - POST   /api/categories/      (create)
   - PUT    /api/categories/{id}  (update)
   - DELETE /api/categories/{id}  (delete)
@@ -13,6 +14,8 @@ Swagger examples show raw JSON objects like:
 Actual API returns the same payload in "data" field:
   { "data": { "success": true, "categories": [...] }, "error": null }
 """
+
+import uuid
 
 from flask import request
 
@@ -51,7 +54,8 @@ def create_category():
       {
         "user_id": "<uuid>",
         "parent_id": "<uuid|null>",
-        "name": "Groceries"
+        "name": "Groceries",
+        "limit": 150.0
       }
 
     Responses:
@@ -68,6 +72,39 @@ def create_category():
     return make_response(response, None, status)
 
 
+@bp.get("/categories/monthly-limit", strict_slashes=False)
+def get_category_monthly_limit():
+    """
+    GET /api/categories/monthly-limit
+    Summary: Get spent and configured limit for one category in one month
+
+    Query:
+      - year: int (required)
+      - month: int 1..12 (required)
+      - category_id: uuid (required)
+    """
+    year_raw = request.args.get("year")
+    month_raw = request.args.get("month")
+    category_raw = request.args.get("category_id")
+
+    if year_raw is None or month_raw is None or not category_raw:
+        return make_response({"error": "Missing required query params: year, month, category_id"}, None, 400)
+
+    try:
+        year = int(year_raw)
+        month = int(month_raw)
+    except ValueError:
+        return make_response({"error": "Invalid year/month format"}, None, 400)
+
+    try:
+        category_id = uuid.UUID(category_raw)
+    except ValueError:
+        return make_response({"error": "Invalid category_id format"}, None, 400)
+
+    data, status = categories_service.get_category_monthly_limit(category_id=category_id, year=year, month=month)
+    return make_response(data, None, status)
+
+
 @bp.put("/categories/<uuid:category_id>", strict_slashes=False)
 def update_category(category_id):
     """
@@ -81,7 +118,8 @@ def update_category(category_id):
       {
         "name": "Updated name",
         "is_pinned": true,
-        "count": 3
+        "count": 3,
+        "limit": 200.0
       }
 
     Responses:
