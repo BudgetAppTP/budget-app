@@ -4,10 +4,19 @@ from app.extensions import db
 from app.models import Receipt, ReceiptItem
 from app.models.category import Category
 
-def get_items_by_receipt(receipt_id: uuid.UUID):
+def _load_owned_receipt(receipt_id: uuid.UUID, user_id: uuid.UUID | None = None):
     receipt = db.session.get(Receipt, receipt_id)
     if not receipt:
-        return {"error": "Receipt not found"}, 404
+        return None, {"error": "Receipt not found"}, 404
+    if user_id is not None and receipt.user_id != user_id:
+        return None, {"error": "Receipt not found"}, 404
+    return receipt, None, None
+
+
+def get_items_by_receipt(receipt_id: uuid.UUID, user_id: uuid.UUID | None = None):
+    receipt, error, status = _load_owned_receipt(receipt_id, user_id=user_id)
+    if error:
+        return error, status
 
     items = db.session.query(ReceiptItem).filter_by(receipt_id=receipt_id).all()
     result = []
@@ -26,11 +35,11 @@ def get_items_by_receipt(receipt_id: uuid.UUID):
     return result, 200
 
 
-def create_item(receipt_id: uuid.UUID, data: dict):
+def create_item(receipt_id: uuid.UUID, data: dict, user_id: uuid.UUID | None = None):
     try:
-        receipt = db.session.get(Receipt, receipt_id)
-        if not receipt:
-            return {"error": "Receipt not found"}, 404
+        receipt, error, status = _load_owned_receipt(receipt_id, user_id=user_id)
+        if error:
+            return error, status
 
         item = ReceiptItem(
             receipt_id=receipt.id,
@@ -56,7 +65,11 @@ def create_item(receipt_id: uuid.UUID, data: dict):
         return {"error": str(e)}, 400
 
 
-def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict):
+def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict, user_id: uuid.UUID | None = None):
+    receipt, error, status = _load_owned_receipt(receipt_id, user_id=user_id)
+    if error:
+        return error, status
+
     item = db.session.query(ReceiptItem).filter_by(id=item_id, receipt_id=receipt_id).first()
     if not item:
         return {"error": "Item not found"}, 404
@@ -99,7 +112,11 @@ def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict):
         return {"error": str(e)}, 400
 
 
-def delete_item(receipt_id: uuid.UUID, item_id: uuid.UUID):
+def delete_item(receipt_id: uuid.UUID, item_id: uuid.UUID, user_id: uuid.UUID | None = None):
+    receipt, error, status = _load_owned_receipt(receipt_id, user_id=user_id)
+    if error:
+        return error, status
+
     item = db.session.query(ReceiptItem).filter_by(id=item_id, receipt_id=receipt_id).first()
     if not item:
         return {"error": "Item not found"}, 404

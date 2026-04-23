@@ -1,11 +1,7 @@
 VENV_DIRS := .venv venv
 
-# Detect existing virtual environment
-define detect_venv
-$(shell for d in $(VENV_DIRS); do if [ -d "$$d" ]; then echo $$d; exit; fi; done)
-endef
-
-VENV_DIR := $(strip $(call detect_venv))
+# Detect existing virtual environment without relying on a platform-specific shell.
+VENV_DIR := $(firstword $(foreach d,$(VENV_DIRS),$(if $(wildcard $(d)),$(d))))
 
 ifeq ($(VENV_DIR),)
     VENV_DIR := .venv
@@ -13,9 +9,11 @@ endif
 
 # Normalize paths and executables by OS
 ifeq ($(OS),Windows_NT)
+    SHELL := cmd.exe
+    .SHELLFLAGS := /C
     PYTHON := python
-    PYTHON_VENV := $(VENV_DIR)/Scripts/python.exe
-    PIP_VENV := $(VENV_DIR)/Scripts/pip.exe
+    PYTHON_VENV := $(VENV_DIR)\Scripts\python.exe
+    PIP_VENV := $(VENV_DIR)\Scripts\pip.exe
 else
     PYTHON := python3
     PYTHON_VENV := $(VENV_DIR)/bin/python
@@ -31,6 +29,17 @@ run:
 # Create or reuse venv
 .PHONY: venv
 venv:
+ifeq ($(OS),Windows_NT)
+	@if not exist "$(PYTHON_VENV)" ( \
+		echo Creating virtual environment ($(VENV_DIR))... && \
+		"$(PYTHON)" -m venv "$(VENV_DIR)" && \
+		"$(PYTHON_VENV)" -m pip install --upgrade pip \
+	) else ( \
+		echo Using existing virtual environment ($(VENV_DIR)) \
+	)
+	@echo Installing dependencies...
+	"$(PIP_VENV)" install -r requirements.txt
+else
 	@if [ ! -e "$(PYTHON_VENV)" ]; then \
 		echo "Creating virtual environment ($(VENV_DIR))..."; \
 		"$(PYTHON)" -m venv "$(VENV_DIR)"; \
@@ -40,6 +49,7 @@ venv:
 	fi
 	@echo "Installing dependencies..."
 	"$(PIP_VENV)" install -r requirements.txt
+endif
 
 # Run tests
 .PHONY: test

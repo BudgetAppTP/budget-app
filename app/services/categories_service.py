@@ -3,17 +3,17 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import func
+from sqlalchemy import or_
 
 from app.extensions import db
 from app.models import Category, Receipt, ReceiptItem
 
-def get_all_categories():
+def get_all_categories(user_id: uuid.UUID | None = None):
     # Order pinned categories first, then unpinned; within each group sort by usage count (highest first)
-    categories = (
-        db.session.query(Category)
-        .order_by(Category.is_pinned.desc(), Category.count.desc())
-        .all()
-    )
+    query = db.session.query(Category)
+    if user_id is not None:
+        query = query.filter(or_(Category.user_id == user_id, Category.user_id.is_(None)))
+    categories = query.order_by(Category.is_pinned.desc(), Category.count.desc()).all()
     result = []
     for category in categories:
         result.append({
@@ -32,12 +32,13 @@ def get_all_categories():
         "categories": result,
     }, 200
 
-def create_category(data: dict):
+def create_category(data: dict, user_id: uuid.UUID | None = None):
     try:
 
-        user_id = data.get("user_id")
-        if isinstance(user_id, str):
-            user_id = uuid.UUID(user_id)
+        if user_id is None:
+            user_id = data.get("user_id")
+            if isinstance(user_id, str):
+                user_id = uuid.UUID(user_id)
 
         parent_id = data.get("parent_id")
         if isinstance(parent_id, str):
@@ -68,10 +69,12 @@ def create_category(data: dict):
         db.session.rollback()
         return {"error": str(e)}, 400
     
-def update_category(category_id: uuid.UUID, data: dict):
+def update_category(category_id: uuid.UUID, data: dict, user_id: uuid.UUID | None = None):
     try:
         category = db.session.get(Category, category_id)
         if not category:
+            return {"error": "Category not found"}, 404
+        if user_id is not None and category.user_id != user_id:
             return {"error": "Category not found"}, 404
         if "name" in data:
             category.name = data["name"]
@@ -89,12 +92,14 @@ def update_category(category_id: uuid.UUID, data: dict):
         return {"error": str(e)}, 400
 
 
-def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int):
+def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int, user_id: uuid.UUID | None = None):
     if month < 1 or month > 12:
         return {"error": "Month must be between 1 and 12"}, 400
 
     category = db.session.get(Category, category_id)
     if not category:
+        return {"error": "Category not found"}, 404
+    if user_id is not None and category.user_id not in (None, user_id):
         return {"error": "Category not found"}, 404
 
     start = date(year, month, 1)
@@ -109,6 +114,8 @@ def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int):
             Receipt.issue_date < end,
         )
     )
+    if user_id is not None:
+        spent_q = spent_q.filter(Receipt.user_id == user_id)
 
     spent = round(float(spent_q.scalar() or 0), 2)
 
@@ -120,9 +127,11 @@ def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int):
         "limit": float(category.limit) if category.limit is not None else None,
     }, 200
     
-def delete_category(category_id: uuid.UUID):
+def delete_category(category_id: uuid.UUID, user_id: uuid.UUID | None = None):
     category = db.session.get(Category, category_id)
     if not category:
+        return {"error": "Category not found"}, 404
+    if user_id is not None and category.user_id != user_id:
         return {"error": "Category not found"}, 404
     try:
         db.session.delete(category)
