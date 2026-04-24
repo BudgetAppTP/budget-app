@@ -3,12 +3,15 @@ Smoke tests for the Budget Tracker application.
 
 These tests verify that the application can start and basic infrastructure works.
 """
-import os
 import uuid
+from datetime import date
+from decimal import Decimal
+
 import pytest
 
 from app import create_app
 from app.extensions import db
+from app.models import Account, Category, Income, Receipt, ReceiptItem, User
 from scripts.seed import main as seed_main
 from config import TestConfig
 
@@ -49,6 +52,14 @@ def assert_json_ok(resp):
     return body["data"]
 
 
+def _get_user(email: str) -> User:
+    return db.session.query(User).filter(User.email == email).one()
+
+
+def _get_main_account(user: User) -> Account:
+    return next(account for account in user.accounts if account.account_type.value == "account")
+
+
 def test_health_ok(client):
     r = client.get("/api/health")
     data = assert_json_ok(r)
@@ -61,14 +72,6 @@ def test_transactions_list_ok(auth_client):
     assert "items" in data
     assert "count" in data
     assert isinstance(data["items"], list)
-
-
-def test_budgets_get_ok(auth_client):
-    r = auth_client.get("/api/budgets?month=2025-10")
-    data = assert_json_ok(r)
-    assert data.get("month") == "2025-10"
-    assert "items" in data
-    assert "left" in data
 
 
 def test_goals_list_ok(client):
@@ -191,10 +194,64 @@ def test_auth_flow_ok(client):
     "/api/export/csv?month=2025-10",
     "/api/export/pdf?month=2025-10",
 ])
-def test_export_ok(auth_client, path):
+def test_export_ok(app, auth_client, path):
+    with app.app_context():
+        user = _get_user("u@test.local")
+        account = _get_main_account(user)
+        groceries = Category(user_id=user.id, name="Groceries", limit=Decimal("99.00"))
+        db.session.add(groceries)
+        db.session.flush()
+
+        income = Income(
+            user_id=user.id,
+            description="Salary",
+            amount=Decimal("1000.00"),
+            income_date=date(2025, 10, 1),
+        )
+        receipt_with_item = Receipt(
+            user_id=user.id,
+            account_id=account.id,
+            description="Store receipt",
+            issue_date=date(2025, 10, 2),
+            total_amount=Decimal("12.34"),
+        )
+        receipt_without_item = Receipt(
+            user_id=user.id,
+            account_id=account.id,
+            description="Parking",
+            issue_date=date(2025, 10, 3),
+            total_amount=Decimal("5.00"),
+        )
+        db.session.add_all([income, receipt_with_item, receipt_without_item])
+        db.session.flush()
+
+        db.session.add(
+            ReceiptItem(
+                receipt_id=receipt_with_item.id,
+                user_id=user.id,
+                category_id=groceries.id,
+                name="Bread",
+                quantity=Decimal("1"),
+                unit_price=Decimal("12.34"),
+                total_price=Decimal("12.34"),
+            )
+        )
+        db.session.commit()
+
     r = auth_client.get(path)
     assert r.status_code == 200
     assert len(r.data) > 0
+
+    if path.endswith("csv?month=2025-10"):
+        csv_body = r.data.decode("utf-8")
+        assert "Salary" in csv_body
+        assert "Bread" in csv_body
+        assert "Parking" in csv_body
+        assert "Groceries" in csv_body
+
+
+def test_app_does_not_register_legacy_services_container(app):
+    assert "services" not in app.extensions
 
 
 def test_private_api_requires_auth(client):

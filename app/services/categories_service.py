@@ -119,7 +119,8 @@ def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int):
         "spent": spent,
         "limit": float(category.limit) if category.limit is not None else None,
     }, 200
-    
+
+
 def delete_category(category_id: uuid.UUID):
     category = db.session.get(Category, category_id)
     if not category:

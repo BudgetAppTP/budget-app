@@ -7,7 +7,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 
 from app.extensions import db, migrate
 from app.services.errors import ServiceError
-from app.services import init_services
+from app.services import init_auth_service
 
 load_dotenv()
 
@@ -36,7 +36,7 @@ def create_app(config_object=None):
 
     db.init_app(flask_app)
     migrate.init_app(flask_app, db)
-    init_services(flask_app)
+    init_auth_service(flask_app)
 
     with flask_app.app_context():
         import app.models
@@ -55,7 +55,6 @@ def _register_api(flask_app: Flask):
     from app.api import bp as api_bp
     import app.api.auth          # noqa: F401
     import app.api.transactions  # noqa: F401
-    import app.api.budgets       # noqa: F401
     import app.api.account       # noqa: F401
     import app.api.goals         # noqa: F401
     import app.api.savings_funds # noqa: F401
@@ -70,7 +69,7 @@ def _register_api(flask_app: Flask):
     import app.api.tags          # noqa: F401
     import app.api.monthly_budget # noqa: F401
     import app.api.categories    # noqa: F401
-    import app.api.analytics
+    import app.api.analytics     # noqa: F401
     flask_app.register_blueprint(api_bp)
 
 

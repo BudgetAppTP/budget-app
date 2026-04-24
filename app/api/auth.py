@@ -35,14 +35,6 @@ def _auth_service():
     """Convenience accessor for the authentication service."""
     return current_app.extensions.get("auth_service")
 
-def _services():
-    """Access the services container for backward compatibility.
-
-    Some controllers rely on the in-memory service container for
-    non-auth logic (transactions, budgets, etc.).
-    """
-    return current_app.extensions.get("services")
-
 
 def _cookie_secure() -> bool:
     return bool(current_app.config.get("SESSION_COOKIE_SECURE") or request.is_secure)
