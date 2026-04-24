@@ -23,6 +23,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
 from app.models import User, AuthToken, EmailVerification
+from app.services.users_service import create_user_with_main_account
 
 
 class AuthService:
@@ -96,14 +97,13 @@ class AuthService:
         if existing is not None:
             raise ValueError("User already exists")
         username = self._derive_username(email_normalized)
-        user = User(
+        user = create_user_with_main_account(
             username=username,
             email=email_normalized,
             password_hash=self.hash_password(password),
             is_verified=False,
+            currency="EUR",
         )
-        db.session.add(user)
-        db.session.flush()
         # Always generate a verification code
         code = self._generate_verification_code()
         expires = datetime.utcnow() + timedelta(minutes=self.VERIFICATION_LIFETIME)
@@ -238,14 +238,13 @@ class AuthService:
             username = self._derive_username(email_normalized)
             random_password = secrets.token_urlsafe(16)
             password_hash = self.hash_password(random_password)
-            user = User(
+            user = create_user_with_main_account(
                 username=username,
                 email=email_normalized,
                 password_hash=password_hash,
                 is_verified=True,
+                currency="EUR",
             )
-            db.session.add(user)
-            db.session.flush()
         else:
             # For an existing user, ensure the account is marked as verified.
             if not user.is_verified:

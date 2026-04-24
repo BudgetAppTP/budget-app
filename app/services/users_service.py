@@ -29,6 +29,26 @@ def _create_main_account_for_user(user_id: uuid.UUID, currency: str = "EUR") -> 
     return account
 
 
+def create_user_with_main_account(
+    *,
+    username: str,
+    email: str,
+    password_hash: str,
+    currency: str = "EUR",
+    is_verified: bool = False,
+) -> User:
+    user = User(
+        username=username,
+        email=email,
+        password_hash=password_hash,
+        is_verified=is_verified,
+    )
+    db.session.add(user)
+    db.session.flush()
+    _create_main_account_for_user(user.id, currency)
+    return user
+
+
 def _ensure_unique_username(base_username: str) -> str:
     username = base_username[:32] or "user"
     exists = db.session.query(User).filter(User.username == username).first()
@@ -52,14 +72,12 @@ def ensure_user_for_auth_register(email: str, password_hash: str, default_curren
 
     local_part = email.split("@", 1)[0].strip().lower().replace(" ", "")
     username = _ensure_unique_username(local_part or f"user_{uuid.uuid4().hex[:8]}")
-    user = User(
+    user = create_user_with_main_account(
         username=username,
         email=email,
         password_hash=password_hash,
+        currency=default_currency,
     )
-    db.session.add(user)
-    db.session.flush()
-    _create_main_account_for_user(user.id, default_currency)
     db.session.commit()
     return user
 
@@ -92,15 +110,12 @@ def create_user(data):
         raise ConflictError("User with this email already exists")
 
     try:
-        new_user = User(
+        new_user = create_user_with_main_account(
             username=validated["username"],
             email=validated["email"],
             password_hash=validated["password_hash"],
+            currency=validated.get("currency", "EUR"),
         )
-
-        db.session.add(new_user)
-        db.session.flush()
-        _create_main_account_for_user(new_user.id, validated.get("currency", "EUR"))
         db.session.commit()
 
         return CreatedResult({"id": str(new_user.id), "message": "User created successfully"})
