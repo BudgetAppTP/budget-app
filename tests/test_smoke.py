@@ -3,6 +3,8 @@ Smoke tests for the Budget Tracker application.
 
 These tests verify that the application can start and basic infrastructure works.
 """
+import io
+import time
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -864,6 +866,54 @@ def test_import_qr_preview_ok(client):
     assert "items" in data
     assert "count" in data
     assert data["count"] == len(data["items"])
+
+
+def test_import_qr_extract_id_missing_image_uses_structured_error(auth_client):
+    resp = auth_client.post("/api/import-qr/extract-id")
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Missing image file"
+
+
+def test_import_qr_extract_id_invalid_extension_uses_structured_error(auth_client):
+    resp = auth_client.post(
+        "/api/import-qr/extract-id",
+        data={"image": (io.BytesIO(b"fake-image"), "receipt.txt")},
+        content_type="multipart/form-data",
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Invalid file type. Please upload an image."
+
+
+def test_import_qr_extract_id_rate_limit_uses_structured_error(auth_client):
+    from app.api import importqr
+
+    remote_addr = "203.0.113.10"
+    key = f"{remote_addr}:api_importqr_extract_id"
+    importqr.rate_limit_store[key] = [time.time()] * 10
+
+    try:
+        resp = auth_client.post(
+            "/api/import-qr/extract-id",
+            data={"image": (io.BytesIO(b"fake-image"), "receipt.png")},
+            content_type="multipart/form-data",
+            environ_overrides={"REMOTE_ADDR": remote_addr},
+        )
+    finally:
+        importqr.rate_limit_store.pop(key, None)
+
+    assert resp.status_code == 429
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "rate_limit_exceeded"
+    assert body["error"]["message"] == "Rate limit exceeded. Try again later."
 
 
 def test_auth_flow_ok(client):

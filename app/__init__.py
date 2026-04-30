@@ -7,7 +7,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 
 from app.extensions import db, migrate
 from app.services.errors import ServiceError
-from app.services import init_auth_service
+from app.services import init_auth_service, init_qr_service
 
 load_dotenv()
 
@@ -37,6 +37,7 @@ def create_app(config_object=None):
     db.init_app(flask_app)
     migrate.init_app(flask_app, db)
     init_auth_service(flask_app)
+    init_qr_service(flask_app)
 
     with flask_app.app_context():
         import app.models

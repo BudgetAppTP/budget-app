@@ -43,3 +43,9 @@ class ConflictError(ServiceError):
     status_code = 409
     default_message = "Conflict"
     code = "conflict"
+
+
+class RateLimitExceededError(ServiceError):
+    status_code = 429
+    default_message = "Rate limit exceeded. Try again later."
+    code = "rate_limit_exceeded"

@@ -4,9 +4,14 @@ import re
 import cv2
 import numpy as np
 
+from app.services.errors import BadRequestError
+from app.services.responses import OkResult
+
 
 class QrService:
     EKASA_PATTERN = r"O-[0-9A-Za-z]{20,}"
+    MAX_FILE_SIZE = 5 * 1024 * 1024
+    ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp"}
 
     def _rotate_variants(self, image):
         return [
@@ -91,10 +96,32 @@ class QrService:
             for rot_label, rotated in self._rotate_variants(variant):
                 receipt_id = self._extract_from_image(rotated)
                 if receipt_id:
-                    print(f"QR found with: {label} + {rot_label}")
                     return receipt_id, None
 
         return None, "QR code not found or does not contain a valid eKasa receipt ID"
 
+    def extract_receipt_id_from_upload(self, uploaded_file):
+        if uploaded_file is None:
+            raise BadRequestError("Missing image file")
 
-qr_service = QrService()
+        if not uploaded_file.filename:
+            raise BadRequestError("Invalid image file")
+
+        uploaded_file.seek(0, 2)
+        size = uploaded_file.tell()
+        uploaded_file.seek(0)
+        if size > self.MAX_FILE_SIZE:
+            raise BadRequestError("File too large. Maximum size is 5MB.")
+
+        filename_lower = uploaded_file.filename.lower()
+        if not any(filename_lower.endswith(ext) for ext in self.ALLOWED_EXTENSIONS):
+            raise BadRequestError("Invalid file type. Please upload an image.")
+
+        receipt_id, error = self.extract_ekasa_id(uploaded_file.stream)
+        if error:
+            raise BadRequestError(error)
+
+        if not receipt_id or len(receipt_id) < 10:
+            raise BadRequestError("Invalid receipt ID extracted")
+
+        return OkResult({"receiptId": receipt_id})
