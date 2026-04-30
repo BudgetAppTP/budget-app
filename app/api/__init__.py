@@ -10,7 +10,10 @@ Notes for Swagger:
 - Some swagger examples show raw JSON. Actual responses are wrapped in the envelope above.
 """
 
+import warnings
+
 from flask import Blueprint, jsonify
+from app.services.responses import OkResult
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -81,7 +84,13 @@ def _enforce_authentication():
 
 def make_response(data=None, error=None, status=200):
     """
-    Make unified API response.
+    Deprecated unified API response helper.
+
+    Deprecated:
+    - Use service-layer result objects such as ``OkResult`` or ``CreatedResult``.
+    - Return ``result.to_flask_response()`` from the route.
+    - Raise ``BadRequestError`` / ``NotFoundError`` from the service layer for
+      error cases instead of building manual error responses in the route.
 
     Returns:
       JSON:
@@ -90,6 +99,16 @@ def make_response(data=None, error=None, status=200):
           "error": {"code": str, "message": str} or null
         }
     """
+    warnings.warn(
+        "app.api.make_response is deprecated. "
+        "Use `from app.services.responses import OkResult` (or another result "
+        "object such as CreatedResult) and return "
+        "`result.to_flask_response()` from the route. For failures, raise "
+        "`BadRequestError` or `NotFoundError` from the service layer instead "
+        "of building manual error responses.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return jsonify({"data": data, "error": error}), status
 
 
@@ -107,4 +126,4 @@ def health():
           }
         error: null
     """
-    return make_response({"status": "ok"})
+    return OkResult({"status": "ok"}).to_flask_response()
