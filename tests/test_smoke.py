@@ -250,6 +250,17 @@ def test_export_ok(app, auth_client, path):
         assert "Groceries" in csv_body
 
 
+def test_export_pdf_invalid_month_returns_bad_request(auth_client):
+    r = auth_client.get("/api/export/pdf?month=2025-13")
+
+    assert r.status_code == 400
+    assert r.is_json
+    body = r.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Month must be between 01 and 12"
+
+
 def test_app_does_not_register_legacy_services_container(app):
     assert "services" not in app.extensions
 

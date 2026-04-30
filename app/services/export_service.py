@@ -14,6 +14,7 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Income, Receipt, ReceiptItem
 from app.services.accounts_service import find_main_account
+from app.services.errors import BadRequestError
 
 
 @dataclass
@@ -31,21 +32,24 @@ class ExportRow:
 
 
 def _parse_month_range(month: Optional[str]) -> tuple[Optional[date], Optional[date]]:
-    if month is None or not str(month).strip():
-        return None, None
+    try:
+        if month is None or not str(month).strip():
+            return None, None
 
-    month = str(month).strip()
-    if not re.fullmatch(r"\d{4}-\d{2}", month):
-        raise ValueError("Invalid month format, expected YYYY-MM")
+        month = str(month).strip()
+        if not re.fullmatch(r"\d{4}-\d{2}", month):
+            raise ValueError("Invalid month format, expected YYYY-MM")
 
-    year = int(month[:4])
-    month_num = int(month[5:7])
-    if month_num < 1 or month_num > 12:
-        raise ValueError("Month must be between 01 and 12")
+        year = int(month[:4])
+        month_num = int(month[5:7])
+        if month_num < 1 or month_num > 12:
+            raise ValueError("Month must be between 01 and 12")
 
-    start = date(year, month_num, 1)
-    end = date(year + 1, 1, 1) if month_num == 12 else date(year, month_num + 1, 1)
-    return start, end
+        start = date(year, month_num, 1)
+        end = date(year + 1, 1, 1) if month_num == 12 else date(year, month_num + 1, 1)
+        return start, end
+    except ValueError as exc:
+        raise BadRequestError(str(exc)) from exc
 
 
 def _income_rows(user_id: uuid.UUID, month: Optional[str], currency: str, account_name: str) -> list[ExportRow]:

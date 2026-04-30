@@ -1,9 +1,22 @@
 """
 Export API
 
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
 Paths:
   - GET /api/export/csv?month=YYYY-MM
   - GET /api/export/pdf?month=YYYY-MM
+
+Schemas:
+  ExportQuery:
+    {
+      "month": "YYYY-MM | omitted"
+    }
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
+  404: {"data": null, "error": {"code": "not_found", "message": str}}
 
 Notes:
 - These endpoints return files (CSV/PDF) directly. No envelope.
@@ -19,8 +32,7 @@ from app.services import export_service
 @bp.get("/export/csv", strict_slashes=False)
 def api_export_csv():
     """
-    GET /api/export/csv?month=YYYY-MM
-    Summary: Export monthly data as CSV
+    Export monthly data as CSV
 
     Query:
       - month: "YYYY-MM" (optional)
@@ -29,6 +41,8 @@ def api_export_csv():
       200:
         Content-Type: text/csv
         Body: binary CSV file
+      400: see module errors
+      404: see module errors
     """
     month = request.args.get("month") or None
     data, name = export_service.export_csv(g.current_user.id, month)
@@ -38,8 +52,7 @@ def api_export_csv():
 @bp.get("/export/pdf", strict_slashes=False)
 def api_export_pdf():
     """
-    GET /api/export/pdf?month=YYYY-MM
-    Summary: Export monthly report as PDF
+    Export monthly report as PDF
 
     Query:
       - month: "YYYY-MM" (optional)
@@ -48,6 +61,8 @@ def api_export_pdf():
       200:
         Content-Type: application/pdf
         Body: binary PDF file
+      400: see module errors
+      404: see module errors
     """
     month = request.args.get("month") or None
     data, name = export_service.export_pdf(g.current_user.id, month)
