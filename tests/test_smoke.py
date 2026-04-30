@@ -11,7 +11,8 @@ import pytest
 
 from app import create_app
 from app.extensions import db
-from app.models import Account, Category, Income, Receipt, ReceiptItem, User
+from app.models import Account, AccountMember, Category, Goal, Income, Receipt, ReceiptItem, SavingsFund, User
+from app.services.users_service import create_user_with_main_account
 from scripts.seed import main as seed_main
 from config import TestConfig
 
@@ -167,6 +168,693 @@ def test_goals_without_mock_header_use_fallback_user(client):
     r = client.get("/api/goals")
     data = assert_json_ok(r)
     assert "warning" not in data
+
+
+def test_goals_list_is_scoped_to_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_{uuid.uuid4().hex[:8]}",
+            email=f"older_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_fund = SavingsFund(
+            name="Auth Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Older Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.flush()
+
+        auth_goal = Goal(
+            user_id=auth_user.id,
+            savings_fund_id=auth_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("20.00"),
+            is_completed=False,
+        )
+        older_goal = Goal(
+            user_id=older_user.id,
+            savings_fund_id=older_fund.id,
+            target_amount=Decimal("999.00"),
+            current_amount=Decimal("111.00"),
+            is_completed=False,
+        )
+        db.session.add_all([auth_goal, older_goal])
+        db.session.commit()
+
+        auth_user_id = str(auth_user.id)
+        auth_goal_id = str(auth_goal.id)
+
+    r = auth_client.get("/api/goals")
+    data = assert_json_ok(r)
+
+    assert data["count"] == 1
+    assert [item["id"] for item in data["items"]] == [auth_goal_id]
+    assert data["items"][0]["user_id"] == auth_user_id
+
+
+def test_goals_create_is_scoped_to_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_{uuid.uuid4().hex[:8]}",
+            email=f"older_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_fund = SavingsFund(
+            name="Auth Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Older Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.commit()
+
+        auth_fund_id = str(auth_fund.id)
+        older_fund_id = str(older_fund.id)
+        auth_user_id = str(auth_user.id)
+
+    allowed_resp = auth_client.post(
+        "/api/goals",
+        json={"savings_fund_id": auth_fund_id, "target_amount": "120.00"},
+    )
+    assert allowed_resp.status_code == 201
+    allowed_body = allowed_resp.get_json()
+    assert allowed_body["data"]["user_id"] == auth_user_id
+    assert allowed_body["data"]["savings_fund_id"] == auth_fund_id
+
+    denied_resp = auth_client.post(
+        "/api/goals",
+        json={"savings_fund_id": older_fund_id, "target_amount": "120.00"},
+    )
+    assert denied_resp.status_code == 404
+    denied_body = denied_resp.get_json()
+    assert denied_body["error"]["message"] == "Savings fund not found"
+
+
+def test_goals_update_allows_authenticated_owner_to_update_own_goal(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        auth_fund = SavingsFund(
+            name="Update Auth Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        db.session.add(auth_fund)
+        db.session.flush()
+
+        db.session.add(AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"))
+        db.session.flush()
+
+        auth_goal = Goal(
+            user_id=auth_user.id,
+            savings_fund_id=auth_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("20.00"),
+            is_completed=False,
+        )
+        db.session.add(auth_goal)
+        db.session.commit()
+
+        auth_goal_id = str(auth_goal.id)
+
+    resp = auth_client.patch(
+        f"/api/goals/{auth_goal_id}",
+        json={"target_amount": "150.00"},
+    )
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"]["id"] == auth_goal_id
+    assert body["data"]["target_amount"] == 150.0
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(auth_goal_id))
+        assert goal is not None
+        assert goal.target_amount == Decimal("150.00")
+
+
+def test_goals_update_rejects_foreign_goal_for_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_{uuid.uuid4().hex[:8]}",
+            email=f"older_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_fund = SavingsFund(
+            name="Update Auth Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Update Older Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.flush()
+
+        foreign_goal = Goal(
+            user_id=older_user.id,
+            savings_fund_id=older_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("20.00"),
+            is_completed=False,
+        )
+        db.session.add(foreign_goal)
+        db.session.commit()
+
+        foreign_goal_id = str(foreign_goal.id)
+        original_target_amount = foreign_goal.target_amount
+
+    resp = auth_client.patch(
+        f"/api/goals/{foreign_goal_id}",
+        json={"target_amount": "150.00"},
+    )
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Goal not found"
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(foreign_goal_id))
+        assert goal is not None
+        assert goal.target_amount == original_target_amount
+
+
+def test_goals_allocate_allows_authenticated_owner_to_update_own_goal(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        auth_fund = SavingsFund(
+            name="Allocate Auth Fund",
+            balance=Decimal("400.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        db.session.add(auth_fund)
+        db.session.flush()
+
+        db.session.add(AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"))
+        db.session.flush()
+
+        auth_goal = Goal(
+            user_id=auth_user.id,
+            savings_fund_id=auth_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("20.00"),
+            is_completed=False,
+        )
+        db.session.add(auth_goal)
+        db.session.commit()
+
+        auth_goal_id = str(auth_goal.id)
+
+    resp = auth_client.post(
+        f"/api/goals/{auth_goal_id}/allocate",
+        json={"delta_amount": "30.00"},
+    )
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"]["id"] == auth_goal_id
+    assert body["data"]["current_amount"] == 50.0
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(auth_goal_id))
+        assert goal is not None
+        assert goal.current_amount == Decimal("50.00")
+
+
+def test_goals_allocate_rejects_foreign_goal_for_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_{uuid.uuid4().hex[:8]}",
+            email=f"older_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_fund = SavingsFund(
+            name="Allocate Auth Fund",
+            balance=Decimal("400.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Allocate Older Fund",
+            balance=Decimal("400.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.flush()
+
+        foreign_goal = Goal(
+            user_id=older_user.id,
+            savings_fund_id=older_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("20.00"),
+            is_completed=False,
+        )
+        db.session.add(foreign_goal)
+        db.session.commit()
+
+        foreign_goal_id = str(foreign_goal.id)
+        original_current_amount = foreign_goal.current_amount
+
+    resp = auth_client.post(
+        f"/api/goals/{foreign_goal_id}/allocate",
+        json={"delta_amount": "30.00"},
+    )
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Goal not found"
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(foreign_goal_id))
+        assert goal is not None
+        assert goal.current_amount == original_current_amount
+
+
+def test_goals_complete_allows_authenticated_owner_to_complete_own_goal(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        auth_fund = SavingsFund(
+            name="Complete Auth Fund",
+            balance=Decimal("400.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        db.session.add(auth_fund)
+        db.session.flush()
+
+        db.session.add(AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"))
+        db.session.flush()
+
+        auth_goal = Goal(
+            user_id=auth_user.id,
+            savings_fund_id=auth_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("120.00"),
+            is_completed=False,
+        )
+        db.session.add(auth_goal)
+        db.session.commit()
+
+        auth_goal_id = str(auth_goal.id)
+        original_balance = auth_fund.balance
+
+    resp = auth_client.post(f"/api/goals/{auth_goal_id}/complete")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"]["id"] == auth_goal_id
+    assert body["data"]["is_completed"] is True
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(auth_goal_id))
+        fund = db.session.get(SavingsFund, goal.savings_fund_id)
+        assert goal is not None
+        assert goal.is_completed is True
+        assert fund is not None
+        assert fund.balance == original_balance - Decimal("120.00")
+
+
+def test_goals_complete_rejects_foreign_goal_for_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_{uuid.uuid4().hex[:8]}",
+            email=f"older_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_fund = SavingsFund(
+            name="Complete Auth Fund",
+            balance=Decimal("400.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Complete Older Fund",
+            balance=Decimal("400.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.flush()
+
+        foreign_goal = Goal(
+            user_id=older_user.id,
+            savings_fund_id=older_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("120.00"),
+            is_completed=False,
+        )
+        db.session.add(foreign_goal)
+        db.session.commit()
+
+        foreign_goal_id = str(foreign_goal.id)
+        original_balance = older_fund.balance
+
+    resp = auth_client.post(f"/api/goals/{foreign_goal_id}/complete")
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Goal not found"
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(foreign_goal_id))
+        fund = db.session.get(SavingsFund, goal.savings_fund_id)
+        assert goal is not None
+        assert goal.is_completed is False
+        assert fund is not None
+        assert fund.balance == original_balance
+
+
+def test_goals_reopen_allows_authenticated_owner_to_reopen_own_goal(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        auth_fund = SavingsFund(
+            name="Reopen Auth Fund",
+            balance=Decimal("280.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        db.session.add(auth_fund)
+        db.session.flush()
+
+        db.session.add(AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"))
+        db.session.flush()
+
+        auth_goal = Goal(
+            user_id=auth_user.id,
+            savings_fund_id=auth_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("120.00"),
+            is_completed=True,
+        )
+        db.session.add(auth_goal)
+        db.session.commit()
+
+        auth_goal_id = str(auth_goal.id)
+        original_balance = auth_fund.balance
+
+    resp = auth_client.post(f"/api/goals/{auth_goal_id}/reopen")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"]["id"] == auth_goal_id
+    assert body["data"]["is_completed"] is False
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(auth_goal_id))
+        fund = db.session.get(SavingsFund, goal.savings_fund_id)
+        assert goal is not None
+        assert goal.is_completed is False
+        assert fund is not None
+        assert fund.balance == original_balance + Decimal("120.00")
+
+
+def test_goals_reopen_rejects_foreign_goal_for_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_{uuid.uuid4().hex[:8]}",
+            email=f"older_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_fund = SavingsFund(
+            name="Reopen Auth Fund",
+            balance=Decimal("400.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Reopen Older Fund",
+            balance=Decimal("280.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.flush()
+
+        foreign_goal = Goal(
+            user_id=older_user.id,
+            savings_fund_id=older_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("120.00"),
+            is_completed=True,
+        )
+        db.session.add(foreign_goal)
+        db.session.commit()
+
+        foreign_goal_id = str(foreign_goal.id)
+        original_balance = older_fund.balance
+
+    resp = auth_client.post(f"/api/goals/{foreign_goal_id}/reopen")
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Goal not found"
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(foreign_goal_id))
+        fund = db.session.get(SavingsFund, goal.savings_fund_id)
+        assert goal is not None
+        assert goal.is_completed is True
+        assert fund is not None
+        assert fund.balance == original_balance
+
+
+def test_goals_delete_allows_authenticated_owner_to_delete_own_goal(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        auth_fund = SavingsFund(
+            name="Delete Auth Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        db.session.add(auth_fund)
+        db.session.flush()
+
+        db.session.add(AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"))
+        db.session.flush()
+
+        auth_goal = Goal(
+            user_id=auth_user.id,
+            savings_fund_id=auth_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("0.00"),
+            is_completed=False,
+        )
+        db.session.add(auth_goal)
+        db.session.commit()
+
+        auth_goal_id = str(auth_goal.id)
+
+    resp = auth_client.delete(f"/api/goals/{auth_goal_id}")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"] == {"id": auth_goal_id}
+
+    with app.app_context():
+        assert db.session.get(Goal, uuid.UUID(auth_goal_id)) is None
+
+
+def test_goals_delete_rejects_foreign_goal_for_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_{uuid.uuid4().hex[:8]}",
+            email=f"older_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_fund = SavingsFund(
+            name="Delete Auth Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Delete Older Fund",
+            balance=Decimal("0.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.flush()
+
+        foreign_goal = Goal(
+            user_id=older_user.id,
+            savings_fund_id=older_fund.id,
+            target_amount=Decimal("120.00"),
+            current_amount=Decimal("0.00"),
+            is_completed=False,
+        )
+        db.session.add(foreign_goal)
+        db.session.commit()
+
+        foreign_goal_id = str(foreign_goal.id)
+        older_user_id = older_user.id
+
+    resp = auth_client.delete(f"/api/goals/{foreign_goal_id}")
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Goal not found"
+
+    with app.app_context():
+        goal = db.session.get(Goal, uuid.UUID(foreign_goal_id))
+        assert goal is not None
+        assert goal.user_id == older_user_id
 
 
 def test_import_qr_preview_ok(client):
