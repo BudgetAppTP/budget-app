@@ -284,6 +284,460 @@ def test_user_cannot_access_another_users_income(client, app):
     assert resp.status_code == 404
 
 
+def test_categories_list_is_scoped_to_current_user_and_shared_categories(client, app):
+    client.post("/api/auth/register", json={"email": "owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("owner@test.local")
+        other = _get_user("other@test.local")
+        db.session.add_all([
+            Category(user_id=owner.id, name="Owner category", count=2),
+            Category(user_id=other.id, name="Other category", count=5),
+            Category(user_id=None, name="Shared category", count=1),
+        ])
+        db.session.commit()
+
+    login = client.post("/api/auth/login", json={"email": "owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.get("/api/categories")
+    data = assert_json_ok(resp)
+
+    names = {category["name"] for category in data["categories"]}
+    shared_category = next(category for category in data["categories"] if category["name"] == "Shared category")
+    assert "Owner category" in names
+    assert "Shared category" in names
+    assert "Other category" not in names
+    assert shared_category["user_id"] is None
+
+
+def test_create_category_uses_authenticated_user_not_payload_user_id(client, app):
+    client.post("/api/auth/register", json={"email": "owner-create@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "other-create@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("owner-create@test.local")
+        other = _get_user("other-create@test.local")
+
+    login = client.post("/api/auth/login", json={"email": "owner-create@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.post(
+        "/api/categories",
+        json={
+            "user_id": str(other.id),
+            "name": "Created by owner",
+            "limit": 25.5,
+            "count": 99,
+            "is_pinned": True,
+        },
+    )
+
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["error"] is None
+    created_id = uuid.UUID(body["data"]["id"])
+
+    with app.app_context():
+        category = db.session.get(Category, created_id)
+        assert category is not None
+        assert category.user_id == owner.id
+        assert category.user_id != other.id
+        assert category.count == 0
+        assert category.is_pinned is False
+
+
+def test_create_category_rejects_parent_owned_by_another_user(client, app):
+    client.post("/api/auth/register", json={"email": "owner-parent@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "other-parent@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("owner-parent@test.local")
+        other = _get_user("other-parent@test.local")
+        shared_parent = Category(user_id=None, name="Shared parent")
+        foreign_parent = Category(user_id=other.id, name="Foreign parent")
+        db.session.add_all([shared_parent, foreign_parent])
+        db.session.commit()
+        shared_parent_id = shared_parent.id
+        foreign_parent_id = foreign_parent.id
+        owner_id = owner.id
+
+    login = client.post("/api/auth/login", json={"email": "owner-parent@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    allowed = client.post(
+        "/api/categories",
+        json={"name": "Child of shared", "parent_id": str(shared_parent_id)},
+    )
+    assert allowed.status_code == 201
+
+    denied = client.post(
+        "/api/categories",
+        json={"name": "Child of foreign", "parent_id": str(foreign_parent_id)},
+    )
+    assert denied.status_code == 404
+    denied_body = denied.get_json()
+    assert denied_body["data"] is None
+    assert denied_body["error"]["code"] == "not_found"
+    assert denied_body["error"]["message"] == "Parent category not found"
+
+    with app.app_context():
+        created = db.session.query(Category).filter(Category.name == "Child of shared").one()
+        assert created.user_id == owner_id
+        assert created.parent_id == shared_parent_id
+
+
+def test_create_category_missing_json_uses_error_envelope(auth_client):
+    resp = auth_client.post(
+        "/api/categories",
+        data="not-json",
+        content_type="text/plain",
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Missing JSON body"
+
+
+def test_create_category_non_object_json_uses_error_envelope(auth_client):
+    resp = auth_client.post("/api/categories", json=["not", "an", "object"])
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "JSON body must be an object"
+
+
+def test_category_monthly_limit_is_scoped_to_current_user(client, app):
+    client.post("/api/auth/register", json={"email": "limit-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "limit-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("limit-owner@test.local")
+        other = _get_user("limit-other@test.local")
+
+        owner_account = _get_main_account(owner)
+        other_account = _get_main_account(other)
+
+        owner_category = Category(user_id=owner.id, name="Owner limit", limit=Decimal("250.00"))
+        other_category = Category(user_id=other.id, name="Other limit", limit=Decimal("400.00"))
+        db.session.add_all([owner_category, other_category])
+        db.session.flush()
+
+        other_receipt = Receipt(
+            user_id=other.id,
+            account_id=other_account.id,
+            description="Other purchase",
+            issue_date=date(2025, 5, 10),
+            total_amount=Decimal("60.00"),
+        )
+        db.session.add(other_receipt)
+        db.session.flush()
+
+        db.session.add(
+            ReceiptItem(
+                receipt_id=other_receipt.id,
+                user_id=other.id,
+                category_id=other_category.id,
+                name="Hidden item",
+                quantity=Decimal("1"),
+                unit_price=Decimal("60.00"),
+                total_price=Decimal("60.00"),
+            )
+        )
+        db.session.commit()
+
+        owner_category_id = owner_category.id
+        other_category_id = other_category.id
+        owner_account_id = owner_account.id
+        owner_id = owner.id
+
+    login = client.post("/api/auth/login", json={"email": "limit-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    own_resp = client.get(
+        f"/api/categories/monthly-limit?year=2025&month=5&category_id={owner_category_id}"
+    )
+    assert own_resp.status_code == 200
+    own_body = own_resp.get_json()
+    assert own_body["error"] is None
+    assert own_body["data"]["category_id"] == str(owner_category_id)
+    assert own_body["data"]["spent"] == 0.0
+    assert own_body["data"]["limit"] == 250.0
+
+    foreign_resp = client.get(
+        f"/api/categories/monthly-limit?year=2025&month=5&category_id={other_category_id}"
+    )
+    assert foreign_resp.status_code == 404
+    foreign_body = foreign_resp.get_json()
+    assert foreign_body["data"] is None
+    assert foreign_body["error"]["code"] == "not_found"
+    assert foreign_body["error"]["message"] == "Category not found"
+
+    with app.app_context():
+        owner_receipt = Receipt(
+            user_id=owner_id,
+            account_id=owner_account_id,
+            description="Owner purchase",
+            issue_date=date(2025, 5, 11),
+            total_amount=Decimal("35.00"),
+        )
+        db.session.add(owner_receipt)
+        db.session.flush()
+        db.session.add(
+            ReceiptItem(
+                receipt_id=owner_receipt.id,
+                user_id=owner_id,
+                category_id=owner_category_id,
+                name="Visible item",
+                quantity=Decimal("1"),
+                unit_price=Decimal("35.00"),
+                total_price=Decimal("35.00"),
+            )
+        )
+        db.session.commit()
+
+    updated_resp = client.get(
+        f"/api/categories/monthly-limit?year=2025&month=5&category_id={owner_category_id}"
+    )
+    assert updated_resp.status_code == 200
+    updated_body = updated_resp.get_json()
+    assert updated_body["error"] is None
+    assert updated_body["data"]["spent"] == 35.0
+
+
+def test_category_monthly_limit_rejects_out_of_range_year(auth_client):
+    with auth_client.application.app_context():
+        user = _get_user("u@test.local")
+        category = Category(user_id=user.id, name="Year limited")
+        db.session.add(category)
+        db.session.commit()
+        category_id = category.id
+
+    resp = auth_client.get(
+        f"/api/categories/monthly-limit?year=10000&month=5&category_id={category_id}"
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Invalid year/month format"
+
+
+def test_update_category_allows_owner_to_update_own_category(client, app):
+    client.post("/api/auth/register", json={"email": "update-owner@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("update-owner@test.local")
+        category = Category(user_id=owner.id, name="Original", count=1, is_pinned=False, limit=Decimal("10.00"))
+        db.session.add(category)
+        db.session.commit()
+        category_id = category.id
+
+    login = client.post("/api/auth/login", json={"email": "update-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.put(
+        f"/api/categories/{category_id}",
+        json={"name": "Updated", "count": 7, "is_pinned": True, "limit": 25.5},
+    )
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"]["message"] == "Category updated successfully"
+
+    with app.app_context():
+        category = db.session.get(Category, category_id)
+        assert category.name == "Updated"
+        assert category.count == 7
+        assert category.is_pinned is True
+        assert category.limit == Decimal("25.5")
+
+
+def test_update_category_rejects_foreign_category_with_standard_not_found_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "update-foreign-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "update-foreign-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("update-foreign-owner@test.local")
+        other = _get_user("update-foreign-other@test.local")
+        foreign_category = Category(user_id=other.id, name="Foreign update target", count=2)
+        db.session.add(foreign_category)
+        db.session.commit()
+        foreign_category_id = foreign_category.id
+        owner_id = owner.id
+        other_id = other.id
+
+    login = client.post("/api/auth/login", json={"email": "update-foreign-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.put(
+        f"/api/categories/{foreign_category_id}",
+        json={"name": "Hijacked"},
+    )
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Category not found"
+
+    with app.app_context():
+        category = db.session.get(Category, foreign_category_id)
+        assert category is not None
+        assert category.user_id == other_id
+        assert category.user_id != owner_id
+        assert category.name == "Foreign update target"
+
+
+def test_update_category_invalid_input_uses_standard_bad_request_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "update-invalid@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("update-invalid@test.local")
+        category = Category(user_id=owner.id, name="Invalid input target", count=1)
+        db.session.add(category)
+        db.session.commit()
+        category_id = category.id
+
+    login = client.post("/api/auth/login", json={"email": "update-invalid@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.put(
+        f"/api/categories/{category_id}",
+        json={"count": "not-a-number"},
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Invalid input data"
+
+    with app.app_context():
+        category = db.session.get(Category, category_id)
+        assert category.count == 1
+
+
+def test_update_category_rejects_blank_name_and_preserves_existing_name(client, app):
+    client.post("/api/auth/register", json={"email": "update-blank@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("update-blank@test.local")
+        category = Category(user_id=owner.id, name="Still valid", count=1)
+        db.session.add(category)
+        db.session.commit()
+        category_id = category.id
+
+    login = client.post("/api/auth/login", json={"email": "update-blank@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.put(
+        f"/api/categories/{category_id}",
+        json={"name": "   "},
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Missing name"
+
+    with app.app_context():
+        category = db.session.get(Category, category_id)
+        assert category.name == "Still valid"
+
+
+def test_delete_category_allows_owner_to_delete_own_category(client, app):
+    client.post("/api/auth/register", json={"email": "delete-owner@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("delete-owner@test.local")
+        category = Category(user_id=owner.id, name="Delete me")
+        db.session.add(category)
+        db.session.commit()
+        category_id = category.id
+
+    login = client.post("/api/auth/login", json={"email": "delete-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.delete(f"/api/categories/{category_id}")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"]["message"] == "Category deleted successfully"
+
+    with app.app_context():
+        assert db.session.get(Category, category_id) is None
+
+
+def test_delete_category_rejects_foreign_category_with_standard_not_found_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "delete-foreign-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "delete-foreign-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("delete-foreign-owner@test.local")
+        other = _get_user("delete-foreign-other@test.local")
+        foreign_category = Category(user_id=other.id, name="Foreign delete target")
+        db.session.add(foreign_category)
+        db.session.commit()
+        foreign_category_id = foreign_category.id
+        other_id = other.id
+
+    login = client.post("/api/auth/login", json={"email": "delete-foreign-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.delete(f"/api/categories/{foreign_category_id}")
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Category not found"
+
+    with app.app_context():
+        category = db.session.get(Category, foreign_category_id)
+        assert category is not None
+        assert category.user_id == other_id
+
+
+def test_delete_category_rejects_shared_parent_and_preserves_child_categories(client, app):
+    client.post("/api/auth/register", json={"email": "shared-delete-owner@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("shared-delete-owner@test.local")
+        shared_parent = Category(user_id=None, name="Shared delete target")
+        db.session.add(shared_parent)
+        db.session.flush()
+        child = Category(user_id=owner.id, parent_id=shared_parent.id, name="Child survives")
+        db.session.add(child)
+        db.session.commit()
+        shared_parent_id = shared_parent.id
+        child_id = child.id
+
+    login = client.post("/api/auth/login", json={"email": "shared-delete-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.delete(f"/api/categories/{shared_parent_id}")
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Category not found"
+
+    with app.app_context():
+        assert db.session.get(Category, shared_parent_id) is not None
+        assert db.session.get(Category, child_id) is not None
+
+
 def test_app_creates_successfully(app):
     """Test that the application factory creates an app instance."""
     assert app is not None
