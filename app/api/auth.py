@@ -27,6 +27,7 @@ Notes:
 
 from flask import request, current_app, g
 from app.api import bp, make_response, extract_auth_token
+from app.api.request_parsing import parse_json_object_body
 import requests
 from app.utils.auth import login_required
 
@@ -53,7 +54,7 @@ def api_login():
       200: {"data":{"ok":true}, "error":null}
       401: {"data":null,"error":{"code":"auth_failed","message":"Invalid credentials"}}
     """
-    p = request.get_json(silent=True) or {}
+    p = parse_json_object_body()
     email = (p.get("email") or "").strip()
     password = p.get("password", "")
     # Authenticate via the new auth service; returns token string on success
@@ -91,7 +92,7 @@ def api_register():
       400: {"data":null,"error":{"code":"bad_request","message":"email and password required"}}
       409: {"data":null,"error":{"code":"exists","message":"User already exists"}}
     """
-    p = request.get_json(silent=True) or {}
+    p = parse_json_object_body()
     email = (p.get("email") or "").strip()
     password = p.get("password", "")
     if not email or not password:
@@ -122,7 +123,7 @@ def api_verify_email():
     On success the user's ``is_verified`` flag is set and the code is
     marked as used. Subsequent login attempts will then succeed.
     """
-    p = request.get_json(silent=True) or {}
+    p = parse_json_object_body()
     email = (p.get("email") or "").strip()
     code = (p.get("code") or "").strip()
     if not email or not code:
@@ -207,7 +208,7 @@ def api_login_google():
     creates a new one. A session token is returned via the
     ``Set-Cookie`` header on success.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = parse_json_object_body()
     id_token = (payload.get("token") or payload.get("id_token") or "").strip()
     if not id_token:
         return make_response(None, {"code": "bad_request", "message": "token required"}, 400)

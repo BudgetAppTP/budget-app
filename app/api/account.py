@@ -1,6 +1,10 @@
 """
 Account API
 
+Paths:
+  - GET   /api/account
+  - PATCH /api/account
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
@@ -19,10 +23,10 @@ Common errors:
   404: {"data": null, "error": {"code": "not_found", "message": str}}
 """
 
-from flask import g, request
+from flask import g
 
 from app.api import bp
-from app.services.errors import BadRequestError
+from app.api.request_parsing import parse_json_object_body
 from app.services import accounts_service
 
 
@@ -54,12 +58,7 @@ def api_account_patch():
       404: see module errors
     """
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True)
-
-    if payload_in is None:
-        raise BadRequestError("Missing JSON body")
-    if not isinstance(payload_in, dict):
-        raise BadRequestError("JSON body must be an object")
+    payload_in = parse_json_object_body()
 
     result = accounts_service.update_main_account(user_id, payload_in)
     return result.to_flask_response()

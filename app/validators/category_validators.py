@@ -1,10 +1,4 @@
-import uuid
-
-from app.validators.common_validators import (
-    parse_uuid_field,
-    validate_decimal_field,
-    validate_month_year_filter,
-)
+from app.validators.common_validators import parse_uuid_field, validate_decimal_field
 
 
 def _invalid_input_error():
@@ -99,21 +93,3 @@ def validate_category_update_data(data: dict):
         cleaned["limit"] = limit
 
     return cleaned, None, None
-
-
-def validate_category_monthly_limit_params(category_id: uuid.UUID, year: int, month: int):
-    if year < 1 or year > 9999:
-        return None, None, {"error": "Invalid year/month format"}, 400
-
-    start, end, err, status = validate_month_year_filter(year, month)
-    if err:
-        return None, None, err, status
-
-    return {
-        "category_id": category_id,
-        "year": year,
-        "month": month,
-    }, {
-        "start": start,
-        "end": end,
-    }, None, None

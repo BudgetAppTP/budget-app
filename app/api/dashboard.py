@@ -1,6 +1,9 @@
 """
 Dashboard API
 
+Paths:
+  - GET /api/dashboard/summary
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
@@ -24,6 +27,7 @@ from flask import g, request
 from app.api import bp
 from app.services import dashboard_service
 from app.services.errors import BadRequestError
+from app.validators.common_validators import parse_month_year_query_params
 
 
 @bp.get("/dashboard/summary", strict_slashes=False)
@@ -39,14 +43,12 @@ def api_dashboard_summary():
       200: {"data": DashboardSummary, "error": null}
       400: see module errors
     """
-    year_raw = request.args.get("year")
-    month_raw = request.args.get("month")
-
-    try:
-        year = int(year_raw) if year_raw is not None else None
-        month = int(month_raw) if month_raw is not None else None
-    except ValueError:
-        raise BadRequestError("Invalid year/month format")
+    year, month, err, _ = parse_month_year_query_params(
+        request.args.get("year"),
+        request.args.get("month"),
+    )
+    if err:
+        raise BadRequestError(err["error"])
 
     result = dashboard_service.get_month_summary(
         year=year,

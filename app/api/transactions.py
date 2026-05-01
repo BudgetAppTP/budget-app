@@ -17,6 +17,7 @@ Notes:
 
 from flask import request
 from app.api import bp, make_response
+from app.api.request_parsing import parse_json_object_body
 
 demo_incomes = [
     {"id": 1, "date": "2025-10-01", "description": "Výplata", "amount": 1200.00, "kind": "income"},
@@ -88,7 +89,7 @@ def api_transactions_create():
         data: null
         error: {"code":"bad_request","message":"kind must be income or expense"}
     """
-    p = request.get_json(silent=True) or {}
+    p = parse_json_object_body()
     k = p.get("kind")
     if k == "income":
         new_id = (demo_incomes[-1]["id"] + 1) if demo_incomes else 1

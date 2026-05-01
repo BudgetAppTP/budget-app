@@ -1,6 +1,9 @@
 """
 Import QR / eKasa API
 
+Paths:
+  - POST /api/import-qr/extract-id
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 

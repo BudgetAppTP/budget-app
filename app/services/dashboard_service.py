@@ -5,8 +5,8 @@ from sqlalchemy import func
 
 from app.extensions import db
 from app.models import Income, Receipt
-from app.services.errors import BadRequestError
 from app.services.responses import OkResult
+from app.services.validation import resolve_month_year_filter_or_raise
 
 
 def get_month_summary(
@@ -26,15 +26,7 @@ def get_month_summary(
         year = today.year
         month = today.month
 
-    # validation (same as others)
-    if (year is None) ^ (month is None):
-        raise BadRequestError("Both year and month must be provided together")
-
-    if not (1 <= month <= 12):
-        raise BadRequestError("Month must be between 1 and 12")
-
-    start = date(year, month, 1)
-    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    start, end = resolve_month_year_filter_or_raise(year, month)
 
     incomes_q = db.session.query(func.coalesce(func.sum(Income.amount), 0))
     incomes_q = incomes_q.filter(

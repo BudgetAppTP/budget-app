@@ -1,6 +1,10 @@
 """
 Users API
 
+Paths:
+  - GET  /api/users
+  - POST /api/users
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
@@ -18,10 +22,8 @@ Common errors:
   409: {"data": null, "error": {"code": "conflict", "message": str}}
 """
 
-from flask import request
-
 from app.api import bp
-from app.services.errors import BadRequestError
+from app.api.request_parsing import parse_json_object_body
 from app.services import users_service
 
 
@@ -55,8 +57,6 @@ def api_users_create():
       400: see module errors
       409: see module errors
     """
-    payload = request.get_json() or {}
-    if not payload:
-        raise BadRequestError("Missing JSON body")
+    payload = parse_json_object_body(allow_empty=False)
     result = users_service.create_user(payload)
     return result.to_flask_response()

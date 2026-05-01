@@ -1,3 +1,10 @@
+"""
+Monthly Budget API
+
+Paths:
+  - GET /api/monthly-budget
+"""
+
 import uuid
 from flask import request
 from app.api import bp, make_response

@@ -1,5 +1,4 @@
 from app.validators.common_validators import (
-    parse_uuid_field,
     validate_date_field,
     validate_decimal_field,
     validate_json_object,
@@ -9,10 +8,6 @@ from app.validators.common_validators import (
 
 
 def validate_income_create_data(data: dict):
-    user_id, err, status = parse_uuid_field(data.get("user_id"), "user_id")
-    if err:
-        return None, err, status
-
     description, err, status = validate_required_string(data.get("description"), "description")
     if err:
         return None, err, status
@@ -42,7 +37,6 @@ def validate_income_create_data(data: dict):
         return None, err, status
 
     return {
-        "user_id": user_id,
         "tag_id": data.get("tag_id"),
         "description": description,
         "amount": amount,

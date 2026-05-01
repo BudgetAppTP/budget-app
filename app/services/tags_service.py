@@ -7,6 +7,7 @@ import uuid
 from app.extensions import db
 from app.models import Tag, User
 from app.models.tag import TagType
+from app.services.responses import OkResult
 from typing import List, Dict, Any, Tuple
 
 from app.validators.tag_validators import validate_tag_create_data, validate_tag_update_data
@@ -310,7 +311,7 @@ def get_income_tags(user_id: uuid.UUID | None = None):
             "counter": int(t.counter) if t.counter is not None else 0
         })
 
-    return {"success": True, "tags": result}, 200
+    return OkResult({"success": True, "tags": result})
 
 def get_expense_tags(user_id: uuid.UUID | None = None):
     """
@@ -354,4 +355,4 @@ def get_expense_tags(user_id: uuid.UUID | None = None):
             "counter": int(t.counter) if t.counter is not None else 0
         })
 
-    return {"success": True, "tags": result}, 200
+    return OkResult({"success": True, "tags": result})

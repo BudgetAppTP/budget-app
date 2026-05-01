@@ -9,9 +9,8 @@ Paths:
 
 Swagger shows raw arrays/objects; actual API wraps payload in {"data": ...}.
 """
-
-from flask import request
 from app.api import bp, make_response
+from app.api.request_parsing import parse_json_object_body
 from app.services import receipt_items_service
 
 
@@ -62,9 +61,7 @@ def api_receipt_items_create(receipt_id):
         data: null
         error: {"code":"bad_request","message":"Missing JSON body"}
     """
-    payload = request.get_json() or {}
-    if not payload:
-        return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
+    payload = parse_json_object_body(allow_empty=False)
     response, status = receipt_items_service.create_item(receipt_id, payload)
     return make_response(response, None, status)
 
@@ -93,9 +90,7 @@ def api_receipt_items_update(receipt_id, item_id):
         data: null
         error: {"code":"not_found","message":"Item not found"}
     """
-    payload = request.get_json() or {}
-    if not payload:
-        return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
+    payload = parse_json_object_body(allow_empty=False)
     response, status = receipt_items_service.update_item(receipt_id, item_id, payload)
     return make_response(response, None, status)
 

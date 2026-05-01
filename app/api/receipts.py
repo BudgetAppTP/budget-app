@@ -16,7 +16,9 @@ import uuid
 
 from flask import request, g
 from app.api import bp, make_response
+from app.api.request_parsing import parse_json_object_body
 from app.services import receipts_service, tags_service
+from app.validators.common_validators import parse_month_year_query_params
 
 
 @bp.get("/receipts", strict_slashes=False)
@@ -71,18 +73,11 @@ def api_receipts_list():
     month_raw = request.args.get("month")
     account_raw = request.args.get("account_id")
 
-    year = None
-    month = None
     account_id = None
 
-    # Parse year/month if provided
-    try:
-        if year_raw is not None:
-            year = int(year_raw)
-        if month_raw is not None:
-            month = int(month_raw)
-    except ValueError:
-        return make_response({"error": "Invalid year/month format"}, None, 400)
+    year, month, err, status = parse_month_year_query_params(year_raw, month_raw)
+    if err:
+        return make_response(err, None, status)
 
     if account_raw:
         try:
@@ -134,8 +129,8 @@ def api_expense_tags_list():
             { "error": "Invalid user_id format" }
           error: null
     """
-    data, status = tags_service.get_expense_tags(user_id=g.current_user.id)
-    return make_response(data, None, status)
+    result = tags_service.get_expense_tags(user_id=g.current_user.id)
+    return result.to_flask_response()
 
 
 @bp.post("/receipts", strict_slashes=False)
@@ -183,9 +178,7 @@ def api_receipts_create():
             }
           error: null
     """
-    payload = request.get_json() or {}
-    if not payload:
-        return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
+    payload = parse_json_object_body(allow_empty=False)
     response, status = receipts_service.create_receipt(payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
@@ -280,9 +273,7 @@ def api_receipts_update(receipt_id):
           }
         error: null
     """
-    payload = request.get_json() or {}
-    if not payload:
-        return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
+    payload = parse_json_object_body(allow_empty=False)
     response, status = receipts_service.update_receipt(receipt_id, payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
@@ -357,7 +348,7 @@ def api_receipts_import_ekasa():
             }
           }
     """
-    payload = request.get_json() or {}
+    payload = parse_json_object_body()
 
     receipt_id = payload.get("receiptId") or payload.get("receipt_id")
     user_id = payload.get("user_id") or payload.get("userId")
@@ -470,16 +461,9 @@ def api_receipts_ekasa_items():
         except ValueError:
             return make_response({"error": "Invalid account_id format"}, None, 400)
 
-    # Parse year/month (both optional, но должны быть вместе)
-    year = None
-    month = None
-    try:
-        if year_raw is not None:
-            year = int(year_raw)
-        if month_raw is not None:
-            month = int(month_raw)
-    except ValueError:
-        return make_response({"error": "Invalid year/month format"}, None, 400)
+    year, month, err, status = parse_month_year_query_params(year_raw, month_raw)
+    if err:
+        return make_response(err, None, status)
 
     data, status = receipts_service.get_ekasa_items(
         year=year,

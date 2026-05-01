@@ -1,6 +1,11 @@
 """
 Allocations API
 
+Paths:
+  - GET    /api/savings-funds/{fund_id}/allocations
+  - POST   /api/savings-funds/{fund_id}/allocations
+  - DELETE /api/savings-funds/{fund_id}/allocations/{allocation_id}
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
@@ -21,10 +26,9 @@ Common errors:
 
 import uuid
 
-from flask import request
-
 from app.api import bp
 from app.api.auth_context import get_mock_user_id
+from app.api.request_parsing import parse_json_object_body
 from app.services import allocations_service
 
 
@@ -56,7 +60,7 @@ def api_allocations_create(fund_id: uuid.UUID):
       404: see module errors
     """
     user_id = get_mock_user_id()
-    payload_in = request.get_json(silent=True) or {}
+    payload_in = parse_json_object_body()
     result = allocations_service.create_allocation(user_id, fund_id, payload_in)
     return result.to_flask_response()
 

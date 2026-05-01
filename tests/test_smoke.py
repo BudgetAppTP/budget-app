@@ -1011,6 +1011,42 @@ def test_private_api_requires_auth(client):
     assert body["error"]["code"] == "unauthenticated"
 
 
+def test_incomes_list_rejects_out_of_range_year_with_400(client):
+    client.post("/api/auth/register", json={"email": "year-range@test.local", "password": "pass"})
+    client.post("/api/auth/login", json={"email": "year-range@test.local", "password": "pass"})
+
+    r = client.get("/api/incomes", query_string={"year": 10000, "month": 1})
+
+    assert r.status_code == 400
+    assert r.is_json
+    body = r.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Invalid year/month format"
+
+
+def test_incomes_list_rejects_invalid_sort_field(auth_client):
+    r = auth_client.get("/api/incomes", query_string={"sort": "description"})
+
+    assert r.status_code == 400
+    assert r.is_json
+    body = r.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Invalid sort field"
+
+
+def test_create_income_non_object_json_uses_error_envelope(auth_client):
+    r = auth_client.post("/api/incomes", json=["not", "an", "object"])
+
+    assert r.status_code == 400
+    assert r.is_json
+    body = r.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "JSON body must be an object"
+
+
 def test_user_cannot_access_another_users_income(client, app):
     client.post("/api/auth/register", json={"email": "first@test.local", "password": "pass"})
     client.post("/api/auth/login", json={"email": "first@test.local", "password": "pass"})

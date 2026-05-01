@@ -6,9 +6,9 @@ from app.extensions import db
 from app.models import Category, Receipt, ReceiptItem
 from app.services.errors import BadRequestError, NotFoundError
 from app.services.responses import CreatedResult, OkResult
+from app.services.validation import resolve_month_year_filter_or_raise
 from app.validators.category_validators import (
     validate_category_create_data,
-    validate_category_monthly_limit_params,
     validate_category_update_data,
 )
 
@@ -98,13 +98,7 @@ def update_category(category_id: uuid.UUID, data: dict, user_id: uuid.UUID):
 
 
 def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int, user_id: uuid.UUID):
-    validated, date_range, err, status = validate_category_monthly_limit_params(
-        category_id=category_id,
-        year=year,
-        month=month,
-    )
-    if err:
-        raise BadRequestError(err["error"], status_code=status)
+    start, end = resolve_month_year_filter_or_raise(year, month)
 
     category = db.session.get(Category, category_id)
     if not category or (category.user_id is not None and category.user_id != user_id):
@@ -116,17 +110,17 @@ def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int, us
         .filter(
             ReceiptItem.category_id == category_id,
             Receipt.user_id == user_id,
-            Receipt.issue_date >= date_range["start"],
-            Receipt.issue_date < date_range["end"],
+            Receipt.issue_date >= start,
+            Receipt.issue_date < end,
         )
     )
 
     spent = round(float(spent_q.scalar() or 0), 2)
 
     return OkResult({
-        "year": validated["year"],
-        "month": validated["month"],
-        "category_id": str(validated["category_id"]),
+        "year": year,
+        "month": month,
+        "category_id": str(category_id),
         "spent": spent,
         "limit": float(category.limit) if category.limit is not None else None,
     })

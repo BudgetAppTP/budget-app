@@ -1,6 +1,14 @@
 """
 Savings Funds API
 
+Paths:
+  - GET    /api/savings-funds
+  - POST   /api/savings-funds
+  - GET    /api/savings-funds/{fund_id}
+  - PATCH  /api/savings-funds/{fund_id}
+  - DELETE /api/savings-funds/{fund_id}
+  - POST   /api/savings-funds/{fund_id}/balance-adjustments
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
@@ -41,9 +49,10 @@ Common errors:
 
 import uuid
 
-from flask import current_app, g, request
+from flask import current_app, g
 
 from app.api import bp
+from app.api.request_parsing import parse_json_object_body
 from app.services import savings_funds_service
 
 @bp.get("/savings/summary", strict_slashes=False)
@@ -108,9 +117,8 @@ def api_funds_create():
       201: {"data": Fund, "error": null}
       400: see module errors
     """
+    payload_in = parse_json_object_body()
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True) or {}
-
     result = savings_funds_service.create_public_fund(
         user_id,
         payload_in,
@@ -139,15 +147,9 @@ def api_funds_update(fund_id: uuid.UUID):
       400: see module errors
       404: see module errors
     """
+    payload_in = parse_json_object_body()
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True) or {}
-
-    result = savings_funds_service.update_public_fund(
-        user_id,
-        fund_id,
-        payload_in,
-    )
-
+    result = savings_funds_service.update_public_fund(user_id, fund_id, payload_in)
     return result.to_flask_response()
 
 
@@ -179,7 +181,7 @@ def api_funds_toggle_status(fund_id: uuid.UUID):
       404: see module errors
     """
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True) or {}
+    payload_in = parse_json_object_body()
 
     result = savings_funds_service.update_fund_status(
         user_id,
@@ -206,13 +208,11 @@ def api_funds_adjust_balance(fund_id: uuid.UUID):
       400: see module errors
       404: see module errors
     """
+    payload_in = parse_json_object_body()
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True) or {}
-
     if "delta_amount" not in payload_in:
         from app.services.errors import BadRequestError
         raise BadRequestError("Missing delta_amount")
-
     result = savings_funds_service.adjust_balance(
         user_id,
         fund_id,

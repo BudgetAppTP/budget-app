@@ -18,8 +18,9 @@ Request/Response examples are documented inline with each view function.
 from __future__ import annotations
 
 import uuid
-from flask import request, g
+from flask import g
 from app.api import bp, make_response
+from app.api.request_parsing import parse_json_object_body
 from app.services import tags_service
 from app.models.tag import TagType
 
@@ -79,7 +80,7 @@ def api_tags_create():
         data: {"error": "..."}
         error: null
     """
-    payload = request.get_json(force=True) or {}
+    payload = parse_json_object_body()
     data, status = tags_service.create_tag(payload, user_id=g.current_user.id)
     return make_response(data if "error" not in data else None, None if "error" not in data else data, status)
 
@@ -107,7 +108,7 @@ def api_tags_update(tag_id: uuid.UUID):
         data: {"error": "..."}
         error: null
     """
-    payload = request.get_json() or {}
+    payload = parse_json_object_body()
     data, status = tags_service.update_tag(tag_id, payload, user_id=g.current_user.id)
     # errors come in data['error']; unify envelope accordingly
     if "error" in data:

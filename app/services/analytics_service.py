@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 
 from sqlalchemy import func
 
@@ -11,6 +10,8 @@ from app.models import Receipt, ReceiptItem, Category, Tag
 from app.services import accounts_service
 from app.services.errors import BadRequestError
 from app.services.responses import OkResult
+from app.services.validation import resolve_month_year_filter_or_raise
+from app.validators.common_validators import is_valid_calendar_year
 
 
 def get_donut_data(
@@ -20,17 +21,12 @@ def get_donut_data(
 ):
     if (year is None) or (month is None):
         raise BadRequestError("Both year and month must be provided together")
-
-    if not (1 <= year <= 9999):
+    if not is_valid_calendar_year(year):
         raise BadRequestError("Year must be a valid calendar year")
-
-    if not (1 <= month <= 12):
-        raise BadRequestError("Month must be between 1 and 12")
 
     account = accounts_service.find_main_account(user_id)
 
-    start = date(year, month, 1)
-    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    start, end = resolve_month_year_filter_or_raise(year, month)
 
     # TOTAL
     total_q = (

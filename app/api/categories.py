@@ -1,6 +1,13 @@
 """
 Categories API
 
+Paths:
+  - GET    /api/categories
+  - POST   /api/categories
+  - GET    /api/categories/monthly-limit
+  - PUT    /api/categories/{category_id}
+  - DELETE /api/categories/{category_id}
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
@@ -27,8 +34,10 @@ import uuid
 from flask import g, request
 
 from app.api import bp
+from app.api.request_parsing import parse_json_object_body
 from app.services import categories_service
 from app.services.errors import BadRequestError
+from app.validators.common_validators import parse_month_year_query_params
 
 
 @bp.get("/categories", strict_slashes=False)
@@ -56,11 +65,7 @@ def create_category():
       400: see module errors
       404: see module errors
     """
-    payload = request.get_json(silent=True)
-    if payload is None:
-        raise BadRequestError("Missing JSON body")
-    if not isinstance(payload, dict):
-        raise BadRequestError("JSON body must be an object")
+    payload = parse_json_object_body()
 
     result = categories_service.create_category(payload, user_id=g.current_user.id)
     return result.to_flask_response()
@@ -88,11 +93,9 @@ def get_category_monthly_limit():
     if year_raw is None or month_raw is None or not category_raw:
         raise BadRequestError("Missing required query params: year, month, category_id")
 
-    try:
-        year = int(year_raw)
-        month = int(month_raw)
-    except ValueError:
-        raise BadRequestError("Invalid year/month format")
+    year, month, err, _ = parse_month_year_query_params(year_raw, month_raw)
+    if err:
+        raise BadRequestError(err["error"])
 
     try:
         category_id = uuid.UUID(category_raw)
@@ -124,11 +127,7 @@ def update_category(category_id):
       400: see module errors
       404: see module errors
     """
-    payload = request.get_json(force=True) or {}
-    if not payload:
-        raise BadRequestError("Missing JSON body")
-    if not isinstance(payload, dict):
-        raise BadRequestError("JSON body must be an object")
+    payload = parse_json_object_body(allow_empty=False)
 
     result = categories_service.update_category(
         category_id,
