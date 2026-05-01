@@ -11,30 +11,16 @@ from app.validators.common_validators import (
 
 
 def validate_receipt_create_data(data: dict):
-    user_id, err, status = parse_uuid_field(data.get("user_id"), "user_id")
-    if err:
-        return None, err, status
-
-    description, err, status = validate_required_string(data.get("description"), "description")
-    if err:
-        return None, err, status
-
-    issue_date, err, status = validate_date_field(data.get("issue_date"), "issue_date", required=True)
-    if err:
-        return None, err, status
-
-    total_amount, err, status = validate_decimal_field(
+    user_id = parse_uuid_field(data.get("user_id"), "user_id")
+    description = validate_required_string(data.get("description"), "description")
+    issue_date = validate_date_field(data.get("issue_date"), "issue_date", required=True)
+    total_amount = validate_decimal_field(
         data.get("total_amount"),
         "total_amount",
         required=True,
         strictly_positive=True,
     )
-    if err:
-        return None, err, status
-
-    extra_metadata, err, status = validate_json_object(data.get("extra_metadata"), "extra_metadata")
-    if err:
-        return None, err, status
+    extra_metadata = validate_json_object(data.get("extra_metadata"), "extra_metadata")
 
     return {
         "user_id": user_id,
@@ -45,40 +31,28 @@ def validate_receipt_create_data(data: dict):
         "total_amount": total_amount,
         "external_uid": data.get("external_uid"),
         "extra_metadata": extra_metadata,
-    }, None, None
+    }
 
 
 def validate_receipt_update_data(data: dict):
     cleaned = {}
 
     if "description" in data:
-        description, err, status = validate_non_empty_string(data.get("description"), "description")
-        if err:
-            return None, err, status
-        cleaned["description"] = description
+        cleaned["description"] = validate_non_empty_string(data.get("description"), "description")
 
     if "issue_date" in data:
-        issue_date, err, status = validate_date_field(data.get("issue_date"), "issue_date", required=True)
-        if err:
-            return None, err, status
-        cleaned["issue_date"] = issue_date
+        cleaned["issue_date"] = validate_date_field(data.get("issue_date"), "issue_date", required=True)
 
     if "total_amount" in data:
-        total_amount, err, status = validate_decimal_field(
+        cleaned["total_amount"] = validate_decimal_field(
             data.get("total_amount"),
             "total_amount",
             required=True,
             strictly_positive=True,
         )
-        if err:
-            return None, err, status
-        cleaned["total_amount"] = total_amount
 
     if "extra_metadata" in data:
-        extra_metadata, err, status = validate_json_object(data.get("extra_metadata"), "extra_metadata")
-        if err:
-            return None, err, status
-        cleaned["extra_metadata"] = extra_metadata
+        cleaned["extra_metadata"] = validate_json_object(data.get("extra_metadata"), "extra_metadata")
 
     if "currency" in data:
         cleaned["currency"] = data.get("currency")
@@ -89,4 +63,4 @@ def validate_receipt_update_data(data: dict):
     if "tag_id" in data:
         cleaned["tag_id"] = data.get("tag_id")
 
-    return cleaned, None, None
+    return cleaned

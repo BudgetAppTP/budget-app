@@ -115,7 +115,7 @@ def test_donut_analytics_rejects_year_outside_date_range(app):
 
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == "bad_request"
-    assert response.get_json()["error"]["message"] == "Year must be a valid calendar year"
+    assert response.get_json()["error"]["message"] == "Invalid year format"
 
 
 def test_dashboard_summary_ignores_removed_user_and_account_query_params(app):
@@ -168,4 +168,4 @@ def test_dashboard_summary_uses_error_envelope_for_invalid_query_values(app):
     assert response.status_code == 400
     assert response.get_json()["data"] is None
     assert response.get_json()["error"]["code"] == "bad_request"
-    assert response.get_json()["error"]["message"] == "Invalid year/month format"
+    assert response.get_json()["error"]["message"] == "Invalid month format"

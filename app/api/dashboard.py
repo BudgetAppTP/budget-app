@@ -26,7 +26,6 @@ from flask import g, request
 
 from app.api import bp
 from app.services import dashboard_service
-from app.services.errors import BadRequestError
 from app.validators.common_validators import parse_month_year_query_params
 
 
@@ -43,12 +42,10 @@ def api_dashboard_summary():
       200: {"data": DashboardSummary, "error": null}
       400: see module errors
     """
-    year, month, err, _ = parse_month_year_query_params(
+    year, month = parse_month_year_query_params(
         request.args.get("year"),
         request.args.get("month"),
     )
-    if err:
-        raise BadRequestError(err["error"])
 
     result = dashboard_service.get_month_summary(
         year=year,

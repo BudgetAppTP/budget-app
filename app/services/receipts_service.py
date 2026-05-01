@@ -8,6 +8,7 @@ from app.models import AccountMember, Receipt, ReceiptItem, Tag, User
 from datetime import date, datetime
 
 from app.services import tags_service, ekasa_service
+from app.services.errors import BadRequestError
 from app.validators.common_validators import validate_month_year_filter
 from app.validators.receipt_validators import validate_receipt_create_data, validate_receipt_update_data
 
@@ -45,9 +46,7 @@ def get_all_receipts(
         joinedload(Receipt.tag),
     )
 
-    start, end, err, status = validate_month_year_filter(year, month)
-    if err:
-        return err, status
+    start, end = validate_month_year_filter(year, month)
 
     if start is not None and end is not None:
         query = query.filter(
@@ -189,9 +188,7 @@ def _resolve_account_for_user(
 
 def create_receipt(data: dict, user_id: uuid.UUID | None = None):
     try:
-        validated, err, status = validate_receipt_create_data(data)
-        if err:
-            return err, status
+        validated = validate_receipt_create_data(data)
         account_id, err, status = _resolve_account_for_user(
             user_id,
             data.get("account_id") or data.get("accountId")
@@ -230,6 +227,9 @@ def create_receipt(data: dict, user_id: uuid.UUID | None = None):
 
         return {"id": str(receipt.id), "message": "Receipt created successfully"}, 201
 
+    except BadRequestError:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
@@ -262,9 +262,7 @@ def update_receipt(receipt_id: uuid.UUID, data: dict):
         if not receipt:
             return {"error": "Receipt not found"}, 404
 
-        validated, err, status = validate_receipt_update_data(data)
-        if err:
-            return err, status
+        validated = validate_receipt_update_data(data)
 
         old_tag = receipt.tag
         new_tag = old_tag
@@ -312,6 +310,9 @@ def update_receipt(receipt_id: uuid.UUID, data: dict):
             "id": str(receipt.id),
             "message": "Receipt updated successfully"
         }, 200
+    except BadRequestError:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
@@ -454,9 +455,7 @@ def get_ekasa_items(
       - only eKasa-imported receipts are included (Receipt.external_uid != null)
       - optional user_id filter
     """
-    start, end, err, status = validate_month_year_filter(year, month)
-    if err:
-        return err, status
+    start, end = validate_month_year_filter(year, month)
 
     query = (
         db.session.query(Receipt)

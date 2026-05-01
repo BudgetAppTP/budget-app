@@ -97,9 +97,7 @@ def get_all_users():
 
 
 def create_user(data):
-    validated, err, _ = validate_user_create_data(data)
-    if err:
-        raise BadRequestError(err.get("error") or "Invalid user payload")
+    validated = validate_user_create_data(data)
 
     existing_user = db.session.query(User).filter_by(username=validated["username"]).first()
     if existing_user:

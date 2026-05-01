@@ -10,23 +10,17 @@ from app.models import Receipt, ReceiptItem, Category, Tag
 from app.services import accounts_service
 from app.services.errors import BadRequestError
 from app.services.responses import OkResult
-from app.services.validation import resolve_month_year_filter_or_raise
-from app.validators.common_validators import is_valid_calendar_year
+from app.validators.common_validators import validate_month_year_filter
 
 
 def get_donut_data(
+    user_id: uuid.UUID,
     year: int | None = None,
     month: int | None = None,
-    user_id: uuid.UUID | None = None,
 ):
-    if (year is None) or (month is None):
-        raise BadRequestError("Both year and month must be provided together")
-    if not is_valid_calendar_year(year):
-        raise BadRequestError("Year must be a valid calendar year")
-
     account = accounts_service.find_main_account(user_id)
 
-    start, end = resolve_month_year_filter_or_raise(year, month)
+    start, end = validate_month_year_filter(year, month)
 
     # TOTAL
     total_q = (

@@ -2,36 +2,38 @@ import uuid
 from decimal import Decimal
 from datetime import date
 
+from app.services.errors import BadRequestError
+
 
 def parse_uuid_field(value, field_name: str, required: bool = True):
     if value is None or value == "":
         if required:
-            return None, {"error": f"Missing {field_name}"}, 400
-        return None, None, None
+            raise BadRequestError(f"Missing {field_name}")
+        return None
 
     if isinstance(value, uuid.UUID):
-        return value, None, None
+        return value
 
     if isinstance(value, str):
         try:
-            return uuid.UUID(value), None, None
+            return uuid.UUID(value)
         except ValueError:
-            return None, {"error": f"Invalid {field_name} format"}, 400
+            raise BadRequestError(f"Invalid {field_name} format")
 
-    return None, {"error": f"Invalid {field_name} type"}, 400
+    raise BadRequestError(f"Invalid {field_name} type")
 
 
 def validate_date_field(value, field_name: str, required: bool = True):
     if value is None or value == "":
         if required:
-            return None, {"error": f"Missing {field_name}"}, 400
-        return None, None, None
+            raise BadRequestError(f"Missing {field_name}")
+        return None
 
     try:
         parsed = date.fromisoformat(value)
-        return parsed, None, None
+        return parsed
     except ValueError:
-        return None, {"error": f"Invalid {field_name} format, expected YYYY-MM-DD"}, 400
+        raise BadRequestError(f"Invalid {field_name} format, expected YYYY-MM-DD")
 
 
 def validate_decimal_field(
@@ -43,109 +45,103 @@ def validate_decimal_field(
 ):
     if value is None or value == "":
         if required:
-            return None, {"error": f"Missing {field_name}"}, 400
-        return None, None, None
+            raise BadRequestError(f"Missing {field_name}")
+        return None
 
     try:
         dec = Decimal(str(value))
     except Exception:
-        return None, {"error": f"Invalid {field_name} format"}, 400
+        raise BadRequestError(f"Invalid {field_name} format")
 
     if strictly_positive and dec <= 0:
-        return None, {"error": f"{field_name} must be positive"}, 400
+        raise BadRequestError(f"{field_name} must be positive")
 
     if min_value is not None and dec < min_value:
-        return None, {"error": f"{field_name} must be >= {min_value}"}, 400
+        raise BadRequestError(f"{field_name} must be >= {min_value}")
 
-    return dec, None, None
+    return dec
 
 
 def validate_json_object(value, field_name: str, required: bool = False):
     if value is None:
         if required:
-            return None, {"error": f"Missing {field_name}"}, 400
-        return None, None, None
+            raise BadRequestError(f"Missing {field_name}")
+        return None
 
     if not isinstance(value, dict):
-        return None, {"error": f"{field_name} must be JSON object"}, 400
+        raise BadRequestError(f"{field_name} must be JSON object")
 
-    return value, None, None
+    return value
 
 
 def validate_json_body_object(payload, allow_empty: bool = True):
     if payload is None:
-        return None, {"error": "Missing JSON body"}, 400
+        raise BadRequestError("Missing JSON body")
 
     if not isinstance(payload, dict):
-        return None, {"error": "JSON body must be an object"}, 400
+        raise BadRequestError("JSON body must be an object")
 
     if not allow_empty and not payload:
-        return None, {"error": "Missing JSON body"}, 400
+        raise BadRequestError("Missing JSON body")
 
-    return payload, None, None
+    return payload
 
 
 def validate_required_string(value, field_name: str):
     text = (value or "").strip()
     if not text:
-        return None, {"error": f"Missing {field_name}"}, 400
-    return text, None, None
+        raise BadRequestError(f"Missing {field_name}")
+    return text
 
 
 def validate_non_empty_string(value, field_name: str):
     if value is None:
-        return None, None, None
+        return None
 
     text = str(value).strip()
     if not text:
-        return None, {"error": f"{field_name} cannot be empty"}, 400
+        raise BadRequestError(f"{field_name} cannot be empty")
 
-    return text, None, None
-
-
-def parse_optional_int_query_param(value, field_name: str):
-    if value is None:
-        return None, None, None
-
-    try:
-        return int(value), None, None
-    except (TypeError, ValueError):
-        return None, {"error": f"Invalid {field_name} format"}, 400
+    return text
 
 
 def parse_month_year_query_params(year_raw, month_raw):
-    year, year_err, _ = parse_optional_int_query_param(year_raw, "year")
-    if year_err:
-        return None, None, {"error": "Invalid year/month format"}, 400
+    if year_raw is None:
+        year = None
+    else:
+        try:
+            year = int(year_raw)
+        except (TypeError, ValueError) as exc:
+            raise BadRequestError("Invalid year format") from exc
 
-    month, month_err, _ = parse_optional_int_query_param(month_raw, "month")
-    if month_err:
-        return None, None, {"error": "Invalid year/month format"}, 400
+    if month_raw is None:
+        month = None
+    else:
+        try:
+            month = int(month_raw)
+        except (TypeError, ValueError) as exc:
+            raise BadRequestError("Invalid month format") from exc
 
-    return year, month, None, None
-
-
-def is_valid_calendar_year(year: int) -> bool:
-    return 1 <= year <= 9999
+    return year, month
 
 
 def validate_month_year_filter(year: int | None, month: int | None):
     if (year is None) ^ (month is None):
-        return None, None, {"error": "Both year and month must be provided together"}, 400
+        raise BadRequestError("Both year and month must be provided together")
 
     if year is None and month is None:
-        return None, None, None, None
+        return None, None
 
-    if not is_valid_calendar_year(year):
-        return None, None, {"error": "Invalid year/month format"}, 400
+    if not 1 <= year <= 9999:
+        raise BadRequestError("Invalid year format")
 
     if month < 1 or month > 12:
-        return None, None, {"error": "Month must be between 1 and 12"}, 400
+        raise BadRequestError("Month must be between 1 and 12")
 
     try:
         start = date(year, month, 1)
         end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
     except ValueError:
-        return None, None, {"error": "Invalid year/month format"}, 400
+        raise BadRequestError("Invalid year/month format")
 
-    return start, end, None, None
+    return start, end

@@ -93,9 +93,7 @@ def get_category_monthly_limit():
     if year_raw is None or month_raw is None or not category_raw:
         raise BadRequestError("Missing required query params: year, month, category_id")
 
-    year, month, err, _ = parse_month_year_query_params(year_raw, month_raw)
-    if err:
-        raise BadRequestError(err["error"])
+    year, month = parse_month_year_query_params(year_raw, month_raw)
 
     try:
         category_id = uuid.UUID(category_raw)

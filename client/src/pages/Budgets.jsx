@@ -3,6 +3,7 @@ import "./style/budget.css";
 import { Link } from "react-router-dom";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
+import { getApiErrorMessage, hasApiError } from "../api/errors";
 
 const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
 
@@ -88,11 +89,9 @@ export default function Budgets() {
         if (!alive) return;
 
         if (!res.ok) {
-          const msg =
-            json?.error?.message ||
-            json?.data?.error ||
-            `Request failed (${res.status})`;
-          setApiError(msg);
+          setApiError(
+            getApiErrorMessage(json, `Request failed (${res.status})`)
+          );
           setMonthData((prev) => ({
             ...prev,
             incomes: [],
@@ -101,8 +100,8 @@ export default function Budgets() {
           return;
         }
 
-        if (json?.error) {
-          setApiError(json.error.message || "Unknown error");
+        if (hasApiError(json)) {
+          setApiError(getApiErrorMessage(json, "Unknown error"));
           setMonthData((prev) => ({
             ...prev,
             incomes: [],

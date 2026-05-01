@@ -1022,7 +1022,7 @@ def test_incomes_list_rejects_out_of_range_year_with_400(client):
     body = r.get_json()
     assert body["data"] is None
     assert body["error"]["code"] == "bad_request"
-    assert body["error"]["message"] == "Invalid year/month format"
+    assert body["error"]["message"] == "Invalid year format"
 
 
 def test_incomes_list_rejects_invalid_sort_field(auth_client):
@@ -1045,6 +1045,50 @@ def test_create_income_non_object_json_uses_error_envelope(auth_client):
     assert body["data"] is None
     assert body["error"]["code"] == "bad_request"
     assert body["error"]["message"] == "JSON body must be an object"
+
+
+def test_create_income_rejects_empty_string_tag_id(auth_client):
+    r = auth_client.post(
+        "/api/incomes",
+        json={
+            "income_date": "2025-10-10",
+            "description": "Salary",
+            "amount": 1000,
+            "tag_id": "",
+        },
+    )
+
+    assert r.status_code == 400
+    assert r.is_json
+    body = r.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Missing tag_id"
+
+
+def test_update_income_rejects_empty_string_tag_id(auth_client):
+    created = auth_client.post(
+        "/api/incomes",
+        json={
+            "income_date": "2025-10-10",
+            "description": "Salary",
+            "amount": 1000,
+        },
+    )
+    assert created.status_code == 201
+    income_id = created.get_json()["data"]["id"]
+
+    r = auth_client.put(
+        f"/api/incomes/{income_id}",
+        json={"tag_id": ""},
+    )
+
+    assert r.status_code == 400
+    assert r.is_json
+    body = r.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Missing tag_id"
 
 
 def test_user_cannot_access_another_users_income(client, app):
@@ -1311,7 +1355,7 @@ def test_category_monthly_limit_rejects_out_of_range_year(auth_client):
     body = resp.get_json()
     assert body["data"] is None
     assert body["error"]["code"] == "bad_request"
-    assert body["error"]["message"] == "Invalid year/month format"
+    assert body["error"]["message"] == "Invalid year format"
 
 
 def test_update_category_allows_owner_to_update_own_category(client, app):

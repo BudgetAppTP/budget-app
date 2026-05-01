@@ -1,7 +1,9 @@
 import uuid
 from decimal import Decimal
+
 from app.extensions import db
 from app.models import Receipt, ReceiptItem
+from app.services.errors import BadRequestError
 from app.validators.receipt_item_validators import validate_receipt_item_create_data, validate_receipt_item_update_data
 
 from app.models.category import Category
@@ -34,9 +36,7 @@ def create_item(receipt_id: uuid.UUID, data: dict):
         if not receipt:
             return {"error": "Receipt not found"}, 404
 
-        validated, err, status = validate_receipt_item_create_data(data)
-        if err:
-            return err, status
+        validated = validate_receipt_item_create_data(data)
 
         item = ReceiptItem(
             receipt_id=receipt.id,
@@ -57,6 +57,9 @@ def create_item(receipt_id: uuid.UUID, data: dict):
         db.session.commit()
         return {"item_id": str(item.id), "message": "Item created successfully"}, 201
 
+    except BadRequestError:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
@@ -68,9 +71,7 @@ def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict):
         return {"error": "Item not found"}, 404
 
     try:
-        validated, err, status = validate_receipt_item_update_data(data)
-        if err:
-            return err, status
+        validated = validate_receipt_item_update_data(data)
         old_category_id = item.category_id  # likely uuid.UUID or None
 
         if "name" in validated:
@@ -102,6 +103,9 @@ def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict):
         db.session.commit()
         return {"item_id": str(item.id), "message": "Item updated successfully"}, 200
 
+    except BadRequestError:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400

@@ -3,6 +3,7 @@ import "./style/ekasa.css";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
 import { Html5Qrcode } from "html5-qrcode";
+import { getApiErrorMessage, hasApiError } from "../api/errors";
 
 const API_BASE = "/api";
 const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
@@ -91,14 +92,15 @@ export default function Ekasa() {
       );
       const json = await res.json();
 
-      if (!res.ok || json?.error) {
-        const msg =
-          json?.error?.message ||
-          json?.data?.error ||
-          (lang === "sk"
-            ? "Nepodarilo sa načítať eKasa bločky."
-            : "Failed to load eKasa checks.");
-        setError(msg);
+      if (!res.ok || hasApiError(json)) {
+        setError(
+          getApiErrorMessage(
+            json,
+            lang === "sk"
+              ? "Nepodarilo sa načítať eKasa bločky."
+              : "Failed to load eKasa checks."
+          )
+        );
         setChecks([]);
         return;
       }
@@ -174,13 +176,13 @@ export default function Ekasa() {
 
       const importJson = await importRes.json();
 
-      if (!importRes.ok || importJson?.error) {
-        const errorMsg =
-          importJson?.error?.message ||
-          importJson?.error ||
-          (lang === "sk" ? "Import zlyhal." : "Import failed.");
-
-        setQrError(errorMsg);
+      if (!importRes.ok || hasApiError(importJson)) {
+        setQrError(
+          getApiErrorMessage(
+            importJson,
+            lang === "sk" ? "Import zlyhal." : "Import failed."
+          )
+        );
         return false;
       }
 
@@ -250,12 +252,14 @@ export default function Ekasa() {
 
       const extractJson = await extractRes.json();
 
-      if (!extractRes.ok || extractJson?.error) {
+      if (!extractRes.ok || hasApiError(extractJson)) {
         setQrError(
-          extractJson?.error ||
-            (lang === "sk"
+          getApiErrorMessage(
+            extractJson,
+            lang === "sk"
               ? "Nepodarilo sa extrahovať ID."
-              : "Failed to extract ID.")
+              : "Failed to extract ID."
+          )
         );
         return;
       }
@@ -390,16 +394,15 @@ export default function Ekasa() {
 
       const json = await res.json();
 
-      if (!res.ok || json?.error) {
-        const backendMsg =
-          json?.error?.message ||
-          json?.error?.details?.error ||
-          json?.data?.error ||
-          (lang === "sk"
-            ? "Import z eKasa zlyhal."
-            : "Import from eKasa failed.");
-
-        setEkasaError(backendMsg);
+      if (!res.ok || hasApiError(json)) {
+        setEkasaError(
+          getApiErrorMessage(
+            json,
+            lang === "sk"
+              ? "Import z eKasa zlyhal."
+              : "Import from eKasa failed."
+          )
+        );
         return;
       }
 

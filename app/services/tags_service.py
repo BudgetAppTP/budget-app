@@ -7,6 +7,7 @@ import uuid
 from app.extensions import db
 from app.models import Tag, User
 from app.models.tag import TagType
+from app.services.errors import BadRequestError
 from app.services.responses import OkResult
 from typing import List, Dict, Any, Tuple
 
@@ -130,9 +131,7 @@ def create_tag(data: Dict[str, Any], user_id: uuid.UUID | None = None) -> Tuple[
         ``id`` and a success ``message``.
     """
     try:
-        validated, err, status = validate_tag_create_data(data)
-        if err:
-            return err, status
+        validated = validate_tag_create_data(data)
 
         user_uuid = validated["user_id"]
         user = db.session.get(User, user_uuid)
@@ -147,12 +146,15 @@ def create_tag(data: Dict[str, Any], user_id: uuid.UUID | None = None) -> Tuple[
         db.session.commit()
         return {"id": str(tag.id), "message": "Tag created successfully"}, 201
 
+    except BadRequestError:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
 
 
-def update_tag(tag_id: uuid.UUID, data: Dict[str, Any], user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
+def update_tag(tag_id: uuid.UUID, data: Dict[str, Any], user_id: uuid.UUID) -> Tuple[Dict[str, Any], int]:
     """
     Update an existing tag.
 
@@ -168,16 +170,11 @@ def update_tag(tag_id: uuid.UUID, data: Dict[str, Any], user_id: uuid.UUID | Non
         A tuple of (payload dict, status). On success the payload contains
         ``id`` and a success ``message``.
     """
-    import uuid
     tag = db.session.get(Tag, tag_id)
-    if not tag:
-        return {"error": "Tag not found"}, 404
-    if user_id is not None and tag.user_id != user_id:
+    if not tag or tag.user_id != user_id:
         return {"error": "Tag not found"}, 404
     try:
-        validated, err, status = validate_tag_update_data(data)
-        if err:
-            return err, status
+        validated = validate_tag_update_data(data)
 
         if "name" in validated:
             other = (
@@ -194,12 +191,15 @@ def update_tag(tag_id: uuid.UUID, data: Dict[str, Any], user_id: uuid.UUID | Non
 
         db.session.commit()
         return {"id": str(tag.id), "message": "Tag updated successfully"}, 200
+    except BadRequestError:
+        db.session.rollback()
+        raise
     except Exception as e:
         db.session.rollback()
         return {"error": str(e)}, 400
 
 
-def delete_tag(tag_id: uuid.UUID, user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
+def delete_tag(tag_id: uuid.UUID, user_id: uuid.UUID) -> Tuple[Dict[str, Any], int]:
     """
     Delete a tag.
 
@@ -217,7 +217,7 @@ def delete_tag(tag_id: uuid.UUID, user_id: uuid.UUID | None = None) -> Tuple[Dic
     tag = db.session.get(Tag, tag_id)
     if not tag:
         return {"error": "Tag not found"}, 404
-    if user_id is not None and tag.user_id != user_id:
+    if tag.user_id != user_id:
         return {"error": "Tag not found"}, 404
     try:
         # detach tag from incomes
@@ -269,7 +269,7 @@ def find_or_create_tag_from_ekasa(user_id: uuid.UUID, data: dict) -> Tag | None:
     return tag
 
 
-def get_income_tags(user_id: uuid.UUID | None = None):
+def get_income_tags(user_id: uuid.UUID):
     """
     Get all tags that relate to incomes.
 
@@ -278,7 +278,7 @@ def get_income_tags(user_id: uuid.UUID | None = None):
       - TagType.BOTH
 
     Args:
-      user_id: optional UUID to filter tags for a specific user
+      user_id: UUID for the authenticated user
 
     Returns:
       tuple: (payload: dict, status_code: int)
@@ -296,8 +296,7 @@ def get_income_tags(user_id: uuid.UUID | None = None):
         Tag.type.in_([TagType.INCOME, TagType.BOTH])
     )
 
-    if user_id is not None:
-        query = query.filter(Tag.user_id == user_id)
+    query = query.filter(Tag.user_id == user_id)
 
     tags = query.order_by(Tag.name.asc()).all()
 
@@ -313,7 +312,7 @@ def get_income_tags(user_id: uuid.UUID | None = None):
 
     return OkResult({"success": True, "tags": result})
 
-def get_expense_tags(user_id: uuid.UUID | None = None):
+def get_expense_tags(user_id: uuid.UUID):
     """
     Get all tags that relate to expenses.
 
@@ -322,7 +321,7 @@ def get_expense_tags(user_id: uuid.UUID | None = None):
       - TagType.BOTH
 
     Args:
-      user_id: optional UUID to filter tags for a specific user
+      user_id: UUID for the authenticated user
 
     Returns:
       tuple: (payload: dict, status_code: int)
@@ -340,8 +339,7 @@ def get_expense_tags(user_id: uuid.UUID | None = None):
         Tag.type.in_([TagType.EXPENSE, TagType.BOTH])
     )
 
-    if user_id is not None:
-        query = query.filter(Tag.user_id == user_id)
+    query = query.filter(Tag.user_id == user_id)
 
     tags = query.order_by(Tag.name.asc()).all()
 

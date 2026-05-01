@@ -17,6 +17,7 @@ import uuid
 from flask import request, g
 from app.api import bp, make_response
 from app.api.request_parsing import parse_json_object_body
+from app.services.errors import BadRequestError
 from app.services import receipts_service, tags_service
 from app.validators.common_validators import parse_month_year_query_params
 
@@ -61,7 +62,8 @@ def api_receipts_list():
           data:
             { "error": "Both year and month must be provided together"
               | "Month must be between 1 and 12"
-              | "Invalid year/month format"
+              | "Invalid year format"
+              | "Invalid month format"
             }
           error: null
     """
@@ -75,15 +77,13 @@ def api_receipts_list():
 
     account_id = None
 
-    year, month, err, status = parse_month_year_query_params(year_raw, month_raw)
-    if err:
-        return make_response(err, None, status)
+    year, month = parse_month_year_query_params(year_raw, month_raw)
 
     if account_raw:
         try:
             account_id = uuid.UUID(account_raw)
         except ValueError:
-            return make_response({"error": "Invalid account_id format"}, None, 400)
+            raise BadRequestError("Invalid account_id format")
 
     data, status = receipts_service.get_all_receipts(year=year, month=month, account_id=account_id)
     if status != 200:
@@ -437,7 +437,8 @@ def api_receipts_ekasa_items():
 
       400:
         data: { "error": "Both year and month must be provided together"
-                     | "Invalid year/month format"
+                     | "Invalid year format"
+                     | "Invalid month format"
                      | "Month must be between 1 and 12"
                      | "Invalid user_id format" }
         error: null
@@ -461,9 +462,7 @@ def api_receipts_ekasa_items():
         except ValueError:
             return make_response({"error": "Invalid account_id format"}, None, 400)
 
-    year, month, err, status = parse_month_year_query_params(year_raw, month_raw)
-    if err:
-        return make_response(err, None, status)
+    year, month = parse_month_year_query_params(year_raw, month_raw)
 
     data, status = receipts_service.get_ekasa_items(
         year=year,

@@ -132,7 +132,7 @@
                 "examples": {
                   "invalid_year_month_format": {
                     "summary": "Neplatný formát year/month",
-                    "value": { "error": "Invalid year/month format" }
+                    "value": { "error": "Invalid year format" }
                   },
                   "invalid_sort": {
                     "summary": "Neplatné pole pre triedenie",
@@ -488,7 +488,7 @@
                 "examples": {
                   "invalid_year_month_format": {
                     "summary": "Neplatný formát year/month",
-                    "value": { "error": "Invalid year/month format" }
+                    "value": { "error": "Invalid year format" }
                   },
                   "missing_one_param": {
                     "summary": "Chýba year alebo month",
@@ -786,7 +786,7 @@
                 "examples": {
                   "invalid_year_month_format": {
                     "summary": "Neplatný formát year/month",
-                    "value": { "error": "Invalid year/month format" }
+                    "value": { "error": "Invalid year format" }
                   },
                   "missing_one_param": {
                     "summary": "Chýba year alebo month",
@@ -1069,8 +1069,8 @@
               "application/json": {
                 "examples": {
                   "invalid_year_month_format": {
-                    "summary": "Invalid year/month format",
-                    "value": { "error": "Invalid year/month format" }
+                    "summary": "Invalid year format",
+                    "value": { "error": "Invalid year format" }
                   },
                   "missing_one_param": {
                     "summary": "Only year or only month provided",
@@ -1150,7 +1150,7 @@
                 "examples": {
                   "invalid_year_month": {
                     "summary": "Bad year/month format",
-                    "value": { "error": "Invalid year/month format" }
+                    "value": { "error": "Invalid year format" }
                   },
                   "missing_param": {
                     "summary": "Missing year or month",

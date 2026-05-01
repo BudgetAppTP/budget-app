@@ -39,6 +39,12 @@ class NotFoundError(ServiceError):
     code = "not_found"
 
 
+class ForbiddenError(ServiceError):
+    status_code = 403
+    default_message = "Forbidden"
+    code = "forbidden"
+
+
 class ConflictError(ServiceError):
     status_code = 409
     default_message = "Conflict"

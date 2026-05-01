@@ -6,7 +6,7 @@ from app.extensions import db
 from app.models import Category, Receipt, ReceiptItem
 from app.services.errors import BadRequestError, NotFoundError
 from app.services.responses import CreatedResult, OkResult
-from app.services.validation import resolve_month_year_filter_or_raise
+from app.validators.common_validators import validate_month_year_filter
 from app.validators.category_validators import (
     validate_category_create_data,
     validate_category_update_data,
@@ -41,9 +41,7 @@ def get_all_categories(user_id: uuid.UUID):
 
 
 def create_category(data: dict, user_id: uuid.UUID):
-    validated, err, status = validate_category_create_data(data)
-    if err:
-        raise BadRequestError(err["error"], status_code=status)
+    validated = validate_category_create_data(data)
 
     if validated["parent_id"] is not None:
         parent = db.session.get(Category, validated["parent_id"])
@@ -76,9 +74,7 @@ def update_category(category_id: uuid.UUID, data: dict, user_id: uuid.UUID):
     if not category or category.user_id != user_id:
         raise NotFoundError("Category not found")
 
-    validated, err, status = validate_category_update_data(data)
-    if err:
-        raise BadRequestError(err["error"], status_code=status)
+    validated = validate_category_update_data(data)
 
     try:
         if "name" in validated:
@@ -98,7 +94,7 @@ def update_category(category_id: uuid.UUID, data: dict, user_id: uuid.UUID):
 
 
 def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int, user_id: uuid.UUID):
-    start, end = resolve_month_year_filter_or_raise(year, month)
+    start, end = validate_month_year_filter(year, month)
 
     category = db.session.get(Category, category_id)
     if not category or (category.user_id is not None and category.user_id != user_id):
