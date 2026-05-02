@@ -4,9 +4,9 @@ from sqlalchemy import func, or_
 
 from app.extensions import db
 from app.models import Category, Receipt, ReceiptItem
-from app.services.errors import BadRequestError, NotFoundError
+from app.services.errors import NotFoundError
 from app.services.responses import CreatedResult, OkResult
-from app.validators.common_validators import validate_month_year_filter
+from app.validators.common_validators import MonthYearFilter
 from app.validators.category_validators import (
     validate_category_create_data,
     validate_category_update_data,
@@ -93,8 +93,8 @@ def update_category(category_id: uuid.UUID, data: dict, user_id: uuid.UUID):
     return OkResult({"message": "Category updated successfully"})
 
 
-def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int, user_id: uuid.UUID):
-    start, end = validate_month_year_filter(year, month)
+def get_category_monthly_limit(category_id: uuid.UUID, month_filter: MonthYearFilter, user_id: uuid.UUID):
+    start, end = month_filter.range()
 
     category = db.session.get(Category, category_id)
     if not category or (category.user_id is not None and category.user_id != user_id):
@@ -114,8 +114,8 @@ def get_category_monthly_limit(category_id: uuid.UUID, year: int, month: int, us
     spent = round(float(spent_q.scalar() or 0), 2)
 
     return OkResult({
-        "year": year,
-        "month": month,
+        "year": month_filter.year,
+        "month": month_filter.month,
         "category_id": str(category_id),
         "spent": spent,
         "limit": float(category.limit) if category.limit is not None else None,

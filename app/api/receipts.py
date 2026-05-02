@@ -19,7 +19,7 @@ from app.api import bp, make_response
 from app.api.request_parsing import parse_json_object_body
 from app.services.errors import BadRequestError
 from app.services import receipts_service, tags_service
-from app.validators.common_validators import parse_month_year_query_params
+from app.validators.common_validators import parse_month_year_query_filter
 
 
 @bp.get("/receipts", strict_slashes=False)
@@ -77,7 +77,7 @@ def api_receipts_list():
 
     account_id = None
 
-    year, month = parse_month_year_query_params(year_raw, month_raw)
+    month_filter = parse_month_year_query_filter(year_raw, month_raw)
 
     if account_raw:
         try:
@@ -85,7 +85,7 @@ def api_receipts_list():
         except ValueError:
             raise BadRequestError("Invalid account_id format")
 
-    data, status = receipts_service.get_all_receipts(year=year, month=month, account_id=account_id)
+    data, status = receipts_service.get_all_receipts(month_filter=month_filter, account_id=account_id)
     if status != 200:
         return make_response(data, None, status)
     try:
@@ -462,11 +462,10 @@ def api_receipts_ekasa_items():
         except ValueError:
             return make_response({"error": "Invalid account_id format"}, None, 400)
 
-    year, month = parse_month_year_query_params(year_raw, month_raw)
+    month_filter = parse_month_year_query_filter(year_raw, month_raw)
 
     data, status = receipts_service.get_ekasa_items(
-        year=year,
-        month=month,
+        month_filter=month_filter,
         user_id=user_id,
         account_id=account_id,
     )

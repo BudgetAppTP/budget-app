@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from decimal import Decimal
 from datetime import date
 
@@ -105,7 +106,18 @@ def validate_non_empty_string(value, field_name: str):
     return text
 
 
-def parse_month_year_query_params(year_raw, month_raw):
+@dataclass(frozen=True)
+class MonthYearFilter:
+    year: int | None
+    month: int | None
+    start: date | None
+    end: date | None
+
+    def range(self) -> tuple[date | None, date | None]:
+        return self.start, self.end
+
+
+def parse_month_year_query_filter(year_raw, month_raw) -> MonthYearFilter:
     if year_raw is None:
         year = None
     else:
@@ -122,15 +134,15 @@ def parse_month_year_query_params(year_raw, month_raw):
         except (TypeError, ValueError) as exc:
             raise BadRequestError("Invalid month format") from exc
 
-    return year, month
+    return validate_month_year_filter(year, month)
 
 
-def validate_month_year_filter(year: int | None, month: int | None):
+def validate_month_year_filter(year: int | None, month: int | None) -> MonthYearFilter:
     if (year is None) ^ (month is None):
         raise BadRequestError("Both year and month must be provided together")
 
     if year is None and month is None:
-        return None, None
+        return MonthYearFilter(year=None, month=None, start=None, end=None)
 
     if not 1 <= year <= 9999:
         raise BadRequestError("Invalid year format")
@@ -144,4 +156,4 @@ def validate_month_year_filter(year: int | None, month: int | None):
     except ValueError:
         raise BadRequestError("Invalid year/month format")
 
-    return start, end
+    return MonthYearFilter(year=year, month=month, start=start, end=end)

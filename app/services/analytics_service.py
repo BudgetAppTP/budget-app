@@ -8,28 +8,26 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models import Receipt, ReceiptItem, Category, Tag
 from app.services import accounts_service
-from app.services.errors import BadRequestError
 from app.services.responses import OkResult
-from app.validators.common_validators import validate_month_year_filter
+from app.validators.common_validators import MonthYearFilter
 
 
 def get_donut_data(
     user_id: uuid.UUID,
-    year: int | None = None,
-    month: int | None = None,
+    month_filter: MonthYearFilter,
 ):
     account = accounts_service.find_main_account(user_id)
-
-    start, end = validate_month_year_filter(year, month)
+    start, end = month_filter.range()
 
     # TOTAL
     total_q = (
         db.session.query(func.coalesce(func.sum(ReceiptItem.total_price), 0))
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
-        .filter(Receipt.issue_date >= start, Receipt.issue_date < end)
         .filter(Receipt.user_id == user_id)
         .filter(Receipt.account_id == account.id)
     )
+    if start is not None and end is not None:
+        total_q = total_q.filter(Receipt.issue_date >= start, Receipt.issue_date < end)
 
     total_amount = float(total_q.scalar() or 0.0)
 
@@ -41,12 +39,13 @@ def get_donut_data(
         )
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .outerjoin(Category, ReceiptItem.category_id == Category.id)
-        .filter(Receipt.issue_date >= start, Receipt.issue_date < end)
         .filter(Receipt.user_id == user_id)
         .filter(Receipt.account_id == account.id)
         .group_by(func.coalesce(Category.name, "Uncategorized"))
         .order_by(func.coalesce(func.sum(ReceiptItem.total_price), 0).desc())
     )
+    if start is not None and end is not None:
+        cat_q = cat_q.filter(Receipt.issue_date >= start, Receipt.issue_date < end)
 
     categories = []
     for category, amount in cat_q.all():
@@ -69,7 +68,6 @@ def get_donut_data(
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .outerjoin(Category, ReceiptItem.category_id == Category.id)
         .outerjoin(Tag, Receipt.tag_id == Tag.id)
-        .filter(Receipt.issue_date >= start, Receipt.issue_date < end)
         .filter(Receipt.user_id == user_id)
         .filter(Receipt.account_id == account.id)
         .group_by(
@@ -83,6 +81,8 @@ def get_donut_data(
             Receipt.issue_date.asc(),
         )
     )
+    if start is not None and end is not None:
+        detail_q = detail_q.filter(Receipt.issue_date >= start, Receipt.issue_date < end)
 
     tags_by_category: dict[str, dict[str, dict[str, float]]] = {}
 
@@ -92,8 +92,8 @@ def get_donut_data(
         tags_by_category[category][tag][issue_date.isoformat()] = round(float(amount or 0.0), 2)
 
     return OkResult({
-        "year": year,
-        "month": month,
+        "year": month_filter.year,
+        "month": month_filter.month,
         "total_amount": round(total_amount, 2),
         "categories": categories,
         "tags_by_category": tags_by_category,

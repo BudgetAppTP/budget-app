@@ -45,7 +45,7 @@ from flask import g, request
 from app.api import bp
 from app.api.request_parsing import parse_json_object_body
 from app.services import incomes_service, tags_service
-from app.validators.common_validators import parse_month_year_query_params
+from app.validators.common_validators import parse_month_year_query_filter
 
 
 @bp.get("/incomes", strict_slashes=False)
@@ -63,14 +63,13 @@ def api_incomes_list():
       200: {"data": IncomeList, "error": null}
       400: see module errors
     """
-    year, month = parse_month_year_query_params(
+    month_filter = parse_month_year_query_filter(
         request.args.get("year"),
         request.args.get("month"),
     )
 
     result = incomes_service.get_all_incomes(
-        year=year,
-        month=month,
+        month_filter=month_filter,
         user_id=g.current_user.id,
         sort_by=request.args.get("sort", "income_date"),
         descending=request.args.get("order", "desc").lower() == "desc",

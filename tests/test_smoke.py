@@ -929,8 +929,8 @@ def test_auth_flow_ok(client):
 
 
 @pytest.mark.parametrize("path", [
-    "/api/export/csv?month=2025-10",
-    "/api/export/pdf?month=2025-10",
+    "/api/export/csv?year=2025&month=10",
+    "/api/export/pdf?year=2025&month=10",
 ])
 def test_export_ok(app, auth_client, path):
     with app.app_context():
@@ -980,7 +980,7 @@ def test_export_ok(app, auth_client, path):
     assert r.status_code == 200
     assert len(r.data) > 0
 
-    if path.endswith("csv?month=2025-10"):
+    if path.endswith("csv?year=2025&month=10"):
         csv_body = r.data.decode("utf-8")
         assert "Salary" in csv_body
         assert "Bread" in csv_body
@@ -989,14 +989,14 @@ def test_export_ok(app, auth_client, path):
 
 
 def test_export_pdf_invalid_month_returns_bad_request(auth_client):
-    r = auth_client.get("/api/export/pdf?month=2025-13")
+    r = auth_client.get("/api/export/pdf?year=2025&month=13")
 
     assert r.status_code == 400
     assert r.is_json
     body = r.get_json()
     assert body["data"] is None
     assert body["error"]["code"] == "bad_request"
-    assert body["error"]["message"] == "Month must be between 01 and 12"
+    assert body["error"]["message"] == "Month must be between 1 and 12"
 
 
 def test_app_does_not_register_legacy_services_container(app):

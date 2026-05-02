@@ -1,11 +1,9 @@
 import csv
-import re
 import uuid
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from io import BytesIO, StringIO
-from typing import Optional
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -14,7 +12,7 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models import Income, Receipt, ReceiptItem
 from app.services.accounts_service import find_main_account
-from app.services.errors import BadRequestError
+from app.validators.common_validators import MonthYearFilter
 
 
 @dataclass
@@ -31,29 +29,14 @@ class ExportRow:
     receipt_item_id: str
 
 
-def _parse_month_range(month: Optional[str]) -> tuple[Optional[date], Optional[date]]:
-    try:
-        if month is None or not str(month).strip():
-            return None, None
-
-        month = str(month).strip()
-        if not re.fullmatch(r"\d{4}-\d{2}", month):
-            raise ValueError("Invalid month format, expected YYYY-MM")
-
-        year = int(month[:4])
-        month_num = int(month[5:7])
-        if month_num < 1 or month_num > 12:
-            raise ValueError("Month must be between 01 and 12")
-
-        start = date(year, month_num, 1)
-        end = date(year + 1, 1, 1) if month_num == 12 else date(year, month_num + 1, 1)
-        return start, end
-    except ValueError as exc:
-        raise BadRequestError(str(exc)) from exc
+def _period_label(month_filter: MonthYearFilter) -> str:
+    if month_filter.year is None or month_filter.month is None:
+        return "all"
+    return f"{month_filter.year:04d}-{month_filter.month:02d}"
 
 
-def _income_rows(user_id: uuid.UUID, month: Optional[str], currency: str, account_name: str) -> list[ExportRow]:
-    start, end = _parse_month_range(month)
+def _income_rows(user_id: uuid.UUID, month_filter: MonthYearFilter, currency: str, account_name: str) -> list[ExportRow]:
+    start, end = month_filter.range()
     query = db.session.query(Income).filter(Income.user_id == user_id)
 
     if start is not None and end is not None:
@@ -78,8 +61,8 @@ def _income_rows(user_id: uuid.UUID, month: Optional[str], currency: str, accoun
     return rows
 
 
-def _expense_rows(user_id: uuid.UUID, month: Optional[str], currency: str) -> list[ExportRow]:
-    start, end = _parse_month_range(month)
+def _expense_rows(user_id: uuid.UUID, month_filter: MonthYearFilter, currency: str) -> list[ExportRow]:
+    start, end = month_filter.range()
     query = (
         db.session.query(Receipt)
         .options(
@@ -138,18 +121,19 @@ def _expense_rows(user_id: uuid.UUID, month: Optional[str], currency: str) -> li
     return rows
 
 
-def _export_rows(user_id: uuid.UUID, month: Optional[str]) -> list[ExportRow]:
+def _export_rows(user_id: uuid.UUID, month_filter: MonthYearFilter) -> list[ExportRow]:
     account = find_main_account(user_id)
     currency = account.currency
     account_name = account.name
-    rows = _income_rows(user_id, month, currency, account_name)
-    rows.extend(_expense_rows(user_id, month, currency))
+    rows = _income_rows(user_id, month_filter, currency, account_name)
+    rows.extend(_expense_rows(user_id, month_filter, currency))
     rows.sort(key=lambda row: (row.date, row.kind, row.description, row.receipt_id, row.receipt_item_id))
     return rows
 
 
-def export_csv(user_id: uuid.UUID, month: Optional[str]) -> tuple[bytes, str]:
-    rows = _export_rows(user_id, month)
+def export_csv(user_id: uuid.UUID, month_filter: MonthYearFilter) -> tuple[bytes, str]:
+    rows = _export_rows(user_id, month_filter)
+    period_label = _period_label(month_filter)
     sio = StringIO()
     writer = csv.writer(sio, delimiter=",")
     writer.writerow(
@@ -183,12 +167,13 @@ def export_csv(user_id: uuid.UUID, month: Optional[str]) -> tuple[bytes, str]:
         )
 
     data = sio.getvalue().encode("utf-8")
-    name = f"export_{month or 'all'}_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
+    name = f"export_{period_label}_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
     return data, name
 
 
-def export_pdf(user_id: uuid.UUID, month: Optional[str]) -> tuple[bytes, str]:
-    rows = _export_rows(user_id, month)
+def export_pdf(user_id: uuid.UUID, month_filter: MonthYearFilter) -> tuple[bytes, str]:
+    rows = _export_rows(user_id, month_filter)
+    period_label = _period_label(month_filter)
     income_total = sum((row.amount for row in rows if row.kind == "income"), Decimal("0.00"))
     expense_total = sum((row.amount for row in rows if row.kind == "expense"), Decimal("0.00"))
 
@@ -207,7 +192,7 @@ def export_pdf(user_id: uuid.UUID, month: Optional[str]) -> tuple[bytes, str]:
 
     pdf.setTitle("Budget Export")
     line("Budget Export", font="Helvetica-Bold", size=14, step=18)
-    line(f"Month: {month or 'all'}")
+    line(f"Month: {period_label}")
     line(f"Total incomes: {income_total}")
     line(f"Total expenses: {expense_total}")
     line(f"Balance: {income_total - expense_total}", step=18)
@@ -226,4 +211,4 @@ def export_pdf(user_id: uuid.UUID, month: Optional[str]) -> tuple[bytes, str]:
 
     pdf.save()
     bio.seek(0)
-    return bio.read(), f"export_{month or 'all'}.pdf"
+    return bio.read(), f"export_{period_label}.pdf"

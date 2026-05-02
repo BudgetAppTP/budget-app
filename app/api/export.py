@@ -5,13 +5,14 @@ Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
 Paths:
-  - GET /api/export/csv?month=YYYY-MM
-  - GET /api/export/pdf?month=YYYY-MM
+  - GET /api/export/csv
+  - GET /api/export/pdf
 
 Schemas:
   ExportQuery:
     {
-      "month": "YYYY-MM | omitted"
+      "year": "int | omitted",
+      "month": "int | omitted"
     }
 
 Common errors:
@@ -27,6 +28,7 @@ from io import BytesIO
 from flask import g, request, send_file
 from app.api import bp
 from app.services import export_service
+from app.validators.common_validators import parse_month_year_query_filter
 
 
 @bp.get("/export/csv", strict_slashes=False)
@@ -35,7 +37,8 @@ def api_export_csv():
     Export monthly data as CSV
 
     Query:
-      - month: "YYYY-MM" (optional)
+      - year: int | omitted
+      - month: int | omitted
 
     Responses:
       200:
@@ -44,8 +47,11 @@ def api_export_csv():
       400: see module errors
       404: see module errors
     """
-    month = request.args.get("month") or None
-    data, name = export_service.export_csv(g.current_user.id, month)
+    month_filter = parse_month_year_query_filter(
+        request.args.get("year"),
+        request.args.get("month"),
+    )
+    data, name = export_service.export_csv(g.current_user.id, month_filter=month_filter)
     return send_file(BytesIO(data), mimetype="text/csv", as_attachment=True, download_name=name)
 
 
@@ -55,7 +61,8 @@ def api_export_pdf():
     Export monthly report as PDF
 
     Query:
-      - month: "YYYY-MM" (optional)
+      - year: int | omitted
+      - month: int | omitted
 
     Responses:
       200:
@@ -64,6 +71,9 @@ def api_export_pdf():
       400: see module errors
       404: see module errors
     """
-    month = request.args.get("month") or None
-    data, name = export_service.export_pdf(g.current_user.id, month)
+    month_filter = parse_month_year_query_filter(
+        request.args.get("year"),
+        request.args.get("month"),
+    )
+    data, name = export_service.export_pdf(g.current_user.id, month_filter=month_filter)
     return send_file(BytesIO(data), mimetype="application/pdf", as_attachment=True, download_name=name)

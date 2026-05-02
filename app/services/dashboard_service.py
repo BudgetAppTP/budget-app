@@ -6,13 +6,12 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models import Income, Receipt
 from app.services.responses import OkResult
-from app.validators.common_validators import validate_month_year_filter
+from app.validators.common_validators import MonthYearFilter, validate_month_year_filter
 
 
 def get_month_summary(
     user_id: uuid.UUID,
-    year: int | None = None,
-    month: int | None = None,
+    month_filter: MonthYearFilter,
 ):
     """
     Return total incomes and total expenses for selected month/year.
@@ -21,12 +20,11 @@ def get_month_summary(
     """
 
     # default: current month
-    if year is None and month is None:
+    if month_filter.year is None and month_filter.month is None:
         today = date.today()
-        year = today.year
-        month = today.month
+        month_filter = validate_month_year_filter(today.year, today.month)
 
-    start, end = validate_month_year_filter(year, month)
+    start, end = month_filter.range()
 
     incomes_q = db.session.query(func.coalesce(func.sum(Income.amount), 0))
     incomes_q = incomes_q.filter(
@@ -48,8 +46,8 @@ def get_month_summary(
 
     return OkResult({
         "success": True,
-        "year": year,
-        "month": month,
+        "year": month_filter.year,
+        "month": month_filter.month,
         "total_incomes": total_incomes,
         "total_expenses": total_expenses,
         "balance": total_incomes - total_expenses,

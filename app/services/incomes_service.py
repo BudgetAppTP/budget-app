@@ -5,7 +5,7 @@ from app.models import Income, Tag
 from app.services import tags_service
 from app.services.errors import BadRequestError, ForbiddenError, NotFoundError
 from app.services.responses import CreatedResult, OkResult
-from app.validators.common_validators import validate_month_year_filter
+from app.validators.common_validators import MonthYearFilter
 from app.validators.income_validators import (
     validate_income_create_data,
     validate_income_update_data,
@@ -53,8 +53,7 @@ def _get_owned_income(income_id: uuid.UUID, user_id: uuid.UUID) -> Income:
 
 def get_all_incomes(
     user_id: uuid.UUID,
-    year: int | None = None,
-    month: int | None = None,
+    month_filter: MonthYearFilter,
     sort_by: str = "income_date",
     descending: bool = True,
 ):
@@ -63,7 +62,7 @@ def get_all_incomes(
 
     query = db.session.query(Income).filter(Income.user_id == user_id)
 
-    start, end = validate_month_year_filter(year, month)
+    start, end = month_filter.range()
     if start is not None and end is not None:
         query = query.filter(
             Income.income_date.isnot(None),

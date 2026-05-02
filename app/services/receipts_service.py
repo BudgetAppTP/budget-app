@@ -9,7 +9,7 @@ from datetime import date, datetime
 
 from app.services import tags_service, ekasa_service
 from app.services.errors import BadRequestError
-from app.validators.common_validators import validate_month_year_filter
+from app.validators.common_validators import MonthYearFilter
 from app.validators.receipt_validators import validate_receipt_create_data, validate_receipt_update_data
 
 
@@ -18,8 +18,7 @@ def _receipt_currency(receipt: Receipt) -> str | None:
 
 
 def get_all_receipts(
-    year: int | None = None,
-    month: int | None = None,
+    month_filter: MonthYearFilter,
     account_id: uuid.UUID | None = None,
 ):
     """
@@ -46,7 +45,7 @@ def get_all_receipts(
         joinedload(Receipt.tag),
     )
 
-    start, end = validate_month_year_filter(year, month)
+    start, end = month_filter.range()
 
     if start is not None and end is not None:
         query = query.filter(
@@ -441,8 +440,7 @@ def import_receipt_from_ekasa(
         return {"error": f"Import failed: {str(e)}"}, 400
 
 def get_ekasa_items(
-    year: int | None = None,
-    month: int | None = None,
+    month_filter: MonthYearFilter,
     user_id: uuid.UUID | None = None,
     account_id: uuid.UUID | None = None,
 ):
@@ -455,7 +453,7 @@ def get_ekasa_items(
       - only eKasa-imported receipts are included (Receipt.external_uid != null)
       - optional user_id filter
     """
-    start, end = validate_month_year_filter(year, month)
+    start, end = month_filter.range()
 
     query = (
         db.session.query(Receipt)

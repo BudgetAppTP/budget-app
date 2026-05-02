@@ -37,7 +37,7 @@ from app.api import bp
 from app.api.request_parsing import parse_json_object_body
 from app.services import categories_service
 from app.services.errors import BadRequestError
-from app.validators.common_validators import parse_month_year_query_params
+from app.validators.common_validators import parse_month_year_query_filter
 
 
 @bp.get("/categories", strict_slashes=False)
@@ -93,7 +93,7 @@ def get_category_monthly_limit():
     if year_raw is None or month_raw is None or not category_raw:
         raise BadRequestError("Missing required query params: year, month, category_id")
 
-    year, month = parse_month_year_query_params(year_raw, month_raw)
+    month_filter = parse_month_year_query_filter(year_raw, month_raw)
 
     try:
         category_id = uuid.UUID(category_raw)
@@ -102,8 +102,7 @@ def get_category_monthly_limit():
 
     result = categories_service.get_category_monthly_limit(
         category_id=category_id,
-        year=year,
-        month=month,
+        month_filter=month_filter,
         user_id=g.current_user.id,
     )
     return result.to_flask_response()
