@@ -1047,7 +1047,7 @@ def test_create_income_non_object_json_uses_error_envelope(auth_client):
     assert body["error"]["message"] == "JSON body must be an object"
 
 
-def test_create_income_rejects_empty_string_tag_id(auth_client):
+def test_create_income_allows_empty_string_tag_id_as_no_tag(auth_client):
     r = auth_client.post(
         "/api/incomes",
         json={
@@ -1058,15 +1058,20 @@ def test_create_income_rejects_empty_string_tag_id(auth_client):
         },
     )
 
-    assert r.status_code == 400
+    assert r.status_code == 201
     assert r.is_json
     body = r.get_json()
-    assert body["data"] is None
-    assert body["error"]["code"] == "bad_request"
-    assert body["error"]["message"] == "Missing tag_id"
+    assert body["error"] is None
+    created_id = body["data"]["id"]
+
+    details = auth_client.get(f"/api/incomes/{created_id}")
+    assert details.status_code == 200
+    details_body = details.get_json()
+    assert details_body["error"] is None
+    assert details_body["data"]["tag_id"] is None
 
 
-def test_update_income_rejects_empty_string_tag_id(auth_client):
+def test_update_income_treats_empty_string_tag_id_as_detach(auth_client):
     created = auth_client.post(
         "/api/incomes",
         json={
@@ -1083,12 +1088,16 @@ def test_update_income_rejects_empty_string_tag_id(auth_client):
         json={"tag_id": ""},
     )
 
-    assert r.status_code == 400
+    assert r.status_code == 200
     assert r.is_json
     body = r.get_json()
-    assert body["data"] is None
-    assert body["error"]["code"] == "bad_request"
-    assert body["error"]["message"] == "Missing tag_id"
+    assert body["error"] is None
+
+    details = auth_client.get(f"/api/incomes/{income_id}")
+    assert details.status_code == 200
+    details_body = details.get_json()
+    assert details_body["error"] is None
+    assert details_body["data"]["tag_id"] is None
 
 
 def test_user_cannot_access_another_users_income(client, app):

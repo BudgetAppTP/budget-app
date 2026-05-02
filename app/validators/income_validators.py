@@ -1,4 +1,5 @@
 from app.validators.common_validators import (
+    parse_uuid_field,
     validate_date_field,
     validate_decimal_field,
     validate_json_object,
@@ -22,13 +23,19 @@ def validate_income_create_data(data: dict):
         required=True,
     )
 
+    tag_id = parse_uuid_field(
+        data.get("tag_id"),
+        "tag_id",
+        required=False,
+    )
+
     extra_metadata = validate_json_object(
         data.get("extra_metadata"),
         "extra_metadata",
     )
 
     return {
-        "tag_id": data.get("tag_id"),
+        "tag_id": tag_id,
         "description": description,
         "amount": amount,
         "income_date": income_date,
@@ -67,6 +74,10 @@ def validate_income_update_data(data: dict):
         )
 
     if "tag_id" in data:
-        cleaned["tag_id"] = data.get("tag_id")
+        cleaned["tag_id"] = parse_uuid_field(
+            data.get("tag_id"),
+            "tag_id",
+            required=False,
+        )
 
     return cleaned
