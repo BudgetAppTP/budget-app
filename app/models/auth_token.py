@@ -57,9 +57,9 @@ class AuthToken(Base):
     user: Mapped["User"] = relationship("User", back_populates="auth_tokens")
 
     def is_expired(self) -> bool:
-        """Return True if the token is expired."""
-        from datetime import datetime as _dt  # avoid name shadowing
-        return _dt.utcnow() >= self.expires_at
+        from datetime import datetime as _dt
+        ea = self.expires_at.replace(tzinfo=None) if self.expires_at.tzinfo else self.expires_at
+        return _dt.utcnow() >= ea
 
     def __repr__(self) -> str:
         return f"<AuthToken id={self.id} user_id={self.user_id} expires_at={self.expires_at.isoformat()}>"

@@ -52,7 +52,8 @@ class EmailVerification(Base):
 
     def is_expired(self) -> bool:
         from datetime import datetime as _dt
-        return _dt.utcnow() >= self.expires_at
+        ea = self.expires_at.replace(tzinfo=None) if self.expires_at.tzinfo else self.expires_at
+        return _dt.utcnow() >= ea
 
     def __repr__(self) -> str:
         return f"<EmailVerification id={self.id} user_id={self.user_id} code={self.code}>"
