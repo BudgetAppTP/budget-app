@@ -17,7 +17,7 @@ Actual API returns the same payload in "data" field:
 
 import uuid
 
-from flask import request
+from flask import g, request
 
 from app.api import bp, make_response
 from app.services import categories_service
@@ -40,7 +40,7 @@ def api_categories_list():
           }
         error: null
     """
-    data, status = categories_service.get_all_categories()
+    data, status = categories_service.get_all_categories(user_id=g.current_user.id)
     return make_response(data, None, status)
 
 
@@ -68,7 +68,7 @@ def create_category():
     """
     # Accept JSON body (force=True allows clients that forget the Content-Type header)
     payload = request.get_json(force=True) or {}
-    response, status = categories_service.create_category(payload)
+    response, status = categories_service.create_category(payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -101,7 +101,12 @@ def get_category_monthly_limit():
     except ValueError:
         return make_response({"error": "Invalid category_id format"}, None, 400)
 
-    data, status = categories_service.get_category_monthly_limit(category_id=category_id, year=year, month=month)
+    data, status = categories_service.get_category_monthly_limit(
+        category_id=category_id,
+        year=year,
+        month=month,
+        user_id=g.current_user.id,
+    )
     return make_response(data, None, status)
 
 
@@ -138,7 +143,7 @@ def update_category(category_id):
     if not payload:
         return make_response(None, {"code": "bad_request", "message": "Missing JSON body"}, 400)
 
-    response, status = categories_service.update_category(category_id, payload)
+    response, status = categories_service.update_category(category_id, payload, user_id=g.current_user.id)
     return make_response(response, None, status)
 
 
@@ -159,5 +164,5 @@ def delete_category(category_id):
         data: null
         error: {"code":"not_found","message":"Category not found"}
     """
-    response, status = categories_service.delete_category(category_id)
+    response, status = categories_service.delete_category(category_id, user_id=g.current_user.id)
     return make_response(response, None, status)
