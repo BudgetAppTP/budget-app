@@ -3,47 +3,51 @@ Monthly Budget API
 
 Paths:
   - GET /api/monthly-budget
+
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
+Schemas:
+  MonthlyBudget:
+    {
+      "month": "YYYY-MM",
+      "incomes": [object],
+      "expenses": [object],
+      "total_income": float,
+      "total_expense": float,
+      "balance": float
+    }
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
 """
 
-import uuid
-from flask import request
-from app.api import bp, make_response
+from flask import g, request
+
+from app.api import bp
 from app.services import monthly_budget_service
+from app.validators.common_validators import parse_month_year_query_filter
 
 
 @bp.get("/monthly-budget", strict_slashes=False)
 def api_monthly_budget_get():
     """
-    GET /api/monthly-budget
-    Query (optional):
-      - month: YYYY-MM
-      - user_id: uuid (optional)
+    Return monthly income and expense details for the authenticated user.
 
-    Behavior:
-      - if month missing -> use current month
+    Query:
+      year: int | omitted
+      month: int | omitted
+
+    Responses:
+      200: {"data": MonthlyBudget, "error": null}
+      400: see module errors
     """
-    month = request.args.get("month")
-    user_raw = request.args.get("user_id")
-
-    user_id = None
-
-    if user_raw:
-        try:
-            user_id = uuid.UUID(user_raw)
-        except ValueError:
-            return make_response(
-                None,
-                {"code": "validation_error", "message": "Invalid user_id format"},
-                400,
-            )
-
-    data, status = monthly_budget_service.get_month_summary_budget(month=month, user_id=user_id)
-
-    if status != 200:
-        return make_response(
-            None,
-            {"code": "validation_error", "message": data.get("error", "Validation error")},
-            status,
-        )
-
-    return make_response(data, None, status)
+    month_filter = parse_month_year_query_filter(
+        request.args.get("year"),
+        request.args.get("month"),
+    )
+    result = monthly_budget_service.get_month_summary_budget(
+        user_id=g.current_user.id,
+        month_filter=month_filter,
+    )
+    return result.to_flask_response()

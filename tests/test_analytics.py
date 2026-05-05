@@ -169,3 +169,64 @@ def test_dashboard_summary_uses_error_envelope_for_invalid_query_values(app):
     assert response.get_json()["data"] is None
     assert response.get_json()["error"]["code"] == "bad_request"
     assert response.get_json()["error"]["message"] == "Invalid month format"
+
+
+def test_monthly_budget_ignores_user_id_query_param_and_stays_scoped_to_authenticated_user(app):
+    first = app.test_client()
+    second = app.test_client()
+
+    register_and_login(first, "monthly-budget-first@test.local")
+    register_and_login(second, "monthly-budget-second@test.local")
+
+    first_user_id = first.get("/api/auth/me").get_json()["data"]["id"]
+    second_user_id = second.get("/api/auth/me").get_json()["data"]["id"]
+    first_account_id = first.get("/api/account").get_json()["data"]["id"]
+    second_account_id = second.get("/api/account").get_json()["data"]["id"]
+
+    with app.app_context():
+        _create_income(first_user_id, "100.00")
+        _create_receipt(first_user_id, first_account_id, "10.00")
+        _create_income(second_user_id, "250.00")
+        _create_receipt(second_user_id, second_account_id, "30.00")
+        db.session.commit()
+
+    own = first.get("/api/monthly-budget?year=2025&month=10")
+    assert own.status_code == 200
+    own_data = own.get_json()["data"]
+    assert own_data["month"] == "2025-10"
+    assert own_data["total_income"] == 100.0
+    assert own_data["total_expense"] == 10.0
+    assert own_data["balance"] == 90.0
+    assert len(own_data["incomes"]) == 1
+    assert len(own_data["expenses"]) == 1
+
+    ignored = first.get(f"/api/monthly-budget?year=2025&month=10&user_id={second_user_id}")
+    assert ignored.status_code == 200
+    ignored_data = ignored.get_json()["data"]
+    assert ignored_data["month"] == "2025-10"
+    assert ignored_data["total_income"] == 100.0
+    assert ignored_data["total_expense"] == 10.0
+    assert ignored_data["balance"] == 90.0
+    assert len(ignored_data["incomes"]) == 1
+    assert len(ignored_data["expenses"]) == 1
+
+
+def test_monthly_budget_ignores_invalid_user_id_query_param(app):
+    client = app.test_client()
+    register_and_login(client, "monthly-budget-errors@test.local")
+    user_id = client.get("/api/auth/me").get_json()["data"]["id"]
+    account_id = client.get("/api/account").get_json()["data"]["id"]
+
+    with app.app_context():
+        _create_income(user_id, "75.00")
+        _create_receipt(user_id, account_id, "25.00")
+        db.session.commit()
+
+    response = client.get("/api/monthly-budget?year=2025&month=10&user_id=not-a-uuid")
+
+    assert response.status_code == 200
+    payload = response.get_json()["data"]
+    assert payload["month"] == "2025-10"
+    assert payload["total_income"] == 75.0
+    assert payload["total_expense"] == 25.0
+    assert payload["balance"] == 50.0
