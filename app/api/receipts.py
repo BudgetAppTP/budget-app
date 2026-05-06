@@ -2,132 +2,111 @@
 Receipts API
 
 Paths:
-  - GET    /api/receipts/                 List receipts
-  - POST   /api/receipts/                 Create receipt
-  - GET    /api/receipts/{receipt_id}     Get receipt by id
-  - PUT    /api/receipts/{receipt_id}     Update receipt
-  - DELETE /api/receipts/{receipt_id}     Delete receipt
+  - GET    /api/receipts
+  - GET    /api/receipts/tags
+  - POST   /api/receipts
+  - GET    /api/receipts/{receipt_id}
+  - PUT    /api/receipts/{receipt_id}
+  - DELETE /api/receipts/{receipt_id}
+  - POST   /api/receipts/import-ekasa
+  - GET    /api/receipts/ekasa-items
 
-Notes:
-- Swagger может показывать «сырой» JSON (без конверта). Фактический ответ — в конверте:
-  { "data": <payload>, "error": null }.
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
+Schemas:
+  Receipt:
+    {
+      "id": uuid,
+      "external_uid": "str | null",
+      "tag": "str | null",
+      "tag_id": "uuid | null",
+      "description": str,
+      "issue_date": "YYYY-MM-DD | null",
+      "currency": "str | null",
+      "total_amount": float,
+      "extra_metadata": "object | null",
+      "user_id": uuid,
+      "account_id": uuid,
+      "created_at": "ISO-8601 datetime | null"
+    }
+
+  ReceiptList:
+    [Receipt]
+
+  EkasaChecks:
+    {
+      "success": true,
+      "checks": [object],
+      "total_checks": int,
+      "total_items": int
+    }
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
+  403: {"data": null, "error": {"code": "forbidden", "message": str}}
+  404: {"data": null, "error": {"code": "not_found", "message": str}}
+  409: {"data": null, "error": {"code": "conflict", "message": str}}
 """
+
 import uuid
 
-from flask import request, g
-from app.api import bp, make_response
+from flask import g, request
+
+from app.api import bp
 from app.api.request_parsing import parse_json_object_body
-from app.services.errors import BadRequestError
 from app.services import receipts_service, tags_service
-from app.validators.common_validators import parse_month_year_query_filter
+from app.validators.common_validators import (
+    parse_month_year_query_filter,
+    parse_uuid_field,
+)
 
 
 @bp.get("/receipts", strict_slashes=False)
 def api_receipts_list():
     """
-    GET /api/receipts/
-    Summary: List receipts with optional sorting and optional month/year filter
+    List receipts owned by the authenticated user.
 
     Query:
-      - sort: "issue_date" | "total_amount" (default: "issue_date")
-      - order: "asc" | "desc" (default: "desc")
-      - year: YYYY (optional, must be provided вместе с month)
-      - month: 1..12 (optional, must be provided вместе с year)
-
-    Notes:
-      - If year+month are provided, endpoint returns only receipts from that month/year.
+      sort: "issue_date" | "total_amount" (default: "issue_date")
+      order: "asc" | "desc" (default: "desc")
+      year: int | omitted
+      month: int | omitted
+      account_id: "uuid | omitted"
 
     Responses:
-      200:
-        data: [
-          {
-            "id": "<uuid>",
-            "external_uid": "<str|null>",
-            "tag": "Groceries" | null,
-            "tag_id": "<uuid>" | null,
-            "description": "Tesco groceries",
-            "issue_date": "YYYY-MM-DD" | null,
-            "currency": "EUR",
-            "total_amount": number,
-            "extra_metadata": { ... } | null,
-            "user_id": "<uuid>",
-            "created_at": "YYYY-MM-DDTHH:MM:SS+ZZ:ZZ" | null
-          },
-          ...
-        ]
-        error: null
-
-      400:
-        - If query params are invalid:
-          data:
-            { "error": "Both year and month must be provided together"
-              | "Month must be between 1 and 12"
-              | "Invalid year format"
-              | "Invalid month format"
-            }
-          error: null
+      200: {"data": ReceiptList, "error": null}
+      400: see module errors
+      403: see module errors
     """
-    sort_by = request.args.get("sort", "issue_date")
-    order = request.args.get("order", "desc")
-    reverse = order.lower() == "desc"
+    month_filter = parse_month_year_query_filter(
+        request.args.get("year"),
+        request.args.get("month"),
+    )
 
-    year_raw = request.args.get("year")
-    month_raw = request.args.get("month")
-    account_raw = request.args.get("account_id")
+    account_id = parse_uuid_field(
+        request.args.get("account_id"),
+        "account_id",
+        required=False,
+    )
 
-    account_id = None
-
-    month_filter = parse_month_year_query_filter(year_raw, month_raw)
-
-    if account_raw:
-        try:
-            account_id = uuid.UUID(account_raw)
-        except ValueError:
-            raise BadRequestError("Invalid account_id format")
-
-    data, status = receipts_service.get_all_receipts(month_filter=month_filter, account_id=account_id)
-    if status != 200:
-        return make_response(data, None, status)
-    try:
-        data.sort(key=lambda r: r.get(sort_by), reverse=reverse)
-    except Exception:
-        pass
-
-    return make_response(data, None, 200)
+    result = receipts_service.get_all_receipts(
+        g.current_user.id,
+        month_filter=month_filter,
+        sort_by=request.args.get("sort", "issue_date"),
+        descending=request.args.get("order", "desc").lower() == "desc",
+        account_id=account_id,
+    )
+    return result.to_flask_response()
 
 
 @bp.get("/receipts/tags", strict_slashes=False)
 def api_expense_tags_list():
     """
-    GET /api/receipts/tags
-    Summary: Get all expense-related tags (type=EXPENSE or BOTH)
-
-    Query (optional):
-      - user_id: uuid (if provided, returns only tags of that user)
+    List expense-related tags for the authenticated user.
 
     Responses:
-      200:
-        data:
-          {
-            "success": true,
-            "tags": [
-              {
-                "id": "<uuid>",
-                "user_id": "<uuid>",
-                "name": "Groceries",
-                "type": "EXPENSE" | "BOTH",
-                "counter": number
-              },
-              ...
-            ]
-          }
-        error: null
-
-      400:
-        - If user_id format is invalid:
-          data:
-            { "error": "Invalid user_id format" }
-          error: null
+      200: {"data": {"success": true, "tags": [object]}, "error": null}
     """
     result = tags_service.get_expense_tags(user_id=g.current_user.id)
     return result.to_flask_response()
@@ -136,337 +115,148 @@ def api_expense_tags_list():
 @bp.post("/receipts", strict_slashes=False)
 def api_receipts_create():
     """
-    POST /api/receipts/
-    Summary: Create receipt
+    Create a receipt for the authenticated user.
 
-    Request (JSON):
+    Request:
       {
-        "user_id": "<uuid>",               # required
-        "issue_date": "YYYY-MM-DD",        # optional (can be null/omitted)
-        "description": "Tesco groceries",  # required, non-empty string
-        "currency": "EUR",                 # optional, default: "EUR"
-        "total_amount": 23.45,             # optional, default: 0.0
-        "tag_id": "<uuid>",                # optional, must belong to the same user
-        "external_uid": "<str>",           # optional, external receipt id
-        "extra_metadata": { ... }          # optional JSON
+        "account_id": "uuid | omitted",
+        "tag_id": "uuid | null | omitted",
+        "description": str,
+        "issue_date": "YYYY-MM-DD",
+        "total_amount": float,
+        "external_uid": "str | null | omitted",
+        "extra_metadata": "object | null | omitted"
       }
 
     Responses:
-      201:
-        data:
-          {
-            "id": "<uuid>",
-            "message": "Receipt created successfully"
-          }
-        error: null
-
-      400:
-        - If body is missing:
-          data: null
-          error: {"code":"bad_request","message":"Missing JSON body"}
-
-        - If validation fails (e.g. missing description, bad user/tag):
-          data:
-            {
-              "error": "Missing user_id"
-                | "Invalid user_id format"
-                | "Invalid tag_id format"
-                | "Tag not found"
-                | "Tag does not belong to this user"
-                | "Missing description"
-                | "Invalid issue_date format, expected YYYY-MM-DD"
-            }
-          error: null
+      201: {"data": {"id": uuid, "message": str}, "error": null}
+      400: see module errors
+      403: see module errors
+      404: see module errors
     """
-    payload = parse_json_object_body(allow_empty=False)
-    response, status = receipts_service.create_receipt(payload, user_id=g.current_user.id)
-    return make_response(response, None, status)
+    payload = parse_json_object_body()
+    result = receipts_service.create_receipt(payload, user_id=g.current_user.id)
+    return result.to_flask_response()
 
 
 @bp.get("/receipts/<uuid:receipt_id>", strict_slashes=False)
-def api_receipts_get(receipt_id):
+def api_receipts_get(receipt_id: uuid.UUID):
     """
-    GET /api/receipts/{receipt_id}
-    Summary: Get receipt by id
+    Get one receipt owned by the authenticated user.
 
     Path:
       receipt_id: uuid
 
     Responses:
-      200:
-        data:
-          {
-            "id": "<uuid>",
-            "external_uid": "<str|null>",
-            "tag": "Groceries" | null,
-            "tag_id": "<uuid>" | null,
-            "description": "Tesco groceries",
-            "issue_date": "YYYY-MM-DD" | null,
-            "currency": "EUR",
-            "total_amount": number,
-            "extra_metadata": { ... } | null,
-            "user_id": "<uuid>",
-            "created_at": "YYYY-MM-DDTHH:MM:SS+ZZ:ZZ" | null
-          }
-        error: null
-
-      404:
-        data:
-          {
-            "error": "Receipt not found"
-          }
-        error: null
+      200: {"data": Receipt, "error": null}
+      404: see module errors
     """
-    receipt, status = receipts_service.get_receipt_by_id(receipt_id, user_id=g.current_user.id)
-    return make_response(receipt, None, status)
+    result = receipts_service.get_receipt_by_id(receipt_id, user_id=g.current_user.id)
+    return result.to_flask_response()
 
 
 @bp.put("/receipts/<uuid:receipt_id>", strict_slashes=False)
-def api_receipts_update(receipt_id):
+def api_receipts_update(receipt_id: uuid.UUID):
     """
-    PUT /api/receipts/{receipt_id}
-    Summary: Update receipt
+    Update one receipt owned by the authenticated user.
 
     Path:
       receipt_id: uuid
 
-    Request (JSON):
+    Request:
       {
-        "issue_date": "YYYY-MM-DD",        # optional
-        "description": "Updated text",     # optional, if present must be non-empty
-        "currency": "EUR",                 # optional
-        "total_amount": 25.00,             # optional
-        "tag_id": "<uuid>",                # optional, null to detach tag
-        "external_uid": "<str>",           # optional
-        "extra_metadata": { ... }          # optional
+        "tag_id": "uuid | null | omitted",
+        "description": "str | omitted",
+        "issue_date": "YYYY-MM-DD | omitted",
+        "total_amount": "float | omitted",
+        "external_uid": "str | null | omitted",
+        "extra_metadata": "object | null | omitted"
       }
 
     Responses:
-      200:
-        data:
-          {
-            "id": "<uuid>",
-            "message": "Receipt updated successfully"
-          }
-        error: null
-
-      400:
-        - If body is missing:
-          data: null
-          error: {"code":"bad_request","message":"Missing JSON body"}
-
-        - If validation fails (e.g. empty description, invalid tag/date):
-          data:
-            {
-              "error": "Description cannot be empty"
-                | "Invalid tag_id format"
-                | "Tag not found"
-                | "Tag does not belong to this user"
-                | "Invalid issue_date format, expected YYYY-MM-DD"
-            }
-          error: null
-
-      404:
-        data:
-          {
-            "error": "Receipt not found"
-          }
-        error: null
+      200: {"data": {"id": uuid, "message": str}, "error": null}
+      400: see module errors
+      403: see module errors
+      404: see module errors
     """
-    payload = parse_json_object_body(allow_empty=False)
-    response, status = receipts_service.update_receipt(receipt_id, payload, user_id=g.current_user.id)
-    return make_response(response, None, status)
+    payload = parse_json_object_body()
+    result = receipts_service.update_receipt(
+        receipt_id,
+        payload,
+        user_id=g.current_user.id,
+    )
+    return result.to_flask_response()
 
 
 @bp.delete("/receipts/<uuid:receipt_id>", strict_slashes=False)
-def api_receipts_delete(receipt_id):
+def api_receipts_delete(receipt_id: uuid.UUID):
     """
-    DELETE /api/receipts/{receipt_id}
-    Summary: Delete receipt
+    Delete one receipt owned by the authenticated user.
 
     Path:
       receipt_id: uuid
 
     Responses:
-      200:
-        data:
-          {
-            "message": "Receipt deleted successfully"
-          }
-        error: null
-
-      404:
-        data:
-          {
-            "error": "Receipt not found"
-          }
-        error: null
+      200: {"data": {"message": str}, "error": null}
+      404: see module errors
     """
-    response, status = receipts_service.delete_receipt(receipt_id, user_id=g.current_user.id)
-    return make_response(response, None, status)
+    result = receipts_service.delete_receipt(receipt_id, user_id=g.current_user.id)
+    return result.to_flask_response()
+
 
 @bp.post("/receipts/import-ekasa", strict_slashes=False)
 def api_receipts_import_ekasa():
     """
-    POST /api/receipts/import-ekasa
-    Summary: Import receipt from eKasa
+    Import one eKasa receipt for the authenticated user.
 
-    Request (JSON):
+    Request:
       {
-        "receiptId": "<string>",   # eKasa receiptId
-        "user_id": "<uuid>"        # owner of the receipt (must exist)
+        "receipt_id": str,
+        "account_id": "uuid | omitted"
       }
 
     Responses:
-      201:
-        data:
-          {
-            "message": "Receipt imported successfully",
-            "tag": "Merchant name" | null,
-            "tag_id": "<uuid>" | null,
-            "receipt_id": "<uuid>",
-            "total_items": 5
-          }
-        error: null
-
-      400 / 4xx:
-        - If required fields are missing:
-          data: null
-          error: {
-            "code": "bad_request",
-            "message": "Missing receiptId or user_id"
-          }
-
-        - If eKasa or import fails:
-          data: null
-          error: {
-            "code": "ekasa_error",
-            "message": "Import failed: ...",
-            "details": {
-              "error": "...",      # original error payload from service
-              ...
-            }
-          }
+      201: {"data": {"receipt_id": uuid, "message": str, "total_items": int}, "error": null}
+      400: see module errors
+      403: see module errors
+      409: see module errors
     """
     payload = parse_json_object_body()
-
-    receipt_id = payload.get("receiptId") or payload.get("receipt_id")
-    user_id = payload.get("user_id") or payload.get("userId")
-    account_id = payload.get("account_id") or payload.get("accountId")
-
-    # Basic validation of required fields
-    if not receipt_id or not user_id:
-        return make_response(
-            None,
-            {"code": "bad_request", "message": "Missing receiptId"},
-            400,
-        )
-
-    service_payload, status = receipts_service.import_receipt_from_ekasa(
-        receipt_id, user_id, account_id
+    result = receipts_service.import_receipt_from_ekasa(
+        payload,
+        user_id=g.current_user.id,
     )
-
-    # receipts_service.import_receipt_from_ekasa returns (payload, status)
-    # On error it returns {"error": "..."} – we map that into the `error` field.
-    if status >= 400:
-        if isinstance(service_payload, dict):
-            msg = service_payload.get("error") or "Import from eKasa failed"
-            details = service_payload
-        else:
-            msg = str(service_payload)
-            details = None
-
-        error_body = {"code": "ekasa_error", "message": msg}
-        if details is not None:
-            error_body["details"] = details
-
-        return make_response(None, error_body, status)
-
-    # Success path – payload goes into `data`
-    return make_response(service_payload, None, status)
+    return result.to_flask_response()
 
 
 @bp.get("/receipts/ekasa-items", strict_slashes=False)
 def api_receipts_ekasa_items():
     """
-    GET /api/receipts/ekasa-items
-    Summary: Get all eKasa items for a specific month+year, grouped by receipt (check)
+    List eKasa-imported receipt items for the authenticated user.
 
     Query:
-      - year: YYYY (required together with month)
-      - month: 1..12 (required together with year)
-      - user_id: uuid (optional filter)
-
-    Notes:
-      - Only receipts imported from eKasa are returned.
-        (Detected by Receipt.external_uid != null)
+      year: int | omitted
+      month: int | omitted
+      account_id: "uuid | omitted"
 
     Responses:
-      200:
-        data:
-          {
-            "success": true,
-            "checks": [
-              {
-                "receipt_id": "<uuid>",
-                "external_uid": "<ekasa receiptId>",
-                "issue_date": "YYYY-MM-DD",
-                "description": "...",
-                "currency": "EUR",
-                "total_amount": number,
-                "tag": "Groceries"|null,
-                "tag_id": "<uuid>"|null,
-                "user_id": "<uuid>",
-                "items": [
-                  {
-                    "id": "<uuid>",
-                    "name": "...",
-                    "quantity": number,
-                    "unit_price": number,
-                    "total_price": number,
-                    "category_id": "<uuid>"|null,
-                    "extra_metadata": {...}|null
-                  }
-                ]
-              }
-            ],
-            "total_checks": number,
-            "total_items": number
-          }
-        error: null
-
-      400:
-        data: { "error": "Both year and month must be provided together"
-                     | "Invalid year format"
-                     | "Invalid month format"
-                     | "Month must be between 1 and 12"
-                     | "Invalid user_id format" }
-        error: null
+      200: {"data": EkasaChecks, "error": null}
+      400: see module errors
+      403: see module errors
     """
-    year_raw = request.args.get("year")
-    month_raw = request.args.get("month")
+    month_filter = parse_month_year_query_filter(
+        request.args.get("year"),
+        request.args.get("month"),
+    )
+    account_id = parse_uuid_field(
+        request.args.get("account_id"),
+        "account_id",
+        required=False,
+    )
 
-    # optional user filter
-    raw_user_id = request.args.get("user_id")
-    raw_account_id = request.args.get("account_id")
-    user_id = None
-    account_id = None
-    if raw_user_id:
-        try:
-            user_id = uuid.UUID(raw_user_id)
-        except ValueError:
-            return make_response({"error": "Invalid user_id format"}, None, 400)
-    if raw_account_id:
-        try:
-            account_id = uuid.UUID(raw_account_id)
-        except ValueError:
-            return make_response({"error": "Invalid account_id format"}, None, 400)
-
-    month_filter = parse_month_year_query_filter(year_raw, month_raw)
-
-    data, status = receipts_service.get_ekasa_items(
+    result = receipts_service.get_ekasa_items(
         month_filter=month_filter,
-        user_id=user_id,
+        user_id=g.current_user.id,
         account_id=account_id,
     )
-    return make_response(data, None, status)
+    return result.to_flask_response()

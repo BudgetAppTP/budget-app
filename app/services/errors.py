@@ -51,6 +51,12 @@ class ConflictError(ServiceError):
     code = "conflict"
 
 
+class UpstreamServiceError(ServiceError):
+    status_code = 502
+    default_message = "Upstream service error"
+    code = "upstream_service_error"
+
+
 class RateLimitExceededError(ServiceError):
     status_code = 429
     default_message = "Rate limit exceeded. Try again later."

@@ -46,8 +46,7 @@ export default function Dashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiptId,
-          user_id: USER_ID,
+          receipt_id: receiptId,
         }),
       });
 
@@ -251,8 +250,7 @@ export default function Dashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiptId: rid,
-          user_id: USER_ID,
+          receipt_id: rid,
         }),
       });
 
@@ -528,8 +526,8 @@ export default function Dashboard() {
 
               <p>
                 <T
-                  sk="Zadajte ID bločku (receiptId) z eKasa a importujte výdavok."
-                  en="Enter eKasa receipt ID (receiptId) to import an expense."
+                  sk="Zadajte eKasa ID bločku a importujte výdavok."
+                  en="Enter the eKasa receipt ID to import an expense."
                 />
               </p>
 
@@ -542,7 +540,7 @@ export default function Dashboard() {
                   setEkasaSuccess("");
                 }}
                 placeholder={
-                  lang === "sk" ? "ID bločku (receiptId)" : "Receipt ID (receiptId)"
+                  lang === "sk" ? "eKasa ID bločku" : "eKasa receipt ID"
                 }
                 style={{
                   border: ekasaError ? "1px solid #e53935" : "1px solid #d0d0d0",

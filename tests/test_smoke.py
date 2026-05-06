@@ -13,7 +13,9 @@ import pytest
 
 from app import create_app
 from app.extensions import db
-from app.models import Account, AccountMember, Category, Goal, Income, Receipt, ReceiptItem, SavingsFund, User
+from app.models import Account, AccountMember, Category, Goal, Income, Receipt, ReceiptItem, SavingsFund, Tag, User
+from app.services import ekasa_service
+from app.services.errors import BadRequestError, UpstreamServiceError
 from app.services.users_service import create_user_with_main_account
 from scripts.seed import main as seed_main
 from config import TestConfig
@@ -1120,6 +1122,381 @@ def test_user_cannot_access_another_users_income(client, app):
     other.post("/api/auth/login", json={"email": "second@test.local", "password": "pass"})
     resp = other.get(f"/api/incomes/{income_id}")
     assert resp.status_code == 404
+
+
+def test_receipts_list_rejects_invalid_sort_field(auth_client):
+    r = auth_client.get("/api/receipts", query_string={"sort": "description"})
+
+    assert r.status_code == 400
+    assert r.is_json
+    body = r.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Invalid sort field"
+
+
+def test_create_receipt_uses_authenticated_user_not_payload_user_id(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-owner@test.local")
+        other = _get_user("receipt-other@test.local")
+
+    login = client.post("/api/auth/login", json={"email": "receipt-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.post(
+        "/api/receipts",
+        json={
+            "user_id": str(other.id),
+            "description": "Owner purchase",
+            "issue_date": "2025-10-10",
+            "total_amount": 25.5,
+        },
+    )
+
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["error"] is None
+    created_id = uuid.UUID(body["data"]["id"])
+
+    with app.app_context():
+        receipt = db.session.get(Receipt, created_id)
+        assert receipt is not None
+        assert receipt.user_id == owner.id
+        assert receipt.user_id != other.id
+
+
+def test_create_receipt_account_id_allows_owned_account_and_rejects_foreign_account(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-account-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-account-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-account-owner@test.local")
+        other = _get_user("receipt-account-other@test.local")
+        owner_account = _get_main_account(owner)
+        other_account = _get_main_account(other)
+        owner_account_id = str(owner_account.id)
+        other_account_id = str(other_account.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-account-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    allowed = client.post(
+        "/api/receipts",
+        json={
+            "account_id": owner_account_id,
+            "description": "Owner account purchase",
+            "issue_date": "2025-10-10",
+            "total_amount": 25.5,
+        },
+    )
+    assert allowed.status_code == 201
+    allowed_body = allowed.get_json()
+    assert allowed_body["error"] is None
+
+    denied = client.post(
+        "/api/receipts",
+        json={
+            "account_id": other_account_id,
+            "description": "Foreign account purchase",
+            "issue_date": "2025-10-10",
+            "total_amount": 30,
+        },
+    )
+    assert denied.status_code == 403
+    denied_body = denied.get_json()
+    assert denied_body["data"] is None
+    assert denied_body["error"]["code"] == "forbidden"
+    assert denied_body["error"]["message"] == "User is not a member of this account"
+
+
+def test_create_receipt_tag_id_allows_owned_tag_and_rejects_foreign_tag(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-tag-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-tag-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-tag-owner@test.local")
+        other = _get_user("receipt-tag-other@test.local")
+        owner_tag = Tag(user_id=owner.id, name="Owner tag")
+        foreign_tag = Tag(user_id=other.id, name="Foreign tag")
+        db.session.add_all([owner_tag, foreign_tag])
+        db.session.commit()
+        owner_tag_id = str(owner_tag.id)
+        foreign_tag_id = str(foreign_tag.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-tag-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    allowed = client.post(
+        "/api/receipts",
+        json={
+            "tag_id": owner_tag_id,
+            "description": "Owned tag purchase",
+            "issue_date": "2025-10-10",
+            "total_amount": 25.5,
+        },
+    )
+    assert allowed.status_code == 201
+    allowed_body = allowed.get_json()
+    assert allowed_body["error"] is None
+    allowed_receipt_id = uuid.UUID(allowed_body["data"]["id"])
+
+    with app.app_context():
+        receipt = db.session.get(Receipt, allowed_receipt_id)
+        assert receipt is not None
+        assert str(receipt.tag_id) == owner_tag_id
+
+    denied = client.post(
+        "/api/receipts",
+        json={
+            "tag_id": foreign_tag_id,
+            "description": "Foreign tag purchase",
+            "issue_date": "2025-10-10",
+            "total_amount": 30,
+        },
+    )
+    assert denied.status_code == 403
+    denied_body = denied.get_json()
+    assert denied_body["data"] is None
+    assert denied_body["error"]["code"] == "forbidden"
+    assert denied_body["error"]["message"] == "Tag does not belong to this user"
+
+
+def test_receipts_list_is_scoped_to_authenticated_user(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-list-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-list-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-list-owner@test.local")
+        other = _get_user("receipt-list-other@test.local")
+        owner_account = _get_main_account(owner)
+        other_account = _get_main_account(other)
+
+        owner_receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Owner receipt",
+            issue_date=date(2025, 5, 10),
+            total_amount=Decimal("20.00"),
+        )
+        other_receipt = Receipt(
+            user_id=other.id,
+            account_id=other_account.id,
+            description="Other receipt",
+            issue_date=date(2025, 5, 11),
+            total_amount=Decimal("40.00"),
+        )
+        db.session.add_all([owner_receipt, other_receipt])
+        db.session.commit()
+        owner_receipt_id = str(owner_receipt.id)
+        other_receipt_id = str(other_receipt.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-list-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.get("/api/receipts")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+
+    receipt_ids = {item["id"] for item in body["data"]}
+    assert owner_receipt_id in receipt_ids
+    assert other_receipt_id not in receipt_ids
+
+
+def test_receipts_list_account_filter_allows_owned_account_and_rejects_foreign_account(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-filter-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-filter-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-filter-owner@test.local")
+        other = _get_user("receipt-filter-other@test.local")
+        owner_account = _get_main_account(owner)
+        other_account = _get_main_account(other)
+
+        owner_receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Owner filtered receipt",
+            issue_date=date(2025, 5, 12),
+            total_amount=Decimal("15.00"),
+        )
+        db.session.add(owner_receipt)
+        db.session.commit()
+
+        owner_account_id = str(owner_account.id)
+        other_account_id = str(other_account.id)
+        owner_receipt_id = str(owner_receipt.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-filter-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    allowed = client.get("/api/receipts", query_string={"account_id": owner_account_id})
+    assert allowed.status_code == 200
+    allowed_body = allowed.get_json()
+    assert allowed_body["error"] is None
+    assert [item["id"] for item in allowed_body["data"]] == [owner_receipt_id]
+
+    denied = client.get("/api/receipts", query_string={"account_id": other_account_id})
+    assert denied.status_code == 403
+    denied_body = denied.get_json()
+    assert denied_body["data"] is None
+    assert denied_body["error"]["code"] == "forbidden"
+    assert denied_body["error"]["message"] == "User is not a member of this account"
+
+
+def test_user_cannot_access_another_users_receipt(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-first@test.local", "password": "pass"})
+    client.post("/api/auth/login", json={"email": "receipt-first@test.local", "password": "pass"})
+    created = client.post(
+        "/api/receipts",
+        json={
+            "description": "Salary",
+            "issue_date": "2025-10-10",
+            "total_amount": 20,
+        },
+    )
+    assert created.status_code == 201
+    receipt_id = created.get_json()["data"]["id"]
+    client.post("/api/auth/logout")
+
+    other = app.test_client()
+    other.post("/api/auth/register", json={"email": "receipt-second@test.local", "password": "pass"})
+    other.post("/api/auth/login", json={"email": "receipt-second@test.local", "password": "pass"})
+    resp = other.get(f"/api/receipts/{receipt_id}")
+    assert resp.status_code == 404
+
+
+def test_update_receipt_rejects_wrong_type_issue_date_with_standard_bad_request_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-update-invalid@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-update-invalid@test.local")
+        owner_account = _get_main_account(owner)
+        receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Update target",
+            issue_date=date(2025, 5, 10),
+            total_amount=Decimal("20.00"),
+        )
+        db.session.add(receipt)
+        db.session.commit()
+        receipt_id = receipt.id
+
+    login = client.post("/api/auth/login", json={"email": "receipt-update-invalid@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.put(
+        f"/api/receipts/{receipt_id}",
+        json={"issue_date": 123},
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Invalid issue_date format, expected YYYY-MM-DD"
+
+    with app.app_context():
+        receipt = db.session.get(Receipt, receipt_id)
+        assert receipt is not None
+        assert receipt.issue_date == date(2025, 5, 10)
+
+
+def test_receipts_ekasa_items_rejects_foreign_account_filter(client, app):
+    client.post("/api/auth/register", json={"email": "ekasa-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "ekasa-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        other = _get_user("ekasa-other@test.local")
+        other_account = _get_main_account(other)
+        foreign_account_id = str(other_account.id)
+
+    login = client.post("/api/auth/login", json={"email": "ekasa-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.get(
+        "/api/receipts/ekasa-items",
+        query_string={"year": 2025, "month": 5, "account_id": foreign_account_id},
+    )
+
+    assert resp.status_code == 403
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "forbidden"
+    assert body["error"]["message"] == "User is not a member of this account"
+
+
+def test_import_receipt_from_ekasa_rejects_legacy_camel_case_request_fields(client):
+    client.post("/api/auth/register", json={"email": "ekasa-import@test.local", "password": "pass"})
+    login = client.post("/api/auth/login", json={"email": "ekasa-import@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.post(
+        "/api/receipts/import-ekasa",
+        json={
+            "receiptId": "1234567890ABCDEF",
+        },
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "Missing receipt_id"
+
+
+def test_ekasa_service_raises_upstream_service_error_on_non_200(monkeypatch):
+    class DummyResponse:
+        status_code = 503
+
+        def json(self):
+            return {}
+
+    monkeypatch.setattr(ekasa_service.requests, "post", lambda *args, **kwargs: DummyResponse())
+
+    with pytest.raises(UpstreamServiceError, match="eKasa API returned 503"):
+        ekasa_service.fetch_receipt_data("1234567890ABCDEF")
+
+
+def test_ekasa_service_raises_upstream_service_error_on_invalid_json(monkeypatch):
+    class DummyResponse:
+        status_code = 200
+
+        def json(self):
+            raise ValueError("not json")
+
+    monkeypatch.setattr(ekasa_service.requests, "post", lambda *args, **kwargs: DummyResponse())
+
+    with pytest.raises(UpstreamServiceError, match="Invalid response returned by eKasa API"):
+        ekasa_service.fetch_receipt_data("1234567890ABCDEF")
+
+
+def test_import_receipt_from_ekasa_propagates_ekasa_upstream_errors_in_standard_envelope(client, monkeypatch):
+    client.post("/api/auth/register", json={"email": "ekasa-failure@test.local", "password": "pass"})
+    login = client.post("/api/auth/login", json={"email": "ekasa-failure@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    def raise_ekasa_error(receipt_id):
+        raise UpstreamServiceError("eKasa API returned 503")
+
+    monkeypatch.setattr(ekasa_service, "fetch_receipt_data", raise_ekasa_error)
+
+    resp = client.post(
+        "/api/receipts/import-ekasa",
+        json={
+            "receipt_id": "1234567890ABCDEF",
+        },
+    )
+
+    assert resp.status_code == 502
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "upstream_service_error"
+    assert body["error"]["message"] == "eKasa API returned 503"
 
 
 def test_categories_list_is_scoped_to_current_user_and_shared_categories(client, app):

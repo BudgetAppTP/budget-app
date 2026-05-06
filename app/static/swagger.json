@@ -512,14 +512,14 @@
     "/api/receipts/import-ekasa": {
       "post": {
         "summary": "Import účtenky z eKasa systému",
-        "description": "Na základe `receiptId` z eKasa API načíta údaje o účtenke a uloží ich do lokálnej databázy pod daného používateľa.",
+        "description": "Na základe `receipt_id` z eKasa API načíta údaje o účtenke a uloží ich do lokálnej databázy pod daného používateľa.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "example": {
-                "receiptId": "1234567890ABCDEF",
-                "user_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6"
+                "receipt_id": "1234567890ABCDEF",
+                "account_id": "78754f0f-e6ed-4a10-a09a-26da4cb2a5f6"
               }
             }
           }
@@ -548,7 +548,7 @@
                     "summary": "Chýbajúce polia",
                     "value": {
                       "code": "bad_request",
-                      "message": "Missing receiptId or user_id"
+                      "message": "Missing receipt_id"
                     }
                   },
                   "ekasa_error": {

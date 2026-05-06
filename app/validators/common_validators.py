@@ -33,7 +33,7 @@ def validate_date_field(value, field_name: str, required: bool = True):
     try:
         parsed = date.fromisoformat(value)
         return parsed
-    except ValueError:
+    except (TypeError, ValueError):
         raise BadRequestError(f"Invalid {field_name} format, expected YYYY-MM-DD")
 
 

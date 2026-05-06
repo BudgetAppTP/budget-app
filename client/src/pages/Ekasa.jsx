@@ -169,8 +169,7 @@ export default function Ekasa() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiptId,
-          user_id: USER_ID,
+          receipt_id: receiptId,
         }),
       });
 
@@ -387,8 +386,7 @@ export default function Ekasa() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiptId: rid,
-          user_id: USER_ID,
+          receipt_id: rid,
         }),
       });
 
@@ -556,11 +554,8 @@ export default function Ekasa() {
                         <b>{itemsCount}</b>
                       </span>
 
-                      <span
-                        className="receipt-id"
-                        title="external_uid / receiptId"
-                      >
-                        receiptId: {check.external_uid || "-"}
+                      <span className="receipt-id" title="external_uid / eKasa receipt ID">
+                        eKasa ID: {check.external_uid || "-"}
                       </span>
                     </div>
                   </div>
@@ -775,7 +770,6 @@ export default function Ekasa() {
               {qrError}
             </div>
           )}
-        </div>
 
         <div className="import-card" draggable="true">
           <strong>
@@ -796,8 +790,8 @@ export default function Ekasa() {
 
           <p>
             <T
-              sk="Zadajte ID bločku (receiptId) z eKasa a importujte výdavok."
-              en="Enter eKasa receipt ID (receiptId) to import an expense."
+              sk="Zadajte eKasa ID bločku a importujte výdavok."
+              en="Enter the eKasa receipt ID to import an expense."
             />
           </p>
 
@@ -809,11 +803,7 @@ export default function Ekasa() {
               setEkasaError("");
               setEkasaSuccess("");
             }}
-            placeholder={
-              lang === "sk"
-                ? "ID bločku (receiptId)"
-                : "Receipt ID (receiptId)"
-            }
+            placeholder={lang === "sk" ? "eKasa ID bločku" : "eKasa receipt ID"}
             style={{
               border: ekasaError ? "1px solid #e53935" : "1px solid #d0d0d0",
             }}
