@@ -15,7 +15,7 @@
 }
 
 .comparison.wrap {
-  max-width: 1500px;
+  max-width: 1300px;
   margin: 50px auto;
   padding: 0 20px;
 }
@@ -313,7 +313,7 @@
 
 .comparison .chart-details .summary {
   border-top: 2px solid #e2c675;
-  margin-top: 6px;
+  margin-top: 15px;
   padding-top: 4px;
   text-align: right;
   width: 100%;

@@ -184,6 +184,17 @@ body {
   flex-wrap:wrap;
 }
 
+.dashboard .chart-canvas-wrapper,
+.dashboard .legend {
+  flex: 1;
+}
+
+.dashboard .chart-canvas-wrapper {
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
 .dashboard .donut {
   --size:180px;
   width:var(--size);

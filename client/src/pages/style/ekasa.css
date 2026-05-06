@@ -149,7 +149,7 @@
 .ekasa th,
 .ekasa td {
   border: 1px solid var(--grid);
-  padding: 8px 12px;
+  padding: 10px 14px;
 }
 
 .ekasa th {
@@ -238,6 +238,16 @@
   text-align: center;
   transition: background 0.3s ease;
   background-color: white;
+
+   display: flex;
+  flex-direction: column;
+  justify-content: center; /* по вертикали */
+  align-items: center;
+ gap: 15px;
+}
+
+.ekasa .import-card p {
+  margin: 0;
 }
 
 .ekasa .import-card:hover {
@@ -247,7 +257,6 @@
 .ekasa .import-card strong {
   display: block;
   font-weight: 700;
-  margin-bottom: 8px;
 }
 
 .ekasa .import-card button {
@@ -258,6 +267,7 @@
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
+    width: fit-content;
 }
 
 .ekasa .import-card button:hover {
@@ -286,6 +296,15 @@
      display: block;
     margin-bottom:25px;
 }
+
+  .ekasa .receipt-actions-right{
+     margin-left: 0 !important;
+    justify-content: flex-start;
+  }
+
+  .ekasa .edit-button {
+    overflow: visible !important;
+  }
 }
 
 
@@ -297,7 +316,7 @@
   border-radius: 14px;
   box-shadow: 0 10px 24px rgba(17,24,39,0.06);
 }
-.ekasa .error-text{
+.ekasa .error{
   margin-top: 12px;
   padding: 12px 14px;
   background: rgba(229,57,53,0.08);
@@ -346,10 +365,19 @@
   box-shadow: none !important;
   margin-top: 10px;
 
+  /*overflow-x: auto;
+  -webkit-overflow-scrolling: touch;*/
+}
+
+
+.ekasa .table-card.receipt-card {
+  overflow: visible;
+}
+
+.ekasa .receipt-card > .table-card {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
-
 
 .ekasa .receipt-card{
   position: relative;
@@ -395,8 +423,8 @@
   color: rgba(17,24,39,0.70);
 }
 
-.ekasa .receipt-id{
-  margin-left: auto;
+.ekasa .receipt-id, .ekasa .edit-button{
+   margin-left: 0;
   font-size: 12px;
   color: rgba(17,24,39,0.65);
   background: rgba(17,24,39,0.04);
@@ -411,16 +439,30 @@
 }
 
 
+ .ekasa .edit-button{
+      background: #ebb72e;
+    border: 2px solid #b38a00;
+    color: #1a1200;
+}
+
+.ekasa .receipt-actions-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .ekasa .import-ekasa input {
   width: 100%;
+  box-sizing: border-box;
   padding: 10px 12px;
   border-radius: 10px;
   outline: none;
-  margin-top: 10px;
+ /* margin-top: 10px;*/
 }
 
 .ekasa .import-ekasa button {
-  margin-top: 12px;
+  /*margin-top: 12px;*/
   width: 100%;
 }
 
@@ -440,11 +482,253 @@
   text-align: right;
 }
 
+.ekasa .table-card.receipt-card.highlighted-receipt {
+  border: 2px solid #d6a600 !important;
+  box-shadow: 0 0 0 5px rgba(214, 166, 0, 0.25) !important;
+  animation: receiptHighlightPulse 1.2s ease-in-out 2;
+}
+
+
+
+
+
+@keyframes receiptHighlightPulse {
+  0% {
+    box-shadow: 0 0 0 4px rgba(214, 166, 0, 0.12);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(214, 166, 0, 0.3);
+  }
+
+  100% {
+    box-shadow: 0 0 0 4px rgba(214, 166, 0, 0.12);
+  }
+}
+
+
+.ekasa td textarea,
+.ekasa td input[type="number"] {
+   background-color: #fff8e1;
+    border: none;
+   width: 100%;
+  height:100%; ;
+   box-sizing: border-box;
+   padding: 10px 14px;
+
+   font-size: inherit;
+  font-family: inherit;
+}
+
+
+.ekasa  td textarea {
+  display: block;
+  resize: none;
+  line-height: 1.4;
+    white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+
+.ekasa td input:focus,.ekasa  td textarea:focus {
+  outline: none;
+}
+
+
+.ekasa .ekasa-item-form {
+  width: 100%;
+  margin-top: 15px;
+
+}
+
+
+.ekasa .error-text {
+    width: 100%;
+    margin-top: 6px;
+    color: #d32f2f;
+    font-size: 14px;
+    font-weight: 500;
+    animation: fadeIn 0.3s ease;
+}
+
+.ekasa .expense-table {
+  width: 100%;
+  border-collapse: collapse;
+
+}
+
+.ekasa .expense-table td{
+   border: none;
+
+}
+
+.ekasa .expense-table td {
+  padding: 4px 6px;
+}
+
+
+
+.ekasa .expense-table input{
+  background: white !important;
+  border: 1.8px solid var(--grid) !important;
+  padding: 10px 16px !important;
+  box-sizing: border-box;
+   border-radius: 6px;
+  width: 100%;
+   font-size: 14px !important;
+}
+
+
+.ekasa .btn{
+   width: 100%;
+    background: #ebb72e;
+    border: 2px solid #b38a00;
+    color: #1a1200;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: 15px;
+}
+
+.ekasa .btn:hover,.ekasa .edit-button:hover {
+  background: var(--gold-dark);
+}
+
+.ekasa .actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px; height: 100%;
+  align-items: center;
+}
+
+
+.ekasa  .action-icon {
+  font-size: 20px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.ekasa .action-icon.edit:hover,.ekasa .action-icon.delete:hover{
+  transform: scale(1.15);
+  /*color: var(--gold-dark);*/
+}
+
+.ekasa table th:nth-child(1),
+.ekasa table td:nth-child(1) {
+  width: 27%;
+}
+
+.ekasa table th:nth-child(2),
+.ekasa table td:nth-child(2) {
+  width: 22%;
+}
+
+.ekasa table th:nth-child(3),
+.ekasa table td:nth-child(3) {
+  width: 16%;
+}
+
+.ekasa table th:nth-child(4),
+.ekasa table td:nth-child(4) {
+  width: 15%;
+}
+
+.ekasa table th:nth-child(5),
+.ekasa table td:nth-child(5) {
+  width: 10%;
+}
+
+.ekasa table th:nth-child(6),
+.ekasa table td:nth-child(6) {
+  width: 10%;
+}
+
+
+.ekasa .receipt-card.manual-editing table th:nth-child(1),
+.ekasa .receipt-card.manual-editing table td:nth-child(1)
+{
+  width: 30%;
+}
+
+.ekasa .receipt-card.manual-editing table th:nth-child(2),
+.ekasa .receipt-card.manual-editing table td:nth-child(2) {
+  width: 25%;
+}
+
+.ekasa .receipt-card.manual-editing table th:nth-child(3),
+.ekasa .receipt-card.manual-editing table td:nth-child(3) {
+  width: 16%;
+}
+
+.ekasa .receipt-card.manual-editing table th:nth-child(4),
+.ekasa .receipt-card.manual-editing table td:nth-child(4) {
+  width: 14%;
+}
+
+.ekasa .receipt-card.manual-editing table th:nth-child(5),
+.ekasa .receipt-card.manual-editing table td:nth-child(5) {
+  width: 15%;
+}
+
+
+.ekasa tr.editing td:not(:nth-child(2)) {
+  padding: 0 !important;
+}
+
+.ekasa tr.editing td {
+    border-top: 2px solid #d4a017;
+    border-bottom: 2px solid #d4a017;
+}
+
+
+.ekasa td input[type="number"] {
+    text-align: center;
+}
+
+.ekasa tr.editing .actions {
+    padding: 10px 14px;
+}
+
+
 
 @media (max-width: 720px){
   .receipt-id{ margin-left: 0; width: 100%; }
 
   .ekasa .panel{
     flex-direction: column;
+  }
+}
+
+@media (max-width: 750px) {
+  .ekasa .ekasa-item-form .expense-table,
+  .ekasa .ekasa-item-form .expense-table tbody,
+  .ekasa .ekasa-item-form .expense-table tr {
+    display: block !important;
+    width: 100%;
+  }
+
+  .ekasa .ekasa-item-form .expense-table td {
+    display: block;
+    width: 100% !important;
+    margin-bottom: 10px;
+    padding: 4px 0;
+  }
+
+  .ekasa .ekasa-item-form .expense-table input,
+  .ekasa .ekasa-item-form .expense-table select,
+  .ekasa .ekasa-item-form .expense-table button {
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .ekasa .ekasa-item-form .expense-table {
+    min-width: 0 !important;
+  }
+
+    .ekasa td input[type="number"] {
+    text-align: left;
   }
 }

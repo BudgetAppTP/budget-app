@@ -173,12 +173,14 @@ const handleGoogleSignupError = () => {
               <form onSubmit={submit} className="signin-form">
                 <div className="signin-field">
                   <label>Email</label>
+
                   <input
                     value={form.email}
                     onChange={(e) => onChange("email", e.target.value)}
                     placeholder={lang === "sk" ? "napr. valeria@email.com" : "e.g. valeria@email.com"}
                     autoComplete="email"
                   />
+
                 </div>
 
                 <div className="signin-field">
@@ -241,7 +243,7 @@ const handleGoogleSignupError = () => {
                       shape="rectangular"
                       theme="outline"
                       size="large"
-                      width="300"
+                      width="100%"
                       locale={lang === "sk" ? "sk" : "en"}
                       auto_select={true}
                     />

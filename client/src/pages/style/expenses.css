@@ -231,7 +231,7 @@
 
 .expenses .action-icon.edit:hover,.expenses .action-icon.delete:hover,.expenses .action-icon.redirect:hover,.expenses .month-nav button:hover {
   transform: scale(1.15);
-  color: var(--gold-dark);
+  /*color: var(--gold-dark);*/
 }
 
 
@@ -359,7 +359,7 @@
     font-size: 15px;
 }
 
-.expenses .btn:hover {
+.expenses .btn:hover, .expenses .organisation_button:hover {
   background: var(--gold-dark);
 }
 

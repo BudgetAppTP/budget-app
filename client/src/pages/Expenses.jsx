@@ -176,6 +176,43 @@ export default function Expenses() {
         }
       };
 
+
+  async function createFirstManualReceiptItem(receiptId, description, amount) {
+  const numericAmount = parseFloat(amount);
+
+  const payload = {
+    name: description.trim(),
+    quantity: 1,
+    unit_price: numericAmount,
+    total_price: numericAmount,
+    category_id: null,
+  };
+
+  const res = await fetch(`${API_BASE_URL}/api/receipts/${receiptId}/items`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json();
+
+  if (!res.ok || json.error) {
+    const msg =
+      json.error?.message ||
+      json.data?.error ||
+      (lang === "sk"
+        ? "Výdavok bol vytvorený, ale položka sa nepodarila vytvoriť."
+        : "Expense was created, but receipt item was not created.");
+
+    throw new Error(msg);
+  }
+
+  return json?.data ?? json;
+}
+
+
   async function fetchReceiptById(id) {
   const res = await fetch(`${API_BASE_URL}/api/receipts/${id}`);
   const json = await res.json();
@@ -213,6 +250,17 @@ export default function Expenses() {
       return;
     }
 
+    const numericAmount = parseFloat(amount);
+
+    if (numericAmount < 0) {
+      setError(
+        lang === "sk"
+          ? "Suma nesmie byť záporná"
+          : "Amount cannot be negative"
+      );
+      return;
+    }
+
     setError("");
     if (date < minDate || date > maxDate) {
       setError(
@@ -234,6 +282,9 @@ export default function Expenses() {
       currency: "EUR",
       total_amount: parseFloat(amount),
       tag_id: selectedTagId || null,
+            extra_metadata: {
+      manual: true,
+    },
     };
 
       const res = await fetch(`${API_BASE_URL}/api/receipts`, {
@@ -258,6 +309,40 @@ export default function Expenses() {
       }
 
       const createdId = json?.data?.id;
+
+
+    if (!createdId) {
+      setError(
+        lang === "sk"
+          ? "Server nevrátil ID výdavku."
+          : "Server did not return expense ID."
+      );
+      return;
+    }
+
+    try {
+      await createFirstManualReceiptItem(createdId, description, amount);
+    } catch (itemErr) {
+      console.error(itemErr);
+
+
+      try {
+        await fetch(`${API_BASE_URL}/api/receipts/${createdId}`, {
+          method: "DELETE",
+        });
+      } catch (rollbackErr) {
+        console.error("Rollback failed", rollbackErr);
+      }
+
+      setError(itemErr.message);
+      return;
+    }
+
+
+
+
+
+
 
       const selectedTagName =
   tagsExpense.find((t) => t.id === selectedTagId)?.name || "unclassified";
@@ -438,10 +523,10 @@ setExpenses([...expenses, newRow]);
     }
   };
 
-  const handleEkasaRedirect = () => {
-    alert("Presmerovanie na eKasa (demo)");
-  };
-
+  const handleEkasaRedirect = (expenseId) => {
+  const monthKey = monthKeyFromDate(currentDate);
+  window.location.href = `/Ekasa?month=${monthKey}&expenseId=${expenseId}`;
+};
 
 
 
@@ -655,16 +740,12 @@ setExpenses([...expenses, newRow]);
 
                         {!isEditing && (
                           <span
-                            className="action-icon redirect"
-                            title={
-                              lang === "sk"
-                                ? "Zobraziť na eKasa"
-                                : "View on eKasa"
-                            }
-                            onClick={handleEkasaRedirect}
-                          >
-                            ➜
-                          </span>
+                          className="action-icon redirect"
+                          title={lang === "sk" ? "Zobraziť na eKasa" : "View on eKasa"}
+                          onClick={() => handleEkasaRedirect(exp.id)}
+                        >
+                          ➜
+                        </span>
                         )}
                       </div>
                     </td>

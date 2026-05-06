@@ -217,6 +217,18 @@ useEffect(() => {
       return;
     }
 
+    const numericAmount = parseFloat(amount);
+
+    if (numericAmount < 0) {
+      setError(
+        lang === "sk"
+          ? "Suma nesmie byť záporná"
+          : "Amount cannot be negative"
+      );
+      return;
+    }
+
+
     setError("");
 
     if (date < minDate || date > maxDate) {

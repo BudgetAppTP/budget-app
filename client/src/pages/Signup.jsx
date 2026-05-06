@@ -362,6 +362,8 @@ const handleGoogleSignupError = () => {
     </svg>
   );
 
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
+
   return (
       <div className="wrap signup">
         <div className="signup-bg">
@@ -447,14 +449,31 @@ const handleGoogleSignupError = () => {
 
                     <div className="signup-field">
                       <label>Email</label>
+
                       <input
+                        type="email"
+                        className="email-input"
                         value={form.email}
                         onChange={(e) => onChange("email", e.target.value)}
-                        placeholder={lang === "sk" ? "napr. valeria@email.com" : "e.g. valeria@email.com"}
+                        placeholder={lang === "sk"
+                          ? "napr. valeria@email.com"
+                          : "e.g. valeria@email.com"}
                         autoComplete="email"
                       />
+
+
                       {!form.email.trim() && error && (
-                        <div className="signup-error">{lang === "sk" ? "Zadaj email." : "Email is required"}</div>
+                        <div className="signup-error">
+                          {lang === "sk" ? "Zadaj email." : "Email is required"}
+                        </div>
+                      )}
+
+                      {form.email.trim() && !isValidEmail && (
+                        <div className="signup-error">
+                          {lang === "sk"
+                            ? "Neplatný formát emailu"
+                            : "Invalid email format"}
+                        </div>
                       )}
                     </div>
 

@@ -8,22 +8,6 @@ Chart.register(ArcElement, Tooltip, Legend);
 
 const API_BASE = "/api";
 
-const NEEDS_DATA = {
-  "2026-01": [
-    { date: "2025-01-02", desc: "Nájom", amount: 400, sub: "Bývanie" },
-    { date: "2025-01-05", desc: "Potraviny", amount: 220, sub: "Jedlo" },
-    { date: "2025-01-11", desc: "MHD karta", amount: 30, sub: "Doprava" },
-    { date: "2025-01-20", desc: "Lekáreň", amount: 25, sub: "Zdravie" },
-  ],
-  "2025-12": [
-    { date: "2025-02-03", desc: "Nájom", amount: 400, sub: "Bývanie" },
-    { date: "2025-02-06", desc: "Potraviny", amount: 260, sub: "Jedlo" },
-    { date: "2025-02-10", desc: "Taxi", amount: 20, sub: "Doprava" },
-  ],
-  "2025-11": [
-    { date: "2025-03-05", desc: "Potraviny", amount: 230, sub: "Jedlo" },
-  ],
-};
 
 const chartColors = ["#e6c975", "#ccb8a3", "#b1bfd0", "#c0cfad", "#d6b7c6", "#a9d1c7"];
 
@@ -79,6 +63,18 @@ function normalize(kind, raw) {
   return { rows: list, total };
 }
 
+function normalizeNeeds(raw) {
+  const data = unwrap(raw);
+
+  const categories = Array.isArray(data?.categories) ? data.categories : [];
+
+  return {
+    total: Number(data?.total_amount ?? 0),
+    labels: categories.map((c) => c.category),
+    data: categories.map((c) => Number(c.amount ?? 0)),
+  };
+}
+
 function mapRow(kind, r) {
   if (kind === "incomes") {
     return {
@@ -99,16 +95,21 @@ function mapRow(kind, r) {
 
 
 async function fetchMonthData(activeTab, year, month) {
-  const endpoint = activeTab === "incomes" ? "incomes" : "receipts";
+  let endpoint = "receipts";
+
+  if (activeTab === "incomes") endpoint = "incomes";
+  if (activeTab === "needs") endpoint = "analytics/donut";
 
   const url = new URL(`${API_BASE}/${endpoint}`, window.location.origin);
   url.searchParams.set("year", String(year));
   url.searchParams.set("month", String(month));
 
-  if (endpoint === "incomes") {
+  if (activeTab === "incomes") {
     url.searchParams.set("sort", "income_date");
     url.searchParams.set("order", "desc");
-  } else {
+  }
+
+  if (activeTab === "expenses") {
     url.searchParams.set("sort", "issue_date");
     url.searchParams.set("order", "desc");
   }
@@ -117,9 +118,11 @@ async function fetchMonthData(activeTab, year, month) {
   const json = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const msg = json?.data?.error || json?.error || json?.message || "Request failed";
+    const msg =
+      json?.data?.error || json?.error || json?.message || "Request failed";
     throw new Error(msg);
   }
+
   return json;
 }
 
@@ -151,6 +154,7 @@ export default function Comparison() {
   const [cache, setCache] = useState(() => ({
     incomes: {},
     expenses: {},
+    needs: {},
   }));
 
   const [loading, setLoading] = useState({ left: false, right: false });
@@ -178,7 +182,7 @@ export default function Comparison() {
   };
 
   useEffect(() => {
-    if (!showTables) return;
+      if (!showTables && !isNeeds) return;
 
     let cancelled = false;
 
@@ -194,10 +198,16 @@ export default function Comparison() {
         const payload = await fetchMonthData(activeTab, year, month);
         if (cancelled) return;
 
-        const kind = activeTab === "incomes" ? "incomes" : "receipts";
-        const norm = normalize(kind, payload);
-        const mapped = norm.rows.map((r) => mapRow(kind, r));
-        const value = { rows: mapped, total: norm.total };
+        let value;
+
+        if (activeTab === "needs") {
+          value = normalizeNeeds(payload);
+        } else {
+          const kind = activeTab === "incomes" ? "incomes" : "receipts";
+          const norm = normalize(kind, payload);
+          const mapped = norm.rows.map((r) => mapRow(kind, r));
+          value = { rows: mapped, total: norm.total };
+        }
 
         setCache((prev) => ({
           ...prev,
@@ -239,30 +249,35 @@ export default function Comparison() {
     const renderNeedsCharts = () => {
       if (!leftCanvasRef.current || !rightCanvasRef.current) return;
 
-      const leftArr = NEEDS_DATA[leftKey] || [];
-      const rightArr = NEEDS_DATA[rightKey] || [];
+      const leftNeeds = cache.needs[leftKey] || { labels: [], data: [], total: 0 };
+      const rightNeeds = cache.needs[rightKey] || { labels: [], data: [], total: 0 };
 
-      const leftGrouped = groupNeedsBySub(leftArr);
-      const rightGrouped = groupNeedsBySub(rightArr);
-
-      const labelsL = Object.keys(leftGrouped);
-      const labelsR = Object.keys(rightGrouped);
-      const dataL = Object.values(leftGrouped);
-      const dataR = Object.values(rightGrouped);
+      const labelsL = leftNeeds.labels;
+      const labelsR = rightNeeds.labels;
+      const dataL = leftNeeds.data;
+      const dataR = rightNeeds.data;
 
       if (leftChartRef.current) leftChartRef.current.destroy();
       if (rightChartRef.current) rightChartRef.current.destroy();
 
-      const makeChart = (canvas, labels, data) =>
-        new Chart(canvas, {
+      const makeChart = (canvas, labels, data) => {
+  const hasData = data.reduce((a, b) => a + b, 0) > 0 && labels.length > 0;
+
+        return new Chart(canvas, {
           type: "doughnut",
           data: {
-            labels,
+            labels: hasData
+              ? labels
+              : [lang === "sk" ? "Žiadne výdavky" : "No expenses"],
             datasets: [
               {
-                data,
-                backgroundColor: chartColors.slice(0, labels.length),
-                hoverOffset: 10,
+                data: hasData ? data : [100],
+                backgroundColor: hasData
+                  ? chartColors.slice(0, labels.length)
+                  : ["#e5e7eb"],
+                hoverOffset: hasData ? 10 : 0,
+                borderColor: "#ffffff",
+                borderWidth: 2,
               },
             ],
           },
@@ -271,6 +286,7 @@ export default function Comparison() {
             plugins: {
               legend: { display: false },
               tooltip: {
+                enabled: hasData,
                 backgroundColor: "#333",
                 titleColor: "#fff",
                 callbacks: {
@@ -280,12 +296,18 @@ export default function Comparison() {
             },
           },
         });
+      };
 
       leftChartRef.current = makeChart(leftCanvasRef.current, labelsL, dataL);
       rightChartRef.current = makeChart(rightCanvasRef.current, labelsR, dataR);
 
       const renderDetailsHTML = (labels, data) => {
         const total = data.reduce((a, b) => a + b, 0);
+        if (!labels.length || total <= 0) {
+        return `<div class="summary">${
+          lang === "sk" ? "Žiadne dáta pre tento mesiac" : "No data for this month"
+        }</div>`;
+      }
         let html = labels
           .map((label, i) => {
             const percent = total > 0 ? ((data[i] / total) * 100).toFixed(1) : 0;

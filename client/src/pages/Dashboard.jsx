@@ -3,6 +3,8 @@ import "./style/dashboard.css";
 import { Link } from "react-router-dom";
 import { useLang } from "../i18n/LanguageContext";
 import T from "../i18n/T";
+import "../components/Navbar.jsx"
+import Chart from "chart.js/auto";
 
 const API_BASE = "/api";
 const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
@@ -152,15 +154,168 @@ export default function Dashboard() {
     return () => clearTimeout(t);
   }, [ekasaSuccess]);
 
+   const currentDate = new Date();
+  const monthTitle = currentDate.toLocaleDateString(
+  lang === "sk" ? "sk-SK" : "en-US",
+  {
+    month: "long",
+    year: "numeric",
+  }
+);
 
+const [analyticsData, setAnalyticsData] = useState({
+  total_amount: 0,
+  categories: [],
+});
+
+const [analyticsError, setAnalyticsError] = useState("");
+
+  const fetchDonutAnalytics = async (dateForQuery = currentDate) => {
+  try {
+    setAnalyticsError("");
+
+    const year = dateForQuery.getFullYear();
+    const month = dateForQuery.getMonth() + 1;
+
+    const params = new URLSearchParams({
+      year: String(year),
+      month: String(month),
+    });
+
+    const res = await fetch(`${API_BASE}/analytics/donut?${params.toString()}`);
+    const json = await res.json();
+    const data = json?.data ?? json;
+
+    if (!res.ok) {
+      setAnalyticsError(
+        lang === "sk"
+          ? "Nepodarilo sa načítať analytiku."
+          : "Failed to load analytics."
+      );
+
+      setAnalyticsData({
+        total_amount: 0,
+        categories: [],
+      });
+
+      return;
+    }
+
+    setAnalyticsData({
+      total_amount: parseFloat(data?.total_amount || 0) || 0,
+      categories: Array.isArray(data?.categories) ? data.categories : [],
+    });
+  } catch (err) {
+    console.error(err);
+
+    setAnalyticsError(
+      lang === "sk"
+        ? "Chyba spojenia so serverom pri načítaní analytiky."
+        : "Connection error while loading analytics."
+    );
+
+    setAnalyticsData({
+      total_amount: 0,
+      categories: [],
+    });
+  }
+};
+
+  useEffect(() => {
+  fetchDonutAnalytics(currentDate);
+}, [lang]);
+
+
+  useEffect(() => {
+  const ctx = document.getElementById("dashboardDonutChart");
+  if (!ctx) return;
+
+  const colors = [
+    "#e6c975",
+    "#ccb8a3",
+    "#b1bfd0",
+    "#c0cfad",
+    "#d9b3c9",
+    "#a8d5ba",
+    "#f2b880",
+    "#b9c0ff",
+  ];
+
+  const monthInfo = {
+    sum: analyticsData?.total_amount || 0,
+    labels: (analyticsData?.categories || []).map((c) => c.category),
+    data: (analyticsData?.categories || []).map((c) =>
+      typeof c.percentage === "number"
+        ? c.percentage
+        : parseFloat(c.percentage || 0) || 0
+    ),
+    amounts: (analyticsData?.categories || []).map((c) =>
+      typeof c.amount === "number"
+        ? c.amount
+        : parseFloat(c.amount || 0) || 0
+    ),
+  };
+
+  const hasDonutData = monthInfo.sum > 0 && monthInfo.labels.length > 0;
+
+  const data = {
+    labels: hasDonutData
+      ? monthInfo.labels
+      : [lang === "sk" ? "Žiadne výdavky" : "No expenses"],
+    datasets: [
+      {
+        data: hasDonutData ? monthInfo.data : [100],
+        backgroundColor: hasDonutData
+          ? monthInfo.labels.map((_, i) => colors[i % colors.length])
+          : ["#e5e7eb"],
+        hoverOffset: hasDonutData ? 15 : 0,
+        borderColor: "#ffffff",
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  const chart = new Chart(ctx, {
+    type: "doughnut",
+    data: data,
+    options: {
+      responsive: true,
+      cutout: "68%",
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          enabled: true,
+          backgroundColor: "#333",
+          titleColor: "#fff",
+          bodyColor: "#fff",
+          callbacks: {
+            label: (ctx) => {
+              const percent = Number(ctx.parsed || 0);
+              const amount = monthInfo.amounts[ctx.dataIndex] || 0;
+
+              return `${ctx.label}: ${percent.toFixed(1)}% | ${amount.toFixed(2)} €`;
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return () => {
+    if (chart) chart.destroy();
+  };
+}, [analyticsData, lang]);
 
   return (
     <main className="wrap dashboard">
       <div className="section-title">
         <span className="marker"></span>
         <div>
-           <T sk="Mesačný prehľad" en="Monthly Overview" /> ·{" "}
-          <span id="monthTitle">Október 2025</span>
+           <h2 className="month-title">
+  <T sk="Mesačný prehľad" en="Monthly Overview" /> · {monthTitle}
+</h2>
         </div>
       </div>
 
@@ -208,43 +363,69 @@ export default function Dashboard() {
 
       <section className="grid" aria-label="Detail & rýchly prístup">
         <div>
-          <div className="panel" draggable="true">
+          <div className="panel">
             <div className="drag-handle" title="Presuň sekciu"></div>
             <header>
-              <h3> <T sk="Rozloženie výdavkov" en="Expense Distribution" /></h3>
+              <h2> <T sk="Rozloženie výdavkov" en="Expense Distribution" /></h2>
             </header>
 
             <div className="donut-wrap">
-              <div
-                className="donut"
-                role="img"
-                aria-label="Donut chart: Bývanie 45%, Jedlo 25%, Lieky 20%, Oblečenie 10%"
-              >
-                <div className="donut-center">€ 1 840</div>
+        <div className="chart-canvas-wrapper">
+          <canvas id="dashboardDonutChart"></canvas>
+          <div className="donut-center">
+            € {(analyticsData.total_amount || 0).toFixed(2)}
+          </div>
+        </div>
+
+        <div className="legend">
+          {analyticsData.categories.length > 0 ? (
+            analyticsData.categories.map((cat, i) => (
+              <div className="row" key={cat.category}>
+                <div
+                  className="dot"
+                  style={{
+                    background: [
+                      "#e6c975",
+                      "#ccb8a3",
+                      "#b1bfd0",
+                      "#c0cfad",
+                      "#d9b3c9",
+                      "#a8d5ba",
+                      "#f2b880",
+                      "#b9c0ff",
+                    ][i % 8],
+                  }}
+                ></div>
+
+                <div className="label">{cat.category}</div>
+
+                <strong>
+                  {(parseFloat(cat.percentage || 0) || 0).toFixed(1)}%
+                </strong>
               </div>
-              <div className="legend">
-                <div className="row">
-                  <div className="dot" style={{ background: "var(--gold)" }}></div>
-                  <div className="label">Bývanie</div>
-                  <strong>45%</strong>
-                </div>
-                <div className="row">
-                  <div className="dot" style={{ background: "#9ca3af" }}></div>
-                  <div className="label">Jedlo</div>
-                  <strong>25%</strong>
-                </div>
-                <div className="row">
-                  <div className="dot" style={{ background: "#60a5fa" }}></div>
-                  <div className="label">Lieky</div>
-                  <strong>20%</strong>
-                </div>
-                <div className="row">
-                  <div className="dot" style={{ background: "#34d399" }}></div>
-                  <div className="label">Oblečenie</div>
-                  <strong>10%</strong>
-                </div>
+            ))
+          ) : (
+            <div className="row">
+              <div className="label">
+                <T
+                  sk="Za tento mesiac nie sú dostupné žiadne údaje"
+                  en="No data available for this month"
+                />
               </div>
             </div>
+          )}
+        </div>
+
+        {analyticsError && (
+          <div className="error-text">
+            {analyticsError}
+          </div>
+        )}
+      </div>
+
+
+
+
           </div>
 
           <div id="goals" className="panel" draggable="true" style={{ marginTop: "16px" }}>
