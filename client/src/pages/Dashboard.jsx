@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./style/dashboard.css";
 import { Link } from "react-router-dom";
+import { Html5Qrcode } from "html5-qrcode";
 import { useLang } from "../i18n/LanguageContext";
 import T from "../i18n/T";
 
@@ -9,6 +10,7 @@ const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
 
 export default function Dashboard() {
   const { lang, setLang } = useLang();
+  const scannerRef = useRef(null);
 
   useEffect(() => {
     document.title = "BudgetApp · Dashboard";
@@ -28,6 +30,51 @@ export default function Dashboard() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState("");
   const [qrSuccess, setQrSuccess] = useState("");
+
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerLoading, setScannerLoading] = useState(false);
+  const [lastScanned, setLastScanned] = useState("");
+
+  const importReceiptById = async (receiptId) => {
+    setQrLoading(true);
+    setQrError("");
+    setQrSuccess("");
+
+    try {
+      const importRes = await fetch(`${API_BASE}/receipts/import-ekasa`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          receiptId,
+          user_id: USER_ID,
+        }),
+      });
+
+      const importJson = await importRes.json();
+
+      if (!importRes.ok || importJson?.error) {
+        const errorMsg =
+          importJson?.error?.message ||
+          importJson?.error ||
+          (lang === "sk" ? "Import zlyhal." : "Import failed.");
+        setQrError(errorMsg);
+        return false;
+      }
+
+      setQrSuccess(
+        lang === "sk"
+          ? "Bloček bol úspešne importovaný ✓"
+          : "Receipt imported successfully ✓"
+      );
+      return true;
+    } catch (err) {
+      console.error(err);
+      setQrError(lang === "sk" ? "Chyba spojenia." : "Connection error.");
+      return false;
+    } finally {
+      setQrLoading(false);
+    }
+  };
 
   const handleQrFileChange = (e) => {
     setQrFile(e.target.files[0]);
@@ -69,36 +116,13 @@ export default function Dashboard() {
       }
 
       const receiptId = extractJson.data.receiptId;
+      const ok = await importReceiptById(receiptId);
 
-      const importRes = await fetch(`${API_BASE}/receipts/import-ekasa`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          receiptId: receiptId,
-          user_id: USER_ID,
-        }),
-      });
-
-      const importJson = await importRes.json();
-
-      if (!importRes.ok || importJson?.error) {
-        const errorMsg =
-          importJson?.error?.message ||
-          importJson?.error ||
-          (lang === "sk" ? "Import zlyhal." : "Import failed.");
-        setQrError(errorMsg);
-        return;
+      if (ok) {
+        setQrFile(null);
+        const fileInput = document.querySelector('input[type="file"]');
+        if (fileInput) fileInput.value = null;
       }
-
-      setQrSuccess(
-        lang === "sk"
-          ? "Bloček bol úspešne importovaný ✓"
-          : "Receipt imported successfully ✓"
-      );
-
-      setQrFile(null);
-      const fileInput = document.querySelector('input[type="file"]');
-      if (fileInput) fileInput.value = null;
     } catch (err) {
       console.error(err);
       setQrError(lang === "sk" ? "Chyba spojenia." : "Connection error.");
@@ -106,6 +130,104 @@ export default function Dashboard() {
       setQrLoading(false);
     }
   };
+
+  const stopScanner = async () => {
+    if (!scannerRef.current) return;
+
+    try {
+      const state = scannerRef.current.getState?.();
+      if (state === 2 || state === 3) {
+        await scannerRef.current.stop();
+      }
+    } catch (err) {
+      console.warn("Scanner stop warning:", err);
+    }
+
+    try {
+      await scannerRef.current.clear();
+    } catch (err) {
+      console.warn("Scanner clear warning:", err);
+    }
+
+    scannerRef.current = null;
+  };
+
+  const startScanner = async () => {
+    setQrError("");
+    setQrSuccess("");
+    setScannerLoading(true);
+
+    try {
+      const scanner = new Html5Qrcode("qr-reader");
+      scannerRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 220 },
+        async (decodedText) => {
+          const scannedValue = decodedText.trim();
+
+          if (!scannedValue || scannedValue === lastScanned) return;
+          setLastScanned(scannedValue);
+
+          setQrLoading(true);
+          setQrError("");
+          setQrSuccess("");
+
+          const ok = await importReceiptById(scannedValue);
+
+          setQrLoading(false);
+
+          if (ok) {
+            await stopScanner();
+            setScannerOpen(false);
+          } else {
+            setQrError(
+              lang === "sk"
+                ? "QR neobsahuje platný identifikátor dokladu."
+                : "QR does not contain a valid receipt identifier."
+            );
+
+            setTimeout(() => {
+              setLastScanned("");
+            }, 1500);
+          }
+        },
+        () => {}
+      );
+    } catch (err) {
+      console.error(err);
+      setQrError(
+        lang === "sk"
+          ? "Nepodarilo sa spustiť kameru."
+          : "Unable to start the camera."
+      );
+      setScannerOpen(false);
+    } finally {
+      setScannerLoading(false);
+    }
+  };
+
+  const toggleScanner = async () => {
+    if (scannerOpen) {
+      await stopScanner();
+      setScannerOpen(false);
+    } else {
+      setScannerOpen(true);
+    }
+  };
+
+  useEffect(() => {
+    if (scannerOpen) {
+      startScanner();
+    } else {
+      stopScanner();
+    }
+
+    return () => {
+      stopScanner();
+    };
+  }, [scannerOpen]);
 
   const handleImportEkasa = async () => {
     const rid = (ekasaReceiptId || "").trim();
@@ -336,6 +458,41 @@ export default function Dashboard() {
                   ? "Importovať z QR"
                   : "Import from QR"}
               </button>
+
+              <button
+                type="button"
+                onClick={toggleScanner}
+                disabled={scannerLoading}
+                style={{
+                  marginTop: "10px",
+                  cursor: scannerLoading ? "not-allowed" : "pointer",
+                  opacity: scannerLoading ? 0.7 : 1,
+                  width: "100%",
+                }}
+              >
+                {scannerOpen
+                  ? lang === "sk"
+                    ? "Zavrieť kameru"
+                    : "Close camera"
+                  : lang === "sk"
+                  ? "Skenovať kamerou"
+                  : "Scan with camera"}
+              </button>
+
+              {scannerOpen && (
+                <div
+                  id="qr-reader"
+                  style={{
+                    width: "100%",
+                    minHeight: "260px",
+                    marginTop: "12px",
+                    border: "2px dashed #e4d5a3",
+                    borderRadius: "16px",
+                    overflow: "hidden",
+                    background: "#fffaf0",
+                  }}
+                />
+              )}
 
               {qrSuccess && (
                 <div style={{ marginTop: "8px", color: "#2e7d32", fontSize: "13px" }}>
