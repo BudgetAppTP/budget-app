@@ -4,19 +4,29 @@ from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import func
 
-from app.core.validators import is_valid_iso4217
 from app.extensions import db
-from app.models import AccountMember, AccountType, Goal, SavingsFund, Income, Receipt
+from app.models import AccountMember, AccountType, Goal, Income, Receipt, SavingsFund
 from app.services.errors import BadRequestError, NotFoundError
-from app.services.funds_balance_service import compute_unused_amount
 from app.services.responses import CreatedResult, OkResult
-from app.models import Account, AccountMember, AccountType, Goal, SavingsFund
+
+# TODO: Add savings fund validators module.
+# Move `_to_decimal` and `_to_non_negative_optional_decimal` there.
 
 def _to_decimal(value, field_name: str) -> Decimal:
     try:
         return Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
         raise BadRequestError(f"{field_name} must be a decimal number")
+
+def _to_non_negative_optional_decimal(value, field_name: str) -> Decimal | None:
+    if value is None:
+        return None
+
+    decimal_value = _to_decimal(value, field_name)
+    if decimal_value < 0:
+        raise BadRequestError(f"{field_name} must be greater than or equal to 0")
+    return decimal_value
+
 
 def _serialize_fund_public(fund: SavingsFund, unallocated_amount: Decimal) -> dict:
     return {
@@ -182,14 +192,13 @@ def update_public_fund(user_id: uuid.UUID, fund_id: uuid.UUID, data: dict):
 
     if "target_amount" in data:
         raw = data.get("target_amount")
-        fund.target_amount = _to_decimal(raw, "target_amount") if raw is not None else None
+        fund.target_amount = _to_non_negative_optional_decimal(raw, "target_amount")
 
     if "monthly_contribution" in data:
         raw = data.get("monthly_contribution")
-        fund.monthly_contribution = (
-            _to_decimal(raw, "monthly_contribution")
-            if raw is not None
-            else None
+        fund.monthly_contribution = _to_non_negative_optional_decimal(
+            raw,
+            "monthly_contribution",
         )
 
     db.session.commit()
@@ -238,14 +247,13 @@ def create_public_fund(user_id: uuid.UUID, data: dict, max_savings_funds: int = 
 
     description = str(data.get("description") or "").strip() or None
 
-    target_amount = data.get("target_amount")
-    target_amount = _to_decimal(target_amount, "target_amount") if target_amount is not None else None
-
-    monthly_contribution = data.get("monthly_contribution")
-    monthly_contribution = (
-        _to_decimal(monthly_contribution, "monthly_contribution")
-        if monthly_contribution is not None
-        else None
+    target_amount = _to_non_negative_optional_decimal(
+        data.get("target_amount"),
+        "target_amount",
+    )
+    monthly_contribution = _to_non_negative_optional_decimal(
+        data.get("monthly_contribution"),
+        "monthly_contribution",
     )
 
     fund = SavingsFund(

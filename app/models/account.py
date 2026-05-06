@@ -80,7 +80,8 @@ class Account(Base):
     memberships: Mapped[list['AccountMember']] = relationship(
         'AccountMember',
         back_populates='account',
-        cascade='all, delete-orphan'
+        cascade='all, delete-orphan',
+        passive_deletes=True,
     )
     users: Mapped[list['User']] = relationship(
         'User',
@@ -89,7 +90,9 @@ class Account(Base):
         overlaps='account,memberships,user,account_memberships'
     )
     receipts: Mapped[list['Receipt']] = relationship(
-        'Receipt', back_populates='account'
+        'Receipt',
+        back_populates='account',
+        passive_deletes=True,
     )
     outgoing_allocations: Mapped[list['Allocation']] = relationship(
         'Allocation',

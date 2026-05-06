@@ -70,7 +70,7 @@ class Receipt(Base):
     )
     account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey('accounts.id'),
+        ForeignKey('accounts.id', ondelete='CASCADE'),
         nullable=False,
         index=True
     )

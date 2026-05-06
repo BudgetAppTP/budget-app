@@ -1,15 +1,26 @@
 import os
+import sqlite3
 from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 from werkzeug.exceptions import HTTPException
 from flask_swagger_ui import get_swaggerui_blueprint
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from app.extensions import db, migrate
 from app.services.errors import ServiceError
 from app.services import init_auth_service, init_qr_service
 
 load_dotenv()
+
+
+@event.listens_for(Engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 
 def create_app(config_object=None):

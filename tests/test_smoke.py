@@ -298,6 +298,125 @@ def test_goals_create_is_scoped_to_authenticated_user(auth_client, app):
     assert denied_body["error"]["message"] == "Savings fund not found"
 
 
+def test_savings_funds_list_is_scoped_to_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_fund_{uuid.uuid4().hex[:8]}",
+            email=f"older_fund_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_fund = SavingsFund(
+            name="Auth Fund",
+            balance=Decimal("150.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Older Fund",
+            balance=Decimal("275.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.commit()
+
+        auth_fund_id = str(auth_fund.id)
+        older_fund_id = str(older_fund.id)
+
+    resp = auth_client.get("/api/savings-funds")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"]["count"] == 1
+    assert [item["id"] for item in body["data"]["items"]] == [auth_fund_id]
+    assert auth_fund_id != older_fund_id
+
+
+def test_savings_funds_create_rejects_negative_planning_amounts(auth_client, app):
+    resp = auth_client.post(
+        "/api/savings-funds",
+        json={
+            "name": "Invalid Fund",
+            "currency": "EUR",
+            "target_amount": "-1.00",
+            "monthly_contribution": "-5.00",
+        },
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "target_amount must be greater than or equal to 0"
+
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+        count = (
+            db.session.query(SavingsFund)
+            .join(AccountMember, AccountMember.account_id == SavingsFund.id)
+            .filter(AccountMember.user_id == auth_user.id)
+            .count()
+        )
+        assert count == 0
+
+
+def test_savings_funds_update_rejects_negative_planning_amounts(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        auth_fund = SavingsFund(
+            name="Update Fund",
+            balance=Decimal("150.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        db.session.add(auth_fund)
+        db.session.flush()
+
+        db.session.add(AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"))
+        db.session.commit()
+
+        auth_fund_id = str(auth_fund.id)
+
+    resp = auth_client.patch(
+        f"/api/savings-funds/{auth_fund_id}",
+        json={
+            "target_amount": "-1.00",
+            "monthly_contribution": "-5.00",
+        },
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "bad_request"
+    assert body["error"]["message"] == "target_amount must be greater than or equal to 0"
+
+    with app.app_context():
+        fund = db.session.get(SavingsFund, uuid.UUID(auth_fund_id))
+        assert fund is not None
+        assert fund.target_amount == Decimal("500.00")
+        assert fund.monthly_contribution == Decimal("50.00")
+
+
 def test_goals_update_allows_authenticated_owner_to_update_own_goal(auth_client, app):
     with app.app_context():
         auth_user = _get_user("u@test.local")
@@ -859,6 +978,51 @@ def test_goals_delete_rejects_foreign_goal_for_authenticated_user(auth_client, a
         goal = db.session.get(Goal, uuid.UUID(foreign_goal_id))
         assert goal is not None
         assert goal.user_id == older_user_id
+
+
+def test_savings_funds_delete_cascades_receipts(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        auth_fund = SavingsFund(
+            name="Receipt-backed Fund",
+            balance=Decimal("80.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        db.session.add(auth_fund)
+        db.session.flush()
+
+        db.session.add(AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"))
+        db.session.flush()
+
+        receipt = Receipt(
+            user_id=auth_user.id,
+            account_id=auth_fund.id,
+            description="Fund expense",
+            issue_date=date(2025, 1, 15),
+            total_amount=Decimal("12.50"),
+            external_uid=None,
+            extra_metadata=None,
+        )
+        db.session.add(receipt)
+        db.session.commit()
+
+        auth_fund_id = str(auth_fund.id)
+        receipt_id = str(receipt.id)
+
+    resp = auth_client.delete(f"/api/savings-funds/{auth_fund_id}")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"] == {"id": auth_fund_id}
+
+    with app.app_context():
+        assert db.session.get(SavingsFund, uuid.UUID(auth_fund_id)) is None
+        assert db.session.get(Receipt, uuid.UUID(receipt_id)) is None
 
 
 def test_import_qr_preview_ok(client):
