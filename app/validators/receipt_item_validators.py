@@ -1,10 +1,11 @@
 from decimal import Decimal
 
 from app.validators.common_validators import (
+    parse_uuid_field,
     validate_decimal_field,
     validate_json_object,
-    validate_required_string,
     validate_non_empty_string,
+    validate_required_string,
 )
 
 
@@ -25,12 +26,13 @@ def validate_receipt_item_create_data(data: dict):
     )
 
     extra_metadata = validate_json_object(data.get("extra_metadata"), "extra_metadata")
+    category_id = parse_uuid_field(data.get("category_id"), "category_id", required=False)
 
     return {
         "name": name,
         "quantity": quantity,
         "unit_price": unit_price,
-        "category_id": data.get("category_id"),
+        "category_id": category_id,
         "extra_metadata": extra_metadata,
     }
 
@@ -58,7 +60,11 @@ def validate_receipt_item_update_data(data: dict):
         )
 
     if "category_id" in data:
-        cleaned["category_id"] = data.get("category_id")
+        cleaned["category_id"] = parse_uuid_field(
+            data.get("category_id"),
+            "category_id",
+            required=False,
+        )
 
     if "extra_metadata" in data:
         cleaned["extra_metadata"] = validate_json_object(data.get("extra_metadata"), "extra_metadata")

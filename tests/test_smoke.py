@@ -1369,6 +1369,284 @@ def test_user_cannot_access_another_users_receipt(client, app):
     assert resp.status_code == 404
 
 
+def test_receipt_items_list_returns_items_for_authenticated_receipt_owner(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-items-owner@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-items-owner@test.local")
+        owner_account = _get_main_account(owner)
+        receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Groceries",
+            issue_date=date(2025, 5, 10),
+            total_amount=Decimal("8.50"),
+        )
+        db.session.add(receipt)
+        db.session.flush()
+
+        item = ReceiptItem(
+            receipt_id=receipt.id,
+            user_id=owner.id,
+            name="Milk",
+            quantity=Decimal("2.000"),
+            unit_price=Decimal("1.75"),
+            total_price=Decimal("3.50"),
+            extra_metadata={"brand": "Test"},
+        )
+        db.session.add(item)
+        db.session.commit()
+
+        receipt_id = str(receipt.id)
+        item_id = str(item.id)
+        owner_id = str(owner.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-items-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.get(f"/api/receipts/{receipt_id}/items")
+
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"] == [{
+        "id": item_id,
+        "receipt_id": receipt_id,
+        "user_id": owner_id,
+        "category_id": None,
+        "name": "Milk",
+        "quantity": 2.0,
+        "unit_price": 1.75,
+        "total_price": 3.5,
+        "extra_metadata": {"brand": "Test"},
+    }]
+
+
+def test_receipt_items_list_rejects_foreign_receipt_with_standard_not_found_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-items-requester@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-items-owner2@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-items-owner2@test.local")
+        owner_account = _get_main_account(owner)
+        receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Foreign receipt",
+            issue_date=date(2025, 5, 11),
+            total_amount=Decimal("4.20"),
+        )
+        db.session.add(receipt)
+        db.session.commit()
+        foreign_receipt_id = str(receipt.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-items-requester@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.get(f"/api/receipts/{foreign_receipt_id}/items")
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Receipt not found"
+
+
+def test_receipt_items_create_creates_item_for_authenticated_receipt_owner(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-items-create@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-items-create@test.local")
+        owner_account = _get_main_account(owner)
+        receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Create item target",
+            issue_date=date(2025, 5, 12),
+            total_amount=Decimal("0.00"),
+        )
+        db.session.add(receipt)
+        db.session.commit()
+        receipt_id = str(receipt.id)
+        owner_id = owner.id
+
+    login = client.post("/api/auth/login", json={"email": "receipt-items-create@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.post(
+        f"/api/receipts/{receipt_id}/items",
+        json={"name": "Bread", "quantity": 2, "unit_price": 1.25},
+    )
+
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["error"] is None
+    assert body["data"]["message"] == "Item created successfully"
+    item_id = uuid.UUID(body["data"]["item_id"])
+
+    with app.app_context():
+        item = db.session.get(ReceiptItem, item_id)
+        assert item is not None
+        assert item.receipt_id == uuid.UUID(receipt_id)
+        assert item.user_id == owner_id
+        assert item.name == "Bread"
+        assert float(item.total_price) == 2.5
+
+
+def test_receipt_items_create_rejects_foreign_receipt_with_standard_not_found_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-items-create-requester@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-items-create-owner@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-items-create-owner@test.local")
+        owner_account = _get_main_account(owner)
+        receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Foreign create receipt",
+            issue_date=date(2025, 5, 13),
+            total_amount=Decimal("0.00"),
+        )
+        db.session.add(receipt)
+        db.session.commit()
+        foreign_receipt_id = str(receipt.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-items-create-requester@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.post(
+        f"/api/receipts/{foreign_receipt_id}/items",
+        json={"name": "Bread", "quantity": 1, "unit_price": 1.25},
+    )
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Receipt not found"
+
+
+def test_receipt_items_create_rejects_foreign_category_with_standard_not_found_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-items-category-owner@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-items-category-other@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-items-category-owner@test.local")
+        other = _get_user("receipt-items-category-other@test.local")
+        owner_account = _get_main_account(owner)
+        receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Category guard",
+            issue_date=date(2025, 5, 14),
+            total_amount=Decimal("0.00"),
+        )
+        foreign_category = Category(user_id=other.id, name="Foreign receipt item category")
+        db.session.add_all([receipt, foreign_category])
+        db.session.commit()
+        receipt_id = str(receipt.id)
+        foreign_category_id = str(foreign_category.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-items-category-owner@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.post(
+        f"/api/receipts/{receipt_id}/items",
+        json={"name": "Bread", "quantity": 1, "unit_price": 1.25, "category_id": foreign_category_id},
+    )
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Category not found"
+
+
+def test_receipt_items_update_rejects_foreign_item_with_standard_not_found_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-items-update-requester@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-items-update-owner@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-items-update-owner@test.local")
+        owner_account = _get_main_account(owner)
+        receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Foreign update receipt",
+            issue_date=date(2025, 5, 15),
+            total_amount=Decimal("5.00"),
+        )
+        db.session.add(receipt)
+        db.session.flush()
+        item = ReceiptItem(
+            receipt_id=receipt.id,
+            user_id=owner.id,
+            name="Milk",
+            quantity=Decimal("1.000"),
+            unit_price=Decimal("2.00"),
+            total_price=Decimal("2.00"),
+        )
+        db.session.add(item)
+        db.session.commit()
+        foreign_receipt_id = str(receipt.id)
+        foreign_item_id = str(item.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-items-update-requester@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.put(
+        f"/api/receipts/{foreign_receipt_id}/items/{foreign_item_id}",
+        json={"name": "Updated"},
+    )
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Receipt not found"
+
+
+def test_receipt_items_delete_rejects_foreign_item_with_standard_not_found_envelope(client, app):
+    client.post("/api/auth/register", json={"email": "receipt-items-delete-requester@test.local", "password": "pass"})
+    client.post("/api/auth/register", json={"email": "receipt-items-delete-owner@test.local", "password": "pass"})
+
+    with app.app_context():
+        owner = _get_user("receipt-items-delete-owner@test.local")
+        owner_account = _get_main_account(owner)
+        receipt = Receipt(
+            user_id=owner.id,
+            account_id=owner_account.id,
+            description="Foreign delete receipt",
+            issue_date=date(2025, 5, 16),
+            total_amount=Decimal("5.00"),
+        )
+        db.session.add(receipt)
+        db.session.flush()
+        item = ReceiptItem(
+            receipt_id=receipt.id,
+            user_id=owner.id,
+            name="Cheese",
+            quantity=Decimal("1.000"),
+            unit_price=Decimal("3.00"),
+            total_price=Decimal("3.00"),
+        )
+        db.session.add(item)
+        db.session.commit()
+        foreign_receipt_id = str(receipt.id)
+        foreign_item_id = str(item.id)
+
+    login = client.post("/api/auth/login", json={"email": "receipt-items-delete-requester@test.local", "password": "pass"})
+    assert login.status_code == 200
+
+    resp = client.delete(f"/api/receipts/{foreign_receipt_id}/items/{foreign_item_id}")
+
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "not_found"
+    assert body["error"]["message"] == "Receipt not found"
+
+
 def test_update_receipt_rejects_wrong_type_issue_date_with_standard_bad_request_envelope(client, app):
     client.post("/api/auth/register", json={"email": "receipt-update-invalid@test.local", "password": "pass"})
 
