@@ -13,7 +13,7 @@ import pytest
 
 from app import create_app
 from app.extensions import db
-from app.models import Account, AccountMember, Category, Goal, Income, Receipt, ReceiptItem, SavingsFund, Tag, User
+from app.models import Account, AccountMember, Allocation, Category, Goal, Income, Receipt, ReceiptItem, SavingsFund, Tag, User
 from app.services import ekasa_service
 from app.services.errors import BadRequestError, UpstreamServiceError
 from app.services.users_service import create_user_with_main_account
@@ -346,6 +346,174 @@ def test_savings_funds_list_is_scoped_to_authenticated_user(auth_client, app):
     assert body["data"]["count"] == 1
     assert [item["id"] for item in body["data"]["items"]] == [auth_fund_id]
     assert auth_fund_id != older_fund_id
+
+
+def test_allocations_list_is_scoped_to_authenticated_user(client, app):
+    with app.app_context():
+        older_user = create_user_with_main_account(
+            username=f"older_alloc_{uuid.uuid4().hex[:8]}",
+            email=f"older_alloc_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_email = "u@test.local"
+        auth_password = "pass"
+        reg = client.post("/api/auth/register", json={"email": auth_email, "password": auth_password})
+        assert reg.status_code == 201
+        login = client.post("/api/auth/login", json={"email": auth_email, "password": auth_password})
+        assert login.status_code == 200
+
+        auth_user = _get_user(auth_email)
+        auth_main_account = _get_main_account(auth_user)
+        older_main_account = _get_main_account(older_user)
+
+        auth_fund = SavingsFund(
+            name="Auth Alloc Fund",
+            balance=Decimal("150.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Older Alloc Fund",
+            balance=Decimal("275.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.flush()
+
+        auth_allocation = Allocation(
+            allocation_date=date(2026, 1, 15),
+            amount=Decimal("45.00"),
+            source_account_id=auth_main_account.id,
+            target_account_id=auth_fund.id,
+        )
+        older_allocation = Allocation(
+            allocation_date=date(2026, 1, 16),
+            amount=Decimal("88.00"),
+            source_account_id=older_main_account.id,
+            target_account_id=older_fund.id,
+        )
+        db.session.add_all([auth_allocation, older_allocation])
+        db.session.commit()
+
+        auth_fund_id = str(auth_fund.id)
+        older_fund_id = str(older_fund.id)
+        auth_allocation_id = str(auth_allocation.id)
+        older_allocation_id = str(older_allocation.id)
+
+    allowed_resp = client.get(f"/api/savings-funds/{auth_fund_id}/allocations")
+    assert allowed_resp.status_code == 200
+    allowed_body = allowed_resp.get_json()
+    assert allowed_body["error"] is None
+    assert allowed_body["data"]["count"] == 1
+    assert [item["id"] for item in allowed_body["data"]["items"]] == [auth_allocation_id]
+
+    denied_resp = client.get(f"/api/savings-funds/{older_fund_id}/allocations")
+    assert denied_resp.status_code == 404
+    denied_body = denied_resp.get_json()
+    assert denied_body["error"]["message"] == "Savings fund not found"
+    assert older_allocation_id != auth_allocation_id
+
+
+def test_allocations_create_is_scoped_to_authenticated_user(auth_client, app):
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+
+        older_user = create_user_with_main_account(
+            username=f"older_alloc_create_{uuid.uuid4().hex[:8]}",
+            email=f"older_alloc_create_{uuid.uuid4().hex[:8]}@test.local",
+            password_hash="hash",
+            is_verified=True,
+        )
+        db.session.flush()
+
+        auth_main_account = _get_main_account(auth_user)
+        older_main_account = _get_main_account(older_user)
+        auth_main_account.balance = Decimal("300.00")
+        older_main_account.balance = Decimal("500.00")
+
+        auth_fund = SavingsFund(
+            name="Auth Create Fund",
+            balance=Decimal("25.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("500.00"),
+            monthly_contribution=Decimal("50.00"),
+        )
+        older_fund = SavingsFund(
+            name="Older Create Fund",
+            balance=Decimal("75.00"),
+            currency="EUR",
+            account_type="savings_fund",
+            target_amount=Decimal("900.00"),
+            monthly_contribution=Decimal("90.00"),
+        )
+        db.session.add_all([auth_fund, older_fund])
+        db.session.flush()
+
+        db.session.add_all([
+            AccountMember(user_id=auth_user.id, account_id=auth_fund.id, role="owner"),
+            AccountMember(user_id=older_user.id, account_id=older_fund.id, role="owner"),
+        ])
+        db.session.commit()
+
+        auth_fund_id = str(auth_fund.id)
+        older_fund_id = str(older_fund.id)
+        auth_main_account_id = auth_main_account.id
+        older_main_account_id = older_main_account.id
+
+    allowed_resp = auth_client.post(
+        f"/api/savings-funds/{auth_fund_id}/allocations",
+        json={"amount": "40.00"},
+    )
+    assert allowed_resp.status_code == 201
+    allowed_body = allowed_resp.get_json()
+    assert allowed_body["error"] is None
+    assert allowed_body["data"]["amount"] == 40.0
+    assert allowed_body["data"]["source_account_id"] == str(auth_main_account_id)
+    assert allowed_body["data"]["target_account_id"] == auth_fund_id
+
+    denied_resp = auth_client.post(
+        f"/api/savings-funds/{older_fund_id}/allocations",
+        json={"amount": "40.00"},
+    )
+    assert denied_resp.status_code == 404
+    denied_body = denied_resp.get_json()
+    assert denied_body["error"]["message"] == "Savings fund not found"
+
+    with app.app_context():
+        auth_main_account = db.session.get(Account, auth_main_account_id)
+        older_main_account = db.session.get(Account, older_main_account_id)
+        auth_fund = db.session.get(SavingsFund, uuid.UUID(auth_fund_id))
+        older_fund = db.session.get(SavingsFund, uuid.UUID(older_fund_id))
+        allocations = (
+            db.session.query(Allocation)
+            .filter(Allocation.target_account_id.in_([auth_fund.id, older_fund.id]))
+            .order_by(Allocation.target_account_id.asc(), Allocation.id.asc())
+            .all()
+        )
+
+        assert auth_main_account.balance == Decimal("260.00")
+        assert older_main_account.balance == Decimal("500.00")
+        assert auth_fund.balance == Decimal("65.00")
+        assert older_fund.balance == Decimal("75.00")
+        assert len(allocations) == 1
+        assert allocations[0].source_account_id == auth_main_account_id
+        assert allocations[0].target_account_id == auth_fund.id
+        assert allocations[0].amount == Decimal("40.00")
 
 
 def test_savings_funds_create_rejects_negative_planning_amounts(auth_client, app):
