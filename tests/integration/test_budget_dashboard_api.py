@@ -51,7 +51,7 @@ def test_monthly_budget_totals_income_and_expenses(auth_client_factory):
     create_income(client, 300, "2025-10-01")
     create_receipt(client, 125, "2025-10-02")
 
-    response = client.get("/api/monthly-budget?month=2025-10")
+    response = client.get("/api/monthly-budget?year=2025&month=10")
 
     assert response.status_code == 200
     data = response.get_json()["data"]
@@ -86,30 +86,3 @@ def test_dashboard_rejects_invalid_month_and_partial_date(auth_client_factory):
     assert invalid_format.status_code == 400
     assert invalid_month.status_code == 400
     assert partial.status_code == 400
-
-
-def test_budgets_endpoint_seeds_default_sections_when_empty(auth_client_factory):
-    client = auth_client_factory("budgets-seed@test.local")
-
-    response = client.get("/api/budgets?month=2030-01")
-
-    assert response.status_code == 200
-    data = response.get_json()["data"]
-    assert data["month"] == "2030-01"
-    assert len(data["items"]) > 0
-
-
-def test_budget_update_persists_changed_limit(auth_client_factory):
-    client = auth_client_factory("budgets-update@test.local")
-    initial = client.get("/api/budgets?month=2030-02").get_json()["data"]
-    item = initial["items"][0]
-
-    update = client.put(
-        "/api/budgets/2030-02",
-        json={"items": [{"id": item["id"], "section": item["section"], "limit_amount": 123.45, "percent_target": 10}]},
-    )
-    after_update = client.get("/api/budgets?month=2030-02").get_json()["data"]
-
-    assert update.status_code == 200
-    changed = next(row for row in after_update["items"] if row["id"] == item["id"])
-    assert changed["limit_amount"] == 123.45

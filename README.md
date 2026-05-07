@@ -22,7 +22,6 @@ budget_app/
     __init__.py
     api/
       auth.py
-      transactions.py
       budgets.py
       goals.py
       importqr.py
@@ -185,11 +184,6 @@ npm run dev
   * `POST /api/auth/register`
   * `POST /api/auth/logout`
 
-* **Transactions**
-
-  * `GET /api/transactions` (filters: `month`, `kind`, `category`, `search`)
-  * `POST /api/transactions`
-
 * **Budgets**
 
   * `GET /api/budgets?month=YYYY-MM`
@@ -224,7 +218,7 @@ All endpoints return `application/json` except file downloads under `/api/export
 ## Project Structure (Details)
 
 * `budget_app/app/__init__.py`: Flask app factory, CORS, error handlers, and API blueprint registration. Flask’s `template_folder` and `static_folder` are disabled to enforce API-only behavior.
-* `budget_app/app/api/*`: JSON controllers (auth, transactions, budgets, goals, import-qr, export, dashboard, incomes, receipts, receipt_items, users).
+* `budget_app/app/api/*`: JSON controllers (auth, budgets, goals, import-qr, export, dashboard, incomes, receipts, receipt_items, users).
 * `budget_app/app/core/*`: domain entities and DTOs.
 * `budget_app/app/services/*`: business logic, repositories, and stubs.
 * `budget_app/legacy_templates/` and `budget_app/static_legacy/`: archived legacy Jinja pages and assets for the designer to port into React. Not used by the running backend.
@@ -244,7 +238,7 @@ pytest -q
 Smoke tests assert:
 
 * Health: `/api/health`
-* Core lists and shapes: `/api/transactions`, `/api/budgets`, `/api/goals`, `/api/dashboard`
+* Core lists and shapes: `/api/budgets`, `/api/goals`, `/api/dashboard`
 * Auth flow: register → login → logout
 * Import QR preview
 * Export CSV/PDF (file responses)

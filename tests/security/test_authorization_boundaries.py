@@ -62,7 +62,7 @@ def test_monthly_budget_ignores_user_id_query_parameter(auth_client_factory):
     create_income(owner, amount=50, description="Owner salary")
     create_income(other, amount=200, description="Other salary")
 
-    response = owner.get(f"/api/monthly-budget?month=2025-10&user_id={other_id}")
+    response = owner.get(f"/api/monthly-budget?year=2025&month=10&user_id={other_id}")
 
     assert response.status_code == 200
     data = response.get_json()["data"]

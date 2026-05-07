@@ -23,6 +23,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
 from app.models import User, AuthToken, EmailVerification
+from app.services.errors import BadRequestError, ConflictError, UnauthorizedError
+from app.services.users_service import create_user_with_main_account
 
 
 class AuthService:
@@ -85,25 +87,24 @@ class AuthService:
         verification to a separate step.
 
         Raises:
-            ValueError: if email or password is missing, or if the user
-            already exists.
+            BadRequestError: If email or password is missing.
+            ConflictError: If the user already exists.
         """
         email_normalized = (email or "").strip().lower()
         if not email_normalized or not password:
-            raise ValueError("Email and password are required")
+            raise BadRequestError("email and password required")
         # Check existence
         existing = db.session.execute(db.select(User).filter_by(email=email_normalized)).scalar()
         if existing is not None:
-            raise ValueError("User already exists")
+            raise ConflictError("User already exists", code="exists")
         username = self._derive_username(email_normalized)
-        user = User(
+        user = create_user_with_main_account(
             username=username,
             email=email_normalized,
             password_hash=self.hash_password(password),
             is_verified=False,
+            currency="EUR",
         )
-        db.session.add(user)
-        db.session.flush()
         # Always generate a verification code
         code = self._generate_verification_code()
         expires = datetime.utcnow() + timedelta(minutes=self.VERIFICATION_LIFETIME)
@@ -121,23 +122,39 @@ class AuthService:
     # ------------------------------------------------------------------
     # Login / Logout
     # ------------------------------------------------------------------
-    def login(self, email: str, password: str) -> Optional[str]:
+    def login(self, email: str, password: str) -> str:
         """Authenticate a user and issue a new token.
 
-        Returns the opaque token string if authentication succeeds,
-        otherwise returns None. Only verified users can obtain tokens.
+        Returns the opaque token string if authentication succeeds.
+        Only verified users can obtain tokens.
+
+        Raises:
+            UnauthorizedError: If the credentials are invalid or the
+            account has not been verified yet.
         """
         email_normalized = (email or "").strip().lower()
         if not email_normalized or not password:
-            return None
+            raise UnauthorizedError(
+                "Invalid credentials or account not verified",
+                code="auth_failed",
+            )
         user = db.session.execute(db.select(User).filter_by(email=email_normalized)).scalar()
         if user is None:
-            return None
+            raise UnauthorizedError(
+                "Invalid credentials or account not verified",
+                code="auth_failed",
+            )
         # Must be verified to login
         if not user.is_verified:
-            return None
+            raise UnauthorizedError(
+                "Invalid credentials or account not verified",
+                code="auth_failed",
+            )
         if not self.verify_password(password, user.password_hash):
-            return None
+            raise UnauthorizedError(
+                "Invalid credentials or account not verified",
+                code="auth_failed",
+            )
         # Generate a unique token
         token_value = secrets.token_urlsafe(32)
         expires_at = datetime.utcnow() + timedelta(seconds=self.TOKEN_LIFETIME)
@@ -238,14 +255,13 @@ class AuthService:
             username = self._derive_username(email_normalized)
             random_password = secrets.token_urlsafe(16)
             password_hash = self.hash_password(random_password)
-            user = User(
+            user = create_user_with_main_account(
                 username=username,
                 email=email_normalized,
                 password_hash=password_hash,
                 is_verified=True,
+                currency="EUR",
             )
-            db.session.add(user)
-            db.session.flush()
         else:
             # For an existing user, ensure the account is marked as verified.
             if not user.is_verified:

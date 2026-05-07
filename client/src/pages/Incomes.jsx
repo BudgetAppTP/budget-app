@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useState} from "react";
 import "./style/incomes.css";
 import { useLang } from "../i18n/LanguageContext";
 import T from "../i18n/T";
+import { getApiErrorMessage, hasApiError } from "../api/errors";
 
 
 const API_BASE = "/api";
@@ -52,6 +53,15 @@ export default function Incomes() {
     const res = await fetch(`${API_BASE}/incomes?${params.toString()}`);
     const json = await res.json();
 
+    if (!res.ok || hasApiError(json)) {
+      throw new Error(
+        getApiErrorMessage(
+          json,
+          lang === "sk" ? "Chyba pri načítaní príjmov" : "Failed to load incomes"
+        )
+      );
+    }
+
     const data = json.data ?? json;
     const list = Array.isArray(data.incomes) ? data.incomes : [];
 
@@ -81,9 +91,10 @@ export default function Incomes() {
     const json = await res.json();
 
     if (!res.ok) {
-      const msg =
-        json?.data?.error ||
-        (lang === "sk" ? "Nepodarilo sa načítať príjem" : "Failed to load income");
+      const msg = getApiErrorMessage(
+        json,
+        lang === "sk" ? "Nepodarilo sa načítať príjem" : "Failed to load income"
+      );
       throw new Error(msg);
     }
 
@@ -130,10 +141,10 @@ const createIncomeTag = async (name) => {
   const json = await res.json();
 
   if (!res.ok) {
-    const msg =
-      json?.data?.error ||
-      json?.error?.message ||
-      (lang === "sk" ? "Nepodarilo sa vytvoriť tag" : "Failed to create tag");
+    const msg = getApiErrorMessage(
+      json,
+      lang === "sk" ? "Nepodarilo sa vytvoriť tag" : "Failed to create tag"
+    );
     throw new Error(msg);
   }
 
@@ -248,11 +259,12 @@ useEffect(() => {
 
       if (!res.ok) {
         setError(
-          json?.data?.error ||
-            json?.error?.message ||
-            (lang === "sk"
+          getApiErrorMessage(
+            json,
+            lang === "sk"
               ? "Nepodarilo sa vytvoriť záznam"
-              : "Failed to create income")
+              : "Failed to create income"
+          )
         );
         return;
       }
@@ -309,10 +321,12 @@ useEffect(() => {
 
       if (!res.ok) {
         setError(
-          json?.data?.error ||
-            (lang === "sk"
+          getApiErrorMessage(
+            json,
+            lang === "sk"
               ? "Nepodarilo sa vymazať záznam"
-              : "Failed to delete income")
+              : "Failed to delete income"
+          )
         );
         return;
       }
@@ -361,10 +375,12 @@ useEffect(() => {
 
         if (!res.ok) {
           setError(
-            json?.data?.error ||
-              (lang === "sk"
+            getApiErrorMessage(
+              json,
+              lang === "sk"
                 ? "Nepodarilo sa upraviť záznam"
-                : "Failed to update income")
+                : "Failed to update income"
+            )
           );
           return;
         }

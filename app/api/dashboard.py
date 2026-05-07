@@ -1,38 +1,54 @@
-import uuid
-from flask import request, g
-from app.api import bp, make_response
+"""
+Dashboard API
+
+Paths:
+  - GET /api/dashboard/summary
+
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
+Schemas:
+  DashboardSummary:
+    {
+      "success": true,
+      "year": int,
+      "month": int,
+      "total_incomes": float,
+      "total_expenses": float,
+      "balance": float
+    }
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
+"""
+
+from flask import g, request
+
+from app.api import bp
 from app.services import dashboard_service
+from app.validators.common_validators import parse_month_year_query_filter
 
 
 @bp.get("/dashboard/summary", strict_slashes=False)
 def api_dashboard_summary():
     """
-    GET /api/dashboard/summary
-    Query (optional):
-      - year: int
-      - month: int (1..12)
-      - user_id: uuid (optional)
+    Get monthly income and expense totals for the authenticated user.
 
-    Behavior:
-      - if year+month missing -> use current month
-      - if only one provided -> 400
+    Query:
+      year: int | omitted
+      month: int | omitted
+
+    Responses:
+      200: {"data": DashboardSummary, "error": null}
+      400: see module errors
     """
-    year_raw = request.args.get("year")
-    month_raw = request.args.get("month")
-    year = None
-    month = None
+    month_filter = parse_month_year_query_filter(
+        request.args.get("year"),
+        request.args.get("month"),
+    )
 
-    try:
-        if year_raw is not None:
-            year = int(year_raw)
-        if month_raw is not None:
-            month = int(month_raw)
-    except ValueError:
-        return make_response({"error": "Invalid year/month format"}, None, 400)
-
-    data, status = dashboard_service.get_month_summary(
-        year=year,
-        month=month,
+    result = dashboard_service.get_month_summary(
+        month_filter=month_filter,
         user_id=g.current_user.id,
     )
-    return make_response(data, None, status)
+    return result.to_flask_response()

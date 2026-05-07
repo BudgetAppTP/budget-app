@@ -7,6 +7,7 @@ class BaseConfig:
     TESTING = False
     DEFAULT_CURRENCY = os.getenv("DEFAULT_CURRENCY", "EUR")
     IMPORT_XLSX_PATH = os.getenv("IMPORT_XLSX_PATH", "/mnt/data/BugetAppTP.xlsx")
+    MAX_SAVINGS_FUNDS = int(os.getenv("MAX_SAVINGS_FUNDS", "10"))
 
     # Google OAuth configuration. Set ``GOOGLE_CLIENT_ID`` to the client ID
     # obtained from the Google Developer Console. When provided, the
