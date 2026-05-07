@@ -1,6 +1,10 @@
 """
 Account API
 
+Paths:
+  - GET   /api/account
+  - PATCH /api/account
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
@@ -19,11 +23,12 @@ Common errors:
   404: {"data": null, "error": {"code": "not_found", "message": str}}
 """
 
-from flask import request
+from flask import g
 
 from app.api import bp
-from app.api.auth_context import get_mock_user_id
+from app.api.request_parsing import parse_json_object_body
 from app.services import accounts_service
+
 
 @bp.get("/account", strict_slashes=False)
 def api_account_get():
@@ -34,7 +39,7 @@ def api_account_get():
       200: {"data": Account, "error": null}
       404: see module errors
     """
-    user_id = get_mock_user_id()
+    user_id = g.current_user.id
     result = accounts_service.get_main_account(user_id)
     return result.to_flask_response()
 
@@ -52,7 +57,8 @@ def api_account_patch():
       400: see module errors
       404: see module errors
     """
-    user_id = get_mock_user_id()
-    payload_in = request.get_json(silent=True) or {}
+    user_id = g.current_user.id
+    payload_in = parse_json_object_body()
+
     result = accounts_service.update_main_account(user_id, payload_in)
     return result.to_flask_response()

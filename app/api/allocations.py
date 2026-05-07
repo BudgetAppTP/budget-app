@@ -1,6 +1,11 @@
 """
 Allocations API
 
+Paths:
+  - GET    /api/savings-funds/{fund_id}/allocations
+  - POST   /api/savings-funds/{fund_id}/allocations
+  - DELETE /api/savings-funds/{fund_id}/allocations/{allocation_id}
+
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
@@ -21,10 +26,10 @@ Common errors:
 
 import uuid
 
-from flask import request
+from flask import g
 
 from app.api import bp
-from app.api.auth_context import get_mock_user_id
+from app.api.request_parsing import parse_json_object_body
 from app.services import allocations_service
 
 
@@ -37,7 +42,7 @@ def api_allocations_list(fund_id: uuid.UUID):
       200: {"data": {"items": [Allocation], "count": int}, "error": null}
       404: see module errors
     """
-    user_id = get_mock_user_id()
+    user_id = g.current_user.id
     result = allocations_service.list_allocations(user_id, fund_id)
     return result.to_flask_response()
 
@@ -55,8 +60,8 @@ def api_allocations_create(fund_id: uuid.UUID):
       400: see module errors
       404: see module errors
     """
-    user_id = get_mock_user_id()
-    payload_in = request.get_json(silent=True) or {}
+    user_id = g.current_user.id
+    payload_in = parse_json_object_body()
     result = allocations_service.create_allocation(user_id, fund_id, payload_in)
     return result.to_flask_response()
 
@@ -71,6 +76,6 @@ def api_allocations_undo(fund_id: uuid.UUID, allocation_id: uuid.UUID):
       400: see module errors
       404: see module errors
     """
-    user_id = get_mock_user_id()
+    user_id = g.current_user.id
     result = allocations_service.undo_allocation(user_id, fund_id, allocation_id)
     return result.to_flask_response()

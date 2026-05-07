@@ -115,4 +115,4 @@ class Tag(Base):
         elif has_incomes:
             self.type = TagType.INCOME
         else:
-            return
+            self.type = TagType.BOTH

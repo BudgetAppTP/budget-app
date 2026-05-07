@@ -29,17 +29,20 @@ def _main_account_query(user_id: uuid.UUID):
     )
 
 
-def get_main_account(user_id: uuid.UUID):
+def find_main_account(user_id: uuid.UUID) -> Account:
     account = _main_account_query(user_id).first()
     if account is None:
         raise NotFoundError("Main account not found")
+    return account
+
+
+def get_main_account(user_id: uuid.UUID):
+    account = find_main_account(user_id)
     return OkResult(_serialize_account(account))
 
 
 def update_main_account(user_id: uuid.UUID, data: dict):
-    account = _main_account_query(user_id).first()
-    if account is None:
-        raise NotFoundError("Main account not found")
+    account = find_main_account(user_id)
 
     if "name" in data:
         name = str(data.get("name") or "").strip()

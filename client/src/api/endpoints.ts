@@ -18,22 +18,6 @@ export const authApi = {
   googleLogin: (body: { token: string }) => unwrap(http.post("/auth/google", body))
 };
 
-export type Transaction = {
-  id: number | string;
-  date: string;
-  kind: "income" | "expense";
-  amount: number;
-  description?: string;
-  category?: string;
-};
-
-export const transactionsApi = {
-  list: (q?: { month?: string; kind?: string; category?: string; search?: string }) =>
-    unwrap<{ items: Transaction[]; count: number }>(http.get("/transactions", { params: q })),
-  create: (body: Partial<Transaction> & { kind: "income" | "expense" }) =>
-    unwrap<Transaction>(http.post("/transactions", body))
-};
-
 export type BudgetItem = {
   id: string;
   month: string;

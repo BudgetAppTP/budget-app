@@ -1,38 +1,26 @@
-import uuid
+"""
+Analytics API
+
+Paths:
+  - GET /api/analytics/donut
+"""
+
 from flask import request, g
-from app.api import bp, make_response
+
+from app.api import bp
 from app.services import analytics_service
+from app.validators.common_validators import parse_month_year_query_filter
+
 
 @bp.get("/analytics/donut", strict_slashes=False)
 def api_donut_chart():
-    year_raw = request.args.get("year")
-    month_raw = request.args.get("month")
-    user_raw = request.args.get("user_id")  # optional
-    account_raw = request.args.get("account_id")  # optional
-
-    try:
-        year = int(year_raw) if year_raw is not None else None
-        month = int(month_raw) if month_raw is not None else None
-    except ValueError:
-        return make_response({"error": "Invalid year/month format"}, None, 400)
-
-    user_id = None
-    account_id = None
-    if user_raw:
-        try:
-            user_id = uuid.UUID(user_raw)
-        except ValueError:
-            return make_response({"error": "Invalid user_id format"}, None, 400)
-    if account_raw:
-        try:
-            account_id = uuid.UUID(account_raw)
-        except ValueError:
-            return make_response({"error": "Invalid account_id format"}, None, 400)
-
-    data, status = analytics_service.get_donut_data(
-        year=year,
-        month=month,
-        user_id=user_id,
-        account_id=account_id,
+    month_filter = parse_month_year_query_filter(
+        request.args.get("year"),
+        request.args.get("month"),
     )
-    return make_response(data, None, status)
+
+    result = analytics_service.get_donut_data(
+        month_filter=month_filter,
+        user_id=g.current_user.id,
+    )
+    return result.to_flask_response()

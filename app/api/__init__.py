@@ -10,7 +10,11 @@ Notes for Swagger:
 - Some swagger examples show raw JSON. Actual responses are wrapped in the envelope above.
 """
 
+import warnings
+
 from flask import Blueprint, jsonify
+from app.services.errors import UnauthorizedError
+from app.services.responses import OkResult
 
 bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -69,10 +73,9 @@ def _enforce_authentication():
     token = extract_auth_token()
     user = auth_service.verify_token(token) if token else None
     if user is None:
-        return make_response(
-            None,
-            {"code": "unauthenticated", "message": "Authentication required"},
-            401,
+        raise UnauthorizedError(
+            "Authentication required",
+            code="unauthenticated",
         )
     # Attach user to request context for downstream handlers
     g.current_user = user
@@ -81,7 +84,13 @@ def _enforce_authentication():
 
 def make_response(data=None, error=None, status=200):
     """
-    Make unified API response.
+    Deprecated unified API response helper.
+
+    Deprecated:
+    - Use service-layer result objects such as ``OkResult`` or ``CreatedResult``.
+    - Return ``result.to_flask_response()`` from the route.
+    - Raise ``BadRequestError`` / ``NotFoundError`` from the service layer for
+      error cases instead of building manual error responses in the route.
 
     Returns:
       JSON:
@@ -90,6 +99,16 @@ def make_response(data=None, error=None, status=200):
           "error": {"code": str, "message": str} or null
         }
     """
+    warnings.warn(
+        "app.api.make_response is deprecated. "
+        "Use `from app.services.responses import OkResult` (or another result "
+        "object such as CreatedResult) and return "
+        "`result.to_flask_response()` from the route. For failures, raise "
+        "`BadRequestError` or `NotFoundError` from the service layer instead "
+        "of building manual error responses.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return jsonify({"data": data, "error": error}), status
 
 
@@ -107,4 +126,4 @@ def health():
           }
         error: null
     """
-    return make_response({"status": "ok"})
+    return OkResult({"status": "ok"}).to_flask_response()

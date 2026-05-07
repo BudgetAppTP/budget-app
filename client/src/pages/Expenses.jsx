@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import "./style/expenses.css";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
+import { getApiErrorMessage, hasApiError } from "../api/errors";
 
 const API_BASE_URL = "";
 const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
@@ -65,10 +66,10 @@ export default function Expenses() {
   const json = await res.json();
 
   if (!res.ok) {
-    const msg =
-      json?.data?.error ||
-      json?.error?.message ||
-      (lang === "sk" ? "Nepodarilo sa vytvoriť tag" : "Failed to create tag");
+    const msg = getApiErrorMessage(
+      json,
+      lang === "sk" ? "Nepodarilo sa vytvoriť tag" : "Failed to create tag"
+    );
     throw new Error(msg);
   }
 
@@ -144,6 +145,17 @@ export default function Expenses() {
 
           const res = await fetch(`${API_BASE_URL}/api/receipts?${params.toString()}`);
           const json = await res.json();
+
+          if (!res.ok || hasApiError(json)) {
+            throw new Error(
+              getApiErrorMessage(
+                json,
+                lang === "sk"
+                  ? "Nepodarilo sa načítať výdavky."
+                  : "Failed to load expenses."
+              )
+            );
+          }
 
           const list = Array.isArray(json?.data)
             ? json.data
@@ -246,14 +258,15 @@ export default function Expenses() {
 
       const json = await res.json();
 
-      if (!res.ok || json.error) {
-        const backendMsg =
-          json.error?.message ||
-          json.data?.error ||
-          (lang === "sk"
-            ? "Nepodarilo sa vytvoriť výdavok."
-            : "Failed to create expense.");
-        setError(backendMsg);
+      if (!res.ok || hasApiError(json)) {
+        setError(
+          getApiErrorMessage(
+            json,
+            lang === "sk"
+              ? "Nepodarilo sa vytvoriť výdavok."
+              : "Failed to create expense."
+          )
+        );
         return;
       }
 
@@ -319,14 +332,15 @@ setExpenses([...expenses, newRow]);
 
       const json = await res.json();
 
-      if (!res.ok || json.error) {
-        const backendMsg =
-          json.error?.message ||
-          json.data?.error ||
-          (lang === "sk"
-            ? "Nepodarilo sa vymazať výdavok."
-            : "Failed to delete expense.");
-        setError(backendMsg);
+      if (!res.ok || hasApiError(json)) {
+        setError(
+          getApiErrorMessage(
+            json,
+            lang === "sk"
+              ? "Nepodarilo sa vymazať výdavok."
+              : "Failed to delete expense."
+          )
+        );
         return;
       }
 
@@ -385,14 +399,15 @@ setExpenses([...expenses, newRow]);
 
         const json = await res.json();
 
-        if (!res.ok || json.error) {
-          const backendMsg =
-            json.error?.message ||
-            json.data?.error ||
-            (lang === "sk"
-              ? "Nepodarilo sa upraviť výdavok."
-              : "Failed to update expense.");
-          setError(backendMsg);
+        if (!res.ok || hasApiError(json)) {
+          setError(
+            getApiErrorMessage(
+              json,
+              lang === "sk"
+                ? "Nepodarilo sa upraviť výdavok."
+                : "Failed to update expense."
+            )
+          );
           return;
         }
 

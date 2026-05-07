@@ -1,8 +1,42 @@
+"""
+Goals API
+
+Paths:
+  - GET    /api/funds/{fund_id}/goals
+  - POST   /api/funds/{fund_id}/goals
+  - PATCH  /api/goals/{goal_id}
+  - PUT    /api/goals/{goal_id}
+  - DELETE /api/goals/{goal_id}
+  - PATCH  /api/goals/{goal_id}/status
+  - PATCH  /api/goals/{goal_id}/amount
+
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
+Schemas:
+  Goal:
+    {
+      "id": uuid,
+      "user_id": uuid,
+      "savings_fund_id": uuid,
+      "target_amount": float,
+      "current_amount": float,
+      "is_completed": bool
+    }
+
+  GoalStatus:
+    {"id": uuid, "is_completed": bool}
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
+  404: {"data": null, "error": {"code": "not_found", "message": str}}
+"""
 import uuid
 
-from flask import g, request
+from flask import g
 
 from app.api import bp
+from app.api.request_parsing import parse_json_object_body
 from app.services import goals_service
 
 
@@ -38,8 +72,7 @@ def api_goals_create(fund_id: uuid.UUID):
       404: see module errors
     """
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True) or {}
-
+    payload_in = parse_json_object_body()
     result = goals_service.create_goal(user_id, fund_id, payload_in)
     return result.to_flask_response()
 
@@ -63,8 +96,7 @@ def api_goals_update(goal_id: uuid.UUID):
       404: see module errors
     """
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True) or {}
-
+    payload_in = parse_json_object_body()
     result = goals_service.update_goal(user_id, goal_id, payload_in)
     return result.to_flask_response()
 
@@ -97,7 +129,7 @@ def api_goals_toggle_status(goal_id: uuid.UUID):
       404: see module errors
     """
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True) or {}
+    payload_in = parse_json_object_body()
 
     result = goals_service.update_goal_status(user_id, goal_id, payload_in)
     return result.to_flask_response()
@@ -117,8 +149,7 @@ def api_goals_adjust_amount(goal_id: uuid.UUID):
       404: see module errors
     """
     user_id = g.current_user.id
-    payload_in = request.get_json(silent=True) or {}
-
+    payload_in = parse_json_object_body()
     if "delta_amount" not in payload_in:
         from app.services.errors import BadRequestError
         raise BadRequestError("Missing delta_amount")

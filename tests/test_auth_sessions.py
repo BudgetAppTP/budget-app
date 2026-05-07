@@ -6,7 +6,7 @@ import pytest
 
 from app import create_app
 from app.extensions import db
-from app.models import AuthToken, Income
+from app.models import AccountMember, AuthToken, Income
 from config import TestConfig
 
 
@@ -158,3 +158,88 @@ def test_payload_user_id_is_ignored_for_owned_resource_creation(app):
     with app.app_context():
         income = db.session.get(Income, UUID(income_id))
         assert str(income.user_id) == owner_id
+
+
+def test_account_get_uses_authenticated_session_user(app):
+    first = app.test_client()
+    second = app.test_client()
+
+    register_and_login(first, "first-account@test.local", "pass")
+    register_and_login(second, "second-account@test.local", "pass")
+
+    first_user_id = first.get("/api/auth/me").get_json()["data"]["id"]
+    second_user_id = second.get("/api/auth/me").get_json()["data"]["id"]
+
+    with app.app_context():
+        first_account = (
+            db.session.query(AccountMember)
+            .filter(AccountMember.user_id == UUID(first_user_id))
+            .first()
+        )
+        second_account = (
+            db.session.query(AccountMember)
+            .filter(AccountMember.user_id == UUID(second_user_id))
+            .first()
+        )
+
+    first_response = first.get("/api/account")
+    second_response = second.get("/api/account")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_response.get_json()["data"]["id"] == str(first_account.account_id)
+    assert second_response.get_json()["data"]["id"] == str(second_account.account_id)
+    assert first_response.get_json()["data"]["id"] != second_response.get_json()["data"]["id"]
+
+
+def test_account_patch_updates_only_authenticated_users_main_account(app):
+    first = app.test_client()
+    second = app.test_client()
+
+    register_and_login(first, "first-account-patch@test.local", "pass")
+    register_and_login(second, "second-account-patch@test.local", "pass")
+
+    first_before = first.get("/api/account")
+    second_before = second.get("/api/account")
+    assert first_before.status_code == 200
+    assert second_before.status_code == 200
+
+    first_account_id = first_before.get_json()["data"]["id"]
+    second_account_id = second_before.get_json()["data"]["id"]
+    assert first_account_id != second_account_id
+
+    renamed = first.patch("/api/account", json={"name": "First patched account"})
+    assert renamed.status_code == 200
+    assert renamed.get_json()["data"]["id"] == first_account_id
+    assert renamed.get_json()["data"]["name"] == "First patched account"
+
+    first_after = first.get("/api/account")
+    second_after = second.get("/api/account")
+    assert first_after.status_code == 200
+    assert second_after.status_code == 200
+    assert first_after.get_json()["data"]["id"] == first_account_id
+    assert first_after.get_json()["data"]["name"] == "First patched account"
+    assert second_after.get_json()["data"]["id"] == second_account_id
+    assert second_after.get_json()["data"]["name"] != "First patched account"
+
+
+def test_account_patch_rejects_missing_json_body(app):
+    client = app.test_client()
+    register_and_login(client, "account-missing-json@test.local", "pass")
+
+    response = client.patch("/api/account")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "bad_request"
+    assert response.get_json()["error"]["message"] == "Missing JSON body"
+
+
+def test_account_patch_rejects_non_object_json_body(app):
+    client = app.test_client()
+    register_and_login(client, "account-array-json@test.local", "pass")
+
+    response = client.patch("/api/account", json=["not", "an", "object"])
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == "bad_request"
+    assert response.get_json()["error"]["message"] == "JSON body must be an object"

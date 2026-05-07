@@ -39,7 +39,31 @@ class NotFoundError(ServiceError):
     code = "not_found"
 
 
+class ForbiddenError(ServiceError):
+    status_code = 403
+    default_message = "Forbidden"
+    code = "forbidden"
+
+
+class UnauthorizedError(ServiceError):
+    status_code = 401
+    default_message = "Unauthorized"
+    code = "unauthorized"
+
+
 class ConflictError(ServiceError):
     status_code = 409
     default_message = "Conflict"
     code = "conflict"
+
+
+class UpstreamServiceError(ServiceError):
+    status_code = 502
+    default_message = "Upstream service error"
+    code = "upstream_service_error"
+
+
+class RateLimitExceededError(ServiceError):
+    status_code = 429
+    default_message = "Rate limit exceeded. Try again later."
+    code = "rate_limit_exceeded"

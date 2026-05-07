@@ -3,6 +3,7 @@ import "./style/ekasa.css";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
 import { Html5Qrcode } from "html5-qrcode";
+import { getApiErrorMessage, hasApiError } from "../api/errors";
 
 const API_BASE = "/api";
 const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
@@ -91,14 +92,15 @@ export default function Ekasa() {
       );
       const json = await res.json();
 
-      if (!res.ok || json?.error) {
-        const msg =
-          json?.error?.message ||
-          json?.data?.error ||
-          (lang === "sk"
-            ? "Nepodarilo sa načítať eKasa bločky."
-            : "Failed to load eKasa checks.");
-        setError(msg);
+      if (!res.ok || hasApiError(json)) {
+        setError(
+          getApiErrorMessage(
+            json,
+            lang === "sk"
+              ? "Nepodarilo sa načítať eKasa bločky."
+              : "Failed to load eKasa checks."
+          )
+        );
         setChecks([]);
         return;
       }
@@ -167,20 +169,19 @@ export default function Ekasa() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiptId,
-          user_id: USER_ID,
+          receipt_id: receiptId,
         }),
       });
 
       const importJson = await importRes.json();
 
-      if (!importRes.ok || importJson?.error) {
-        const errorMsg =
-          importJson?.error?.message ||
-          importJson?.error ||
-          (lang === "sk" ? "Import zlyhal." : "Import failed.");
-
-        setQrError(errorMsg);
+      if (!importRes.ok || hasApiError(importJson)) {
+        setQrError(
+          getApiErrorMessage(
+            importJson,
+            lang === "sk" ? "Import zlyhal." : "Import failed."
+          )
+        );
         return false;
       }
 
@@ -250,12 +251,14 @@ export default function Ekasa() {
 
       const extractJson = await extractRes.json();
 
-      if (!extractRes.ok || extractJson?.error) {
+      if (!extractRes.ok || hasApiError(extractJson)) {
         setQrError(
-          extractJson?.error ||
-            (lang === "sk"
+          getApiErrorMessage(
+            extractJson,
+            lang === "sk"
               ? "Nepodarilo sa extrahovať ID."
-              : "Failed to extract ID.")
+              : "Failed to extract ID."
+          )
         );
         return;
       }
@@ -383,23 +386,21 @@ export default function Ekasa() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiptId: rid,
-          user_id: USER_ID,
+          receipt_id: rid,
         }),
       });
 
       const json = await res.json();
 
-      if (!res.ok || json?.error) {
-        const backendMsg =
-          json?.error?.message ||
-          json?.error?.details?.error ||
-          json?.data?.error ||
-          (lang === "sk"
-            ? "Import z eKasa zlyhal."
-            : "Import from eKasa failed.");
-
-        setEkasaError(backendMsg);
+      if (!res.ok || hasApiError(json)) {
+        setEkasaError(
+          getApiErrorMessage(
+            json,
+            lang === "sk"
+              ? "Import z eKasa zlyhal."
+              : "Import from eKasa failed."
+          )
+        );
         return;
       }
 
@@ -553,11 +554,8 @@ export default function Ekasa() {
                         <b>{itemsCount}</b>
                       </span>
 
-                      <span
-                        className="receipt-id"
-                        title="external_uid / receiptId"
-                      >
-                        receiptId: {check.external_uid || "-"}
+                      <span className="receipt-id" title="external_uid / eKasa receipt ID">
+                        eKasa ID: {check.external_uid || "-"}
                       </span>
                     </div>
                   </div>
@@ -772,7 +770,6 @@ export default function Ekasa() {
               {qrError}
             </div>
           )}
-        </div>
 
         <div className="import-card" draggable="true">
           <strong>
@@ -793,8 +790,8 @@ export default function Ekasa() {
 
           <p>
             <T
-              sk="Zadajte ID bločku (receiptId) z eKasa a importujte výdavok."
-              en="Enter eKasa receipt ID (receiptId) to import an expense."
+              sk="Zadajte eKasa ID bločku a importujte výdavok."
+              en="Enter the eKasa receipt ID to import an expense."
             />
           </p>
 
@@ -806,11 +803,7 @@ export default function Ekasa() {
               setEkasaError("");
               setEkasaSuccess("");
             }}
-            placeholder={
-              lang === "sk"
-                ? "ID bločku (receiptId)"
-                : "Receipt ID (receiptId)"
-            }
+            placeholder={lang === "sk" ? "eKasa ID bločku" : "eKasa receipt ID"}
             style={{
               border: ekasaError ? "1px solid #e53935" : "1px solid #d0d0d0",
             }}

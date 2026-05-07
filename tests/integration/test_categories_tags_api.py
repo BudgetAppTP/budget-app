@@ -125,8 +125,14 @@ def test_tag_counters_increment_and_decrement_for_income_and_receipt_assignments
     assert tag_after_income_unassign["type"] == "expense"
 
     client.delete(f"/api/receipts/{receipt_id}")
-    assert tag_id not in {tag["id"] for tag in client.get("/api/tags/income").get_json()["data"]["tags"]}
-    assert tag_id not in {tag["id"] for tag in client.get("/api/tags/expense").get_json()["data"]["tags"]}
+    income_tags = client.get("/api/tags/income").get_json()["data"]["tags"]
+    expense_tags = client.get("/api/tags/expense").get_json()["data"]["tags"]
+    reset_income_tag = next(tag for tag in income_tags if tag["id"] == tag_id)
+    reset_expense_tag = next(tag for tag in expense_tags if tag["id"] == tag_id)
+    assert reset_income_tag["counter"] == 0
+    assert reset_income_tag["type"] == "both"
+    assert reset_expense_tag["counter"] == 0
+    assert reset_expense_tag["type"] == "both"
 
 
 def test_income_and_expense_tag_endpoints_filter_by_type(auth_client_factory):

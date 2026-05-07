@@ -2,40 +2,32 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+
 from sqlalchemy import func
 
 from app.extensions import db
 from app.models import Receipt, ReceiptItem, Category, Tag
+from app.services import accounts_service
+from app.services.responses import OkResult
+from app.validators.common_validators import MonthYearFilter
 
 
 def get_donut_data(
-    year: int | None = None,
-    month: int | None = None,
-    user_id: uuid.UUID | None = None,
-    account_id: uuid.UUID | None = None,
+    user_id: uuid.UUID,
+    month_filter: MonthYearFilter,
 ):
-    # validate (similar to incomes/receipts)
-    if (year is None) ^ (month is None):
-        return {"error": "Both year and month must be provided together"}, 400
-    if year is None or month is None:
-        return {"error": "Both year and month must be provided together"}, 400
-    if month < 1 or month > 12:
-        return {"error": "Month must be between 1 and 12"}, 400
-
-    start = date(year, month, 1)
-    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    account = accounts_service.find_main_account(user_id)
+    start, end = month_filter.range()
 
     # TOTAL
     total_q = (
         db.session.query(func.coalesce(func.sum(ReceiptItem.total_price), 0))
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
-        .filter(Receipt.issue_date >= start, Receipt.issue_date < end)
+        .filter(Receipt.user_id == user_id)
+        .filter(Receipt.account_id == account.id)
     )
-    if user_id is not None:
-        total_q = total_q.filter(Receipt.user_id == user_id)
-    if account_id is not None:
-        total_q = total_q.filter(Receipt.account_id == account_id)
+    if start is not None and end is not None:
+        total_q = total_q.filter(Receipt.issue_date >= start, Receipt.issue_date < end)
 
     total_amount = float(total_q.scalar() or 0.0)
 
@@ -47,14 +39,13 @@ def get_donut_data(
         )
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .outerjoin(Category, ReceiptItem.category_id == Category.id)
-        .filter(Receipt.issue_date >= start, Receipt.issue_date < end)
+        .filter(Receipt.user_id == user_id)
+        .filter(Receipt.account_id == account.id)
         .group_by(func.coalesce(Category.name, "Uncategorized"))
         .order_by(func.coalesce(func.sum(ReceiptItem.total_price), 0).desc())
     )
-    if user_id is not None:
-        cat_q = cat_q.filter(Receipt.user_id == user_id)
-    if account_id is not None:
-        cat_q = cat_q.filter(Receipt.account_id == account_id)
+    if start is not None and end is not None:
+        cat_q = cat_q.filter(Receipt.issue_date >= start, Receipt.issue_date < end)
 
     categories = []
     for category, amount in cat_q.all():
@@ -77,7 +68,8 @@ def get_donut_data(
         .join(Receipt, ReceiptItem.receipt_id == Receipt.id)
         .outerjoin(Category, ReceiptItem.category_id == Category.id)
         .outerjoin(Tag, Receipt.tag_id == Tag.id)
-        .filter(Receipt.issue_date >= start, Receipt.issue_date < end)
+        .filter(Receipt.user_id == user_id)
+        .filter(Receipt.account_id == account.id)
         .group_by(
             func.coalesce(Category.name, "Uncategorized"),
             func.coalesce(Tag.name, "No tag"),
@@ -89,10 +81,8 @@ def get_donut_data(
             Receipt.issue_date.asc(),
         )
     )
-    if user_id is not None:
-        detail_q = detail_q.filter(Receipt.user_id == user_id)
-    if account_id is not None:
-        detail_q = detail_q.filter(Receipt.account_id == account_id)
+    if start is not None and end is not None:
+        detail_q = detail_q.filter(Receipt.issue_date >= start, Receipt.issue_date < end)
 
     tags_by_category: dict[str, dict[str, dict[str, float]]] = {}
 
@@ -101,10 +91,10 @@ def get_donut_data(
         tags_by_category[category].setdefault(tag, {})
         tags_by_category[category][tag][issue_date.isoformat()] = round(float(amount or 0.0), 2)
 
-    return {
-        "year": year,
-        "month": month,
+    return OkResult({
+        "year": month_filter.year,
+        "month": month_filter.month,
         "total_amount": round(total_amount, 2),
         "categories": categories,
         "tags_by_category": tags_by_category,
-    }, 200
+    })

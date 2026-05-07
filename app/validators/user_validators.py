@@ -1,5 +1,7 @@
 import re
 
+from app.services.errors import BadRequestError
+
 EMAIL_REGEX = r"^[^@]+@[^@]+\.[^@]+$"
 
 
@@ -9,28 +11,28 @@ def validate_user_create_data(data: dict):
     password_hash = data.get("password_hash")
 
     if not username:
-        return None, {"error": "Missing username"}, 400
+        raise BadRequestError("Missing username")
 
     if not email:
-        return None, {"error": "Missing email"}, 400
+        raise BadRequestError("Missing email")
 
     if not password_hash:
-        return None, {"error": "Missing password_hash"}, 400
+        raise BadRequestError("Missing password_hash")
 
     if len(username) > 32:
-        return None, {"error": "username must be at most 32 characters"}, 400
+        raise BadRequestError("username must be at most 32 characters")
 
     if len(email) > 255:
-        return None, {"error": "email must be at most 255 characters"}, 400
+        raise BadRequestError("email must be at most 255 characters")
 
     if len(str(password_hash)) > 255:
-        return None, {"error": "password_hash must be at most 255 characters"}, 400
+        raise BadRequestError("password_hash must be at most 255 characters")
 
     if not re.match(EMAIL_REGEX, email):
-        return None, {"error": "Invalid email format"}, 400
+        raise BadRequestError("Invalid email format")
 
     return {
         "username": username,
         "email": email,
         "password_hash": password_hash,
-    }, None, None
+    }
