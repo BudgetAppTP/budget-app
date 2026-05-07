@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import func
@@ -45,19 +46,35 @@ def _fund_for_user(user_id: uuid.UUID, fund_id: uuid.UUID) -> SavingsFund | None
 
 
 def get_savings_summary(user_id: uuid.UUID):
+    today = date.today()
+    month_start = date(today.year, today.month, 1)
+
+    if today.month == 12:
+        next_month_start = date(today.year + 1, 1, 1)
+    else:
+        next_month_start = date(today.year, today.month + 1, 1)
+
     income_total = (
         db.session.query(func.coalesce(func.sum(Income.amount), 0))
-        .filter(Income.user_id == user_id)
+        .filter(
+            Income.user_id == user_id,
+            Income.income_date >= month_start,
+            Income.income_date < next_month_start,
+        )
         .scalar()
     )
 
     expenses_total = (
         db.session.query(func.coalesce(func.sum(Receipt.total_amount), 0))
-        .filter(Receipt.user_id == user_id)
+        .filter(
+            Receipt.user_id == user_id,
+            Receipt.issue_date >= month_start,
+            Receipt.issue_date < next_month_start,
+        )
         .scalar()
     )
 
-    current_balance = Decimal(income_total) - Decimal(expenses_total)
+    current_balance = Decimal(str(income_total)) - Decimal(str(expenses_total))
 
     active_goals_sum = (
         db.session.query(
