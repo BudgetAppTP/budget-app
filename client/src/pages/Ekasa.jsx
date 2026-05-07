@@ -770,6 +770,7 @@ export default function Ekasa() {
               {qrError}
             </div>
           )}
+        </div>
 
         <div className="import-card" draggable="true">
           <strong>
