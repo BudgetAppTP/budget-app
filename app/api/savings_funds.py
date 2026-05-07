@@ -2,28 +2,20 @@
 Savings Funds API
 
 Paths:
-  - GET    /api/savings-funds
-  - POST   /api/savings-funds
-  - GET    /api/savings-funds/{fund_id}
-  - PATCH  /api/savings-funds/{fund_id}
-  - DELETE /api/savings-funds/{fund_id}
-  - POST   /api/savings-funds/{fund_id}/balance-adjustments
+  - GET    /api/savings/summary
+  - GET    /api/funds
+  - GET    /api/funds/{fund_id}
+  - POST   /api/funds
+  - PATCH  /api/funds/{fund_id}
+  - PUT    /api/funds/{fund_id}
+  - DELETE /api/funds/{fund_id}
+  - PATCH  /api/funds/{fund_id}/status
+  - PATCH  /api/funds/{fund_id}/balance
 
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
 Schemas:
-  SavingsFund:
-    {
-      "id": uuid,
-      "name": str,
-      "balance": float,
-      "currency": str (ISO 4217),
-      "target_amount": float | null,
-      "monthly_contribution": float | null,
-      "unused_amount": float
-    }
-
   Fund:
     {
       "id": uuid,
@@ -36,11 +28,16 @@ Schemas:
       "is_completed": bool
     }
 
-  SavingsFundList:
-    {"items": [SavingsFund], "count": int}
+  SavingsSummary:
+    {
+      "current_balance": float,
+      "total_in_funds": float,
+      "funds_count": int,
+      "total_unallocated_in_funds": float
+    }
 
-  FundDeleted:
-    {"id": uuid}
+  FundStatus:
+    {"id": uuid, "is_completed": bool}
 
 Common errors:
   400: {"data": null, "error": {"code": "bad_request", "message": str}}

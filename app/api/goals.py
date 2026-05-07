@@ -2,13 +2,13 @@
 Goals API
 
 Paths:
-  - GET    /api/goals
-  - POST   /api/goals
+  - GET    /api/funds/{fund_id}/goals
+  - POST   /api/funds/{fund_id}/goals
   - PATCH  /api/goals/{goal_id}
-  - POST   /api/goals/{goal_id}/allocate
-  - POST   /api/goals/{goal_id}/complete
-  - POST   /api/goals/{goal_id}/reopen
+  - PUT    /api/goals/{goal_id}
   - DELETE /api/goals/{goal_id}
+  - PATCH  /api/goals/{goal_id}/status
+  - PATCH  /api/goals/{goal_id}/amount
 
 Response envelope:
   {"data": <payload> | null, "error": {"code": str, "message": str} | null}
@@ -24,11 +24,8 @@ Schemas:
       "is_completed": bool
     }
 
-  GoalList:
-    {"items": [Goal], "count": int}
-
-  GoalDeleted:
-    {"id": uuid}
+  GoalStatus:
+    {"id": uuid, "is_completed": bool}
 
 Common errors:
   400: {"data": null, "error": {"code": "bad_request", "message": str}}
@@ -36,7 +33,7 @@ Common errors:
 """
 import uuid
 
-from flask import g, request
+from flask import g
 
 from app.api import bp
 from app.api.request_parsing import parse_json_object_body
