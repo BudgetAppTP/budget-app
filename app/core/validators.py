@@ -52,6 +52,6 @@ def try_decimal(value) -> Optional[Decimal]:
 def is_valid_iso4217(currency: str) -> bool:
     """Validates if the provided currency code is a valid ISO 4217 code."""
     try:
-        return bool(get_currency_name(currency.strip().upper()))
-    except (UnknownCurrencyError, AttributeError):
+        return bool(get_currency_name(currency.strip().upper(), locale="en"))
+    except (UnknownCurrencyError, AttributeError, TypeError):
         return False

@@ -5,11 +5,11 @@ from sqlalchemy import func
 
 from app.core.validators import is_valid_iso4217
 from app.extensions import db
-from app.models import AccountMember, AccountType, Goal, SavingsFund
+from app.models import AccountMember, AccountType, Goal, SavingsFund, Income, Receipt
 from app.services.errors import BadRequestError, NotFoundError
 from app.services.funds_balance_service import compute_unused_amount
 from app.services.responses import CreatedResult, OkResult
-
+from app.models import Account, AccountMember, AccountType, Goal, SavingsFund
 
 def _to_decimal(value, field_name: str) -> Decimal:
     try:
@@ -17,20 +17,17 @@ def _to_decimal(value, field_name: str) -> Decimal:
     except (InvalidOperation, TypeError, ValueError):
         raise BadRequestError(f"{field_name} must be a decimal number")
 
-
-def _serialize_fund(fund: SavingsFund, unused_amount: Decimal | None = None) -> dict:
-    if unused_amount is None:
-        unused_amount = compute_unused_amount(fund.id)
+def _serialize_fund_public(fund: SavingsFund, unallocated_amount: Decimal) -> dict:
     return {
         "id": str(fund.id),
-        "name": fund.name,
-        "balance": float(fund.balance),
-        "currency": fund.currency,
+        "title": fund.name,
+        "description": fund.description,
+        "current_amount": float(fund.balance),
         "target_amount": float(fund.target_amount) if fund.target_amount is not None else None,
         "monthly_contribution": float(fund.monthly_contribution) if fund.monthly_contribution is not None else None,
-        "unused_amount": float(unused_amount),
+        "unallocated_amount": float(unallocated_amount),
+        "is_completed": bool(fund.is_completed),
     }
-
 
 def _funds_query_for_user(user_id: uuid.UUID):
     return (
@@ -47,71 +44,207 @@ def _fund_for_user(user_id: uuid.UUID, fund_id: uuid.UUID) -> SavingsFund | None
     return _funds_query_for_user(user_id).filter(SavingsFund.id == fund_id).first()
 
 
-def _funds_with_unused_amount_query_for_user(user_id: uuid.UUID):
-    """Return a query yielding (SavingsFund, unused_amount) rows for a user.
+def get_savings_summary(user_id: uuid.UUID):
+    income_total = (
+        db.session.query(func.coalesce(func.sum(Income.amount), 0))
+        .filter(Income.user_id == user_id)
+        .scalar()
+    )
 
-    Filters savings funds by account membership, left-joins active goals,
-    and computes `unused_amount` as:
+    expenses_total = (
+        db.session.query(func.coalesce(func.sum(Receipt.total_amount), 0))
+        .filter(Receipt.user_id == user_id)
+        .scalar()
+    )
 
-        fund.balance - COALESCE(SUM(goal.current_amount), 0)
+    current_balance = Decimal(income_total) - Decimal(expenses_total)
 
-    per fund.
-    """
+    active_goals_sum = (
+        db.session.query(
+            Goal.savings_fund_id.label("fund_id"),
+            func.coalesce(func.sum(Goal.current_amount), 0).label("allocated_amount"),
+        )
+        .filter(Goal.is_completed.is_(False))
+        .group_by(Goal.savings_fund_id)
+        .subquery()
+    )
+
+    funds_aggregates = (
+        db.session.query(
+            func.coalesce(func.sum(SavingsFund.balance), 0).label("total_in_funds"),
+            func.count(SavingsFund.id).label("funds_count"),
+            func.coalesce(
+                func.sum(
+                    SavingsFund.balance
+                    - func.coalesce(active_goals_sum.c.allocated_amount, 0)
+                ),
+                0,
+            ).label("total_unallocated_in_funds"),
+        )
+        .join(AccountMember, AccountMember.account_id == SavingsFund.id)
+        .outerjoin(active_goals_sum, active_goals_sum.c.fund_id == SavingsFund.id)
+        .filter(
+            AccountMember.user_id == user_id,
+            SavingsFund.account_type == AccountType.SAVINGS_FUND,
+        )
+        .one()
+    )
+
+    return OkResult({
+        "current_balance": float(current_balance),
+        "total_in_funds": float(funds_aggregates.total_in_funds),
+        "funds_count": int(funds_aggregates.funds_count),
+        "total_unallocated_in_funds": float(funds_aggregates.total_unallocated_in_funds),
+    })
+
+def _funds_public_query_for_user(user_id: uuid.UUID):
+    active_goals_sum = (
+        db.session.query(
+            Goal.savings_fund_id.label("fund_id"),
+            func.coalesce(func.sum(Goal.current_amount), 0).label("used_amount"),
+        )
+        .filter(Goal.is_completed.is_(False))
+        .group_by(Goal.savings_fund_id)
+        .subquery()
+    )
+
     return (
         db.session.query(
             SavingsFund,
             (
                 SavingsFund.balance
-                - func.coalesce(func.sum(Goal.current_amount), 0)
-            ).label("unused_amount"),
+                - func.coalesce(active_goals_sum.c.used_amount, 0)
+            ).label("unallocated_amount"),
         )
         .join(AccountMember, AccountMember.account_id == SavingsFund.id)
-        .outerjoin(
-            Goal,
-            (Goal.savings_fund_id == SavingsFund.id) & Goal.is_completed.is_(False),
-        )
+        .outerjoin(active_goals_sum, active_goals_sum.c.fund_id == SavingsFund.id)
         .filter(
             AccountMember.user_id == user_id,
             SavingsFund.account_type == AccountType.SAVINGS_FUND,
         )
-        .group_by(SavingsFund.id)
         .order_by(SavingsFund.name.asc())
     )
 
+def list_public_funds(user_id: uuid.UUID):
+    rows = _funds_public_query_for_user(user_id).all()
 
-def list_funds(user_id: uuid.UUID):
-    rows = _funds_with_unused_amount_query_for_user(user_id).all()
-    items = [_serialize_fund(fund, unused_amount) for fund, unused_amount in rows]
-    return OkResult({"items": items, "count": len(items)})
+    items = [
+        _serialize_fund_public(fund, unallocated_amount)
+        for fund, unallocated_amount in rows
+    ]
+
+    return OkResult(items)
+
+def get_public_fund(user_id: uuid.UUID, fund_id: uuid.UUID):
+    row = (
+        _funds_public_query_for_user(user_id)
+        .filter(SavingsFund.id == fund_id)
+        .first()
+    )
+
+    if row is None:
+        raise NotFoundError("Fund not found")
+
+    fund, unallocated_amount = row
+    return OkResult(_serialize_fund_public(fund, unallocated_amount))
+
+def update_public_fund(user_id: uuid.UUID, fund_id: uuid.UUID, data: dict):
+    fund = _fund_for_user(user_id, fund_id)
+    if fund is None:
+        raise NotFoundError("Fund not found")
+
+    if "title" in data:
+        title = str(data.get("title") or "").strip()
+        if not title:
+            raise BadRequestError("title cannot be empty")
+        fund.name = title
+
+    if "description" in data:
+        description = str(data.get("description") or "").strip()
+        fund.description = description or None
+
+    if "target_amount" in data:
+        raw = data.get("target_amount")
+        fund.target_amount = _to_decimal(raw, "target_amount") if raw is not None else None
+
+    if "monthly_contribution" in data:
+        raw = data.get("monthly_contribution")
+        fund.monthly_contribution = (
+            _to_decimal(raw, "monthly_contribution")
+            if raw is not None
+            else None
+        )
+
+    db.session.commit()
+
+    return get_public_fund(user_id, fund_id)
+
+def delete_public_fund(user_id: uuid.UUID, fund_id: uuid.UUID):
+    fund = _fund_for_user(user_id, fund_id)
+    if fund is None:
+        raise NotFoundError("Fund not found")
+
+    db.session.delete(fund)
+    db.session.commit()
+
+    return OkResult({"success": True})
 
 
-def create_fund(user_id: uuid.UUID, data: dict, max_savings_funds: int = 10):
+def update_fund_status(user_id: uuid.UUID, fund_id: uuid.UUID, data: dict):
+    fund = _fund_for_user(user_id, fund_id)
+    if fund is None:
+        raise NotFoundError("Fund not found")
+
+    if "is_completed" not in data:
+        raise BadRequestError("Missing is_completed")
+
+    is_completed = data.get("is_completed")
+    if not isinstance(is_completed, bool):
+        raise BadRequestError("is_completed must be boolean")
+
+    fund.is_completed = is_completed
+    db.session.commit()
+
+    return OkResult({
+        "id": str(fund.id),
+        "is_completed": fund.is_completed,
+    })
+
+def create_public_fund(user_id: uuid.UUID, data: dict, max_savings_funds: int = 10):
     existing = _funds_query_for_user(user_id).count()
     if existing >= max_savings_funds:
         raise BadRequestError(f"Savings funds limit reached ({max_savings_funds})")
 
-    name = str(data.get("name") or "").strip()
-    currency = str(data.get("currency") or "").strip().upper()
-    if not name:
-        raise BadRequestError("Missing name")
-    if not is_valid_iso4217(currency):
-        raise BadRequestError("currency must be a valid ISO 4217 code")
+    title = str(data.get("title") or "").strip()
+    if not title:
+        raise BadRequestError("Missing title")
+
+    description = str(data.get("description") or "").strip() or None
 
     target_amount = data.get("target_amount")
     target_amount = _to_decimal(target_amount, "target_amount") if target_amount is not None else None
+
     monthly_contribution = data.get("monthly_contribution")
-    monthly_contribution = _to_decimal(monthly_contribution, "monthly_contribution") if monthly_contribution is not None else None
+    monthly_contribution = (
+        _to_decimal(monthly_contribution, "monthly_contribution")
+        if monthly_contribution is not None
+        else None
+    )
 
     fund = SavingsFund(
-        name=name,
+        name=title,
         balance=Decimal("0.00"),
-        currency=currency,
+        currency="EUR",
         account_type=AccountType.SAVINGS_FUND,
         target_amount=target_amount,
         monthly_contribution=monthly_contribution,
+        description=description,
+        is_completed=False,
     )
+
     db.session.add(fund)
     db.session.flush()
+
     db.session.add(
         AccountMember(
             user_id=user_id,
@@ -119,59 +252,15 @@ def create_fund(user_id: uuid.UUID, data: dict, max_savings_funds: int = 10):
             role="owner",
         )
     )
-    db.session.commit()
-    return CreatedResult(_serialize_fund(fund))
-
-
-def get_fund(user_id: uuid.UUID, fund_id: uuid.UUID):
-    fund = _fund_for_user(user_id, fund_id)
-    if fund is None:
-        raise NotFoundError("Savings fund not found")
-    return OkResult(_serialize_fund(fund))
-
-
-def update_fund(user_id: uuid.UUID, fund_id: uuid.UUID, data: dict):
-    fund = _fund_for_user(user_id, fund_id)
-    if fund is None:
-        raise NotFoundError("Savings fund not found")
-
-    if "name" in data:
-        name = str(data.get("name") or "").strip()
-        if not name:
-            raise BadRequestError("name cannot be empty")
-        fund.name = name
-
-    if "currency" in data:
-        currency = str(data.get("currency") or "").strip().upper()
-        if not is_valid_iso4217(currency):
-            raise BadRequestError("currency must be a valid ISO 4217 code")
-        fund.currency = currency
-
-    if "target_amount" in data:
-        raw = data.get("target_amount")
-        fund.target_amount = _to_decimal(raw, "target_amount") if raw is not None else None
-    if "monthly_contribution" in data:
-        raw = data.get("monthly_contribution")
-        fund.monthly_contribution = _to_decimal(raw, "monthly_contribution") if raw is not None else None
 
     db.session.commit()
-    return OkResult(_serialize_fund(fund))
 
-
-def delete_fund(user_id: uuid.UUID, fund_id: uuid.UUID):
-    fund = _fund_for_user(user_id, fund_id)
-    if fund is None:
-        raise NotFoundError("Savings fund not found")
-
-    db.session.delete(fund)
-    db.session.commit()
-    return OkResult({"id": str(fund_id)})
-
+    return CreatedResult(_serialize_fund_public(fund, Decimal("0.00")))
 
 def adjust_balance(user_id: uuid.UUID, fund_id: uuid.UUID, delta_amount):
     fund = _fund_for_user(user_id, fund_id)
     if fund is None:
-        raise NotFoundError("Savings fund not found")
+        raise NotFoundError("Fund not found")
 
     delta = _to_decimal(delta_amount, "delta_amount")
 
@@ -181,4 +270,5 @@ def adjust_balance(user_id: uuid.UUID, fund_id: uuid.UUID, delta_amount):
 
     fund.balance = new_balance
     db.session.commit()
-    return OkResult(_serialize_fund(fund))
+
+    return get_public_fund(user_id, fund_id)
