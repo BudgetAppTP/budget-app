@@ -45,6 +45,12 @@ class ForbiddenError(ServiceError):
     code = "forbidden"
 
 
+class UnauthorizedError(ServiceError):
+    status_code = 401
+    default_message = "Unauthorized"
+    code = "unauthorized"
+
+
 class ConflictError(ServiceError):
     status_code = 409
     default_message = "Conflict"

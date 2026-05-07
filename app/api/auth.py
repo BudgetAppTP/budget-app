@@ -26,8 +26,10 @@ Notes:
 """
 
 from flask import request, current_app, g
-from app.api import bp, make_response, extract_auth_token
+from app.api import bp, extract_auth_token
 from app.api.request_parsing import parse_json_object_body
+from app.services.errors import BadRequestError, UnauthorizedError
+from app.services.responses import CreatedResult, OkResult
 import requests
 from app.utils.auth import login_required
 
@@ -57,14 +59,9 @@ def api_login():
     p = parse_json_object_body()
     email = (p.get("email") or "").strip()
     password = p.get("password", "")
-    # Authenticate via the new auth service; returns token string on success
+    # Authenticate via the auth service; it raises on failure.
     token = _auth_service().login(email, password)
-    if not token:
-        return make_response(None, {"code": "auth_failed", "message": "Invalid credentials or account not verified"}, 401)
-    # Build response with token cookie
-    resp, status_code = make_response({"ok": True}, None, 200)
-    # Ensure the status code is applied to the response object
-    resp.status_code = status_code
+    resp, status_code = OkResult({"ok": True}).to_flask_response()
     # Use a long-lived, HTTP-only cookie; SameSite=Lax allows inclusion on same-site requests
     resp.set_cookie(
         "auth_token",
@@ -95,16 +92,8 @@ def api_register():
     p = parse_json_object_body()
     email = (p.get("email") or "").strip()
     password = p.get("password", "")
-    if not email or not password:
-        return make_response(None, {"code": "bad_request", "message": "email and password required"}, 400)
-    try:
-        user, code = _auth_service().register_user(email, password)
-    except ValueError as e:
-        # Map specific errors to API error codes
-        if "already exists" in str(e):
-            return make_response(None, {"code": "exists", "message": "User already exists"}, 409)
-        return make_response(None, {"code": "bad_request", "message": str(e)}, 400)
-    return make_response({"created": True, "id": str(user.id)}, None, 201)
+    user, _code = _auth_service().register_user(email, password)
+    return CreatedResult({"created": True, "id": str(user.id)}).to_flask_response()
 
 
 @bp.post("/auth/verify", strict_slashes=False)
@@ -127,11 +116,11 @@ def api_verify_email():
     email = (p.get("email") or "").strip()
     code = (p.get("code") or "").strip()
     if not email or not code:
-        return make_response(None, {"code": "bad_request", "message": "email and code required"}, 400)
+        raise BadRequestError("email and code required")
     ok = _auth_service().verify_email_code(email, code)
     if not ok:
-        return make_response(None, {"code": "invalid_code", "message": "Invalid or expired code"}, 400)
-    return make_response({"verified": True})
+        raise BadRequestError("Invalid or expired code", code="invalid_code")
+    return OkResult({"verified": True}).to_flask_response()
 
 
 @bp.get("/auth/me", strict_slashes=False)
@@ -139,7 +128,7 @@ def api_verify_email():
 def api_auth_me():
     """Return the currently authenticated user."""
     user = g.current_user
-    return make_response(
+    return OkResult(
         {
             "id": str(user.id),
             "username": user.username,
@@ -147,7 +136,7 @@ def api_auth_me():
             "is_verified": bool(user.is_verified),
             "created_at": user.created_at.isoformat() if user.created_at else None,
         }
-    )
+    ).to_flask_response()
 
 
 @bp.post("/auth/logout", strict_slashes=False)
@@ -170,8 +159,7 @@ def api_logout():
     token = extract_auth_token()
     if token:
         _auth_service().logout(token)
-    resp, status_code = make_response({"ok": True}, None, 200)
-    resp.status_code = status_code
+    resp, _status_code = OkResult({"ok": True}).to_flask_response()
     # Remove the cookie regardless of whether it existed
     resp.set_cookie(
         "auth_token",
@@ -211,7 +199,7 @@ def api_login_google():
     payload = parse_json_object_body()
     id_token = (payload.get("token") or payload.get("id_token") or "").strip()
     if not id_token:
-        return make_response(None, {"code": "bad_request", "message": "token required"}, 400)
+        raise BadRequestError("token required")
     # Call Google's tokeninfo endpoint to validate the token. According to
     # Google documentation, this endpoint returns the decoded claims if the
     # token is valid and has not expired. See:
@@ -223,25 +211,24 @@ def api_login_google():
             timeout=5,
         )
         if verify_resp.status_code != 200:
-            return make_response(None, {"code": "auth_failed", "message": "Invalid Google token"}, 401)
+            raise UnauthorizedError("Invalid Google token", code="auth_failed")
         claims = verify_resp.json()
     except Exception:
-        return make_response(None, {"code": "auth_failed", "message": "Failed to verify Google token"}, 401)
+        raise UnauthorizedError("Failed to verify Google token", code="auth_failed")
     # Ensure the token is intended for our application
     aud = claims.get("aud") or claims.get("azp")  # Some responses use "azp"
     client_id_expected = current_app.config.get("GOOGLE_CLIENT_ID")
     if client_id_expected and aud != client_id_expected:
-        return make_response(None, {"code": "auth_failed", "message": "Token audience mismatch"}, 401)
+        raise UnauthorizedError("Token audience mismatch", code="auth_failed")
     email = claims.get("email")
     email_verified = claims.get("email_verified")
     if not email or str(email_verified).lower() not in {"true", "1"}:
-        return make_response(None, {"code": "auth_failed", "message": "Email not verified"}, 401)
+        raise UnauthorizedError("Email not verified", code="auth_failed")
     # Delegate to the auth service to log in or create the user
     token = _auth_service().login_with_google(email)
     if not token:
-        return make_response(None, {"code": "auth_failed", "message": "Unable to authenticate user"}, 401)
-    resp, status_code = make_response({"ok": True}, None, 200)
-    resp.status_code = status_code
+        raise UnauthorizedError("Unable to authenticate user", code="auth_failed")
+    resp, _status_code = OkResult({"ok": True}).to_flask_response()
     resp.set_cookie(
         "auth_token",
         token,

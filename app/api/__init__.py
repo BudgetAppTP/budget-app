@@ -13,6 +13,7 @@ Notes for Swagger:
 import warnings
 
 from flask import Blueprint, jsonify
+from app.services.errors import UnauthorizedError
 from app.services.responses import OkResult
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -72,10 +73,9 @@ def _enforce_authentication():
     token = extract_auth_token()
     user = auth_service.verify_token(token) if token else None
     if user is None:
-        return make_response(
-            None,
-            {"code": "unauthenticated", "message": "Authentication required"},
-            401,
+        raise UnauthorizedError(
+            "Authentication required",
+            code="unauthenticated",
         )
     # Attach user to request context for downstream handlers
     g.current_user = user

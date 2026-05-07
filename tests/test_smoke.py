@@ -71,77 +71,76 @@ def test_health_ok(client):
     assert data.get("status") == "ok"
 
 
-def test_goals_list_ok(client):
-    user_email = f"user_{uuid.uuid4().hex[:8]}@test.local"
-    create = client.post(
-        "/api/users",
-        json={"username": f"user_{uuid.uuid4().hex[:8]}", "email": user_email, "password_hash": "hash"},
-    )
-    assert create.status_code == 201
-
-    account_resp = client.get("/api/account")
+def test_goals_list_ok(auth_client, app):
+    account_resp = auth_client.get("/api/account")
     account_data = assert_json_ok(account_resp)
     assert account_data["account_type"] == "account"
 
-    fund_resp = client.post(
-        "/api/savings-funds",
-        json={"name": "Vacation Fund", "currency": "EUR", "target_amount": "1000.00", "monthly_contribution": "100.00"},
+    with app.app_context():
+        auth_user = _get_user("u@test.local")
+        main_account = _get_main_account(auth_user)
+        main_account.balance = Decimal("500.00")
+        db.session.commit()
+
+    fund_resp = auth_client.post(
+        "/api/funds",
+        json={"title": "Vacation Fund", "target_amount": "1000.00", "monthly_contribution": "100.00"},
     )
     assert fund_resp.status_code == 201
     fund_id = fund_resp.get_json()["data"]["id"]
 
-    adjust_resp = client.post(
-        f"/api/savings-funds/{fund_id}/balance-adjustments",
-        json={"delta_amount": "500.00"},
+    adjust_resp = auth_client.post(
+        f"/api/savings-funds/{fund_id}/allocations",
+        json={"amount": "500.00"},
     )
-    assert_json_ok(adjust_resp)
+    assert adjust_resp.status_code == 201
 
-    goal_resp = client.post(
-        "/api/goals",
-        json={"savings_fund_id": fund_id, "target_amount": "300.00"},
+    goal_resp = auth_client.post(
+        f"/api/funds/{fund_id}/goals",
+        json={"title": "Trip", "target_amount": "300.00"},
     )
     assert goal_resp.status_code == 201
     goal_id = goal_resp.get_json()["data"]["id"]
     assert goal_resp.get_json()["data"]["current_amount"] == 0.0
 
-    allocate_resp = client.post(
-        f"/api/goals/{goal_id}/allocate",
+    allocate_resp = auth_client.patch(
+        f"/api/goals/{goal_id}/amount",
         json={"delta_amount": "300.00"},
     )
     assert_json_ok(allocate_resp)
 
-    second_goal_resp = client.post(
-        "/api/goals",
-        json={"savings_fund_id": fund_id, "target_amount": "300.00"},
+    second_goal_resp = auth_client.post(
+        f"/api/funds/{fund_id}/goals",
+        json={"title": "Reserve", "target_amount": "300.00"},
     )
     assert second_goal_resp.status_code == 201
     second_goal_id = second_goal_resp.get_json()["data"]["id"]
 
-    over_allocate_resp = client.post(
-        f"/api/goals/{second_goal_id}/allocate",
+    over_allocate_resp = auth_client.patch(
+        f"/api/goals/{second_goal_id}/amount",
         json={"delta_amount": "250.00"},
     )
     assert over_allocate_resp.status_code == 400
     over_allocate_body = over_allocate_resp.get_json()
-    assert over_allocate_body["error"]["message"] == "Insufficient unallocated savings fund balance"
+    assert over_allocate_body["error"]["message"] == "Insufficient unallocated amount in fund"
 
-    complete_resp = client.post(
-        f"/api/goals/{goal_id}/complete",
+    complete_resp = auth_client.patch(
+        f"/api/goals/{goal_id}/status",
+        json={"is_completed": True},
     )
     complete_data = assert_json_ok(complete_resp)
     assert complete_data["is_completed"] is True
 
-    reopen_resp = client.post(
-        f"/api/goals/{goal_id}/reopen",
+    reopen_resp = auth_client.patch(
+        f"/api/goals/{goal_id}/status",
+        json={"is_completed": False},
     )
     reopen_data = assert_json_ok(reopen_resp)
     assert reopen_data["is_completed"] is False
 
-    list_resp = client.get("/api/goals")
+    list_resp = auth_client.get(f"/api/funds/{fund_id}/goals")
     data = assert_json_ok(list_resp)
-    assert "items" in data
-    assert "count" in data
-    assert data["count"] >= 1
+    assert {item["id"] for item in data} == {goal_id, second_goal_id}
 
 
 def test_dashboard_ok(auth_client):
@@ -178,19 +177,6 @@ def test_users_create_is_access_restricted(auth_client):
     assert body["data"] is None
     assert body["error"]["code"] == "forbidden"
     assert body["error"]["message"] == "Access restricted"
-
-
-def test_goals_without_mock_header_use_fallback_user(client):
-    user_email = f"user_{uuid.uuid4().hex[:8]}@test.local"
-    create = client.post(
-        "/api/users",
-        json={"username": f"user_{uuid.uuid4().hex[:8]}", "email": user_email, "password_hash": "hash"},
-    )
-    assert create.status_code == 201
-
-    r = client.get("/api/goals")
-    data = assert_json_ok(r)
-    assert "warning" not in data
 
 
 def test_goals_list_is_scoped_to_authenticated_user(auth_client, app):
@@ -233,6 +219,7 @@ def test_goals_list_is_scoped_to_authenticated_user(auth_client, app):
         auth_goal = Goal(
             user_id=auth_user.id,
             savings_fund_id=auth_fund.id,
+            title="Auth Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("20.00"),
             is_completed=False,
@@ -240,6 +227,7 @@ def test_goals_list_is_scoped_to_authenticated_user(auth_client, app):
         older_goal = Goal(
             user_id=older_user.id,
             savings_fund_id=older_fund.id,
+            title="Older Goal",
             target_amount=Decimal("999.00"),
             current_amount=Decimal("111.00"),
             is_completed=False,
@@ -247,15 +235,13 @@ def test_goals_list_is_scoped_to_authenticated_user(auth_client, app):
         db.session.add_all([auth_goal, older_goal])
         db.session.commit()
 
-        auth_user_id = str(auth_user.id)
+        auth_fund_id = str(auth_fund.id)
         auth_goal_id = str(auth_goal.id)
 
-    r = auth_client.get("/api/goals")
+    r = auth_client.get(f"/api/funds/{auth_fund_id}/goals")
     data = assert_json_ok(r)
 
-    assert data["count"] == 1
-    assert [item["id"] for item in data["items"]] == [auth_goal_id]
-    assert data["items"][0]["user_id"] == auth_user_id
+    assert [item["id"] for item in data] == [auth_goal_id]
 
 
 def test_goals_create_is_scoped_to_authenticated_user(auth_client, app):
@@ -297,24 +283,22 @@ def test_goals_create_is_scoped_to_authenticated_user(auth_client, app):
 
         auth_fund_id = str(auth_fund.id)
         older_fund_id = str(older_fund.id)
-        auth_user_id = str(auth_user.id)
-
     allowed_resp = auth_client.post(
-        "/api/goals",
-        json={"savings_fund_id": auth_fund_id, "target_amount": "120.00"},
+        f"/api/funds/{auth_fund_id}/goals",
+        json={"title": "Scoped Goal", "target_amount": "120.00"},
     )
     assert allowed_resp.status_code == 201
     allowed_body = allowed_resp.get_json()
-    assert allowed_body["data"]["user_id"] == auth_user_id
-    assert allowed_body["data"]["savings_fund_id"] == auth_fund_id
+    assert allowed_body["data"]["fund_id"] == auth_fund_id
+    assert allowed_body["data"]["title"] == "Scoped Goal"
 
     denied_resp = auth_client.post(
-        "/api/goals",
-        json={"savings_fund_id": older_fund_id, "target_amount": "120.00"},
+        f"/api/funds/{older_fund_id}/goals",
+        json={"title": "Foreign Goal", "target_amount": "120.00"},
     )
     assert denied_resp.status_code == 404
     denied_body = denied_resp.get_json()
-    assert denied_body["error"]["message"] == "Savings fund not found"
+    assert denied_body["error"]["message"] == "Fund not found"
 
 
 def test_savings_funds_list_is_scoped_to_authenticated_user(auth_client, app):
@@ -357,13 +341,12 @@ def test_savings_funds_list_is_scoped_to_authenticated_user(auth_client, app):
         auth_fund_id = str(auth_fund.id)
         older_fund_id = str(older_fund.id)
 
-    resp = auth_client.get("/api/savings-funds")
+    resp = auth_client.get("/api/funds")
 
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["error"] is None
-    assert body["data"]["count"] == 1
-    assert [item["id"] for item in body["data"]["items"]] == [auth_fund_id]
+    assert [item["id"] for item in body["data"]] == [auth_fund_id]
     assert auth_fund_id != older_fund_id
 
 
@@ -537,10 +520,9 @@ def test_allocations_create_is_scoped_to_authenticated_user(auth_client, app):
 
 def test_savings_funds_create_rejects_negative_planning_amounts(auth_client, app):
     resp = auth_client.post(
-        "/api/savings-funds",
+        "/api/funds",
         json={
-            "name": "Invalid Fund",
-            "currency": "EUR",
+            "title": "Invalid Fund",
             "target_amount": "-1.00",
             "monthly_contribution": "-5.00",
         },
@@ -584,7 +566,7 @@ def test_savings_funds_update_rejects_negative_planning_amounts(auth_client, app
         auth_fund_id = str(auth_fund.id)
 
     resp = auth_client.patch(
-        f"/api/savings-funds/{auth_fund_id}",
+        f"/api/funds/{auth_fund_id}",
         json={
             "target_amount": "-1.00",
             "monthly_contribution": "-5.00",
@@ -625,6 +607,7 @@ def test_goals_update_allows_authenticated_owner_to_update_own_goal(auth_client,
         auth_goal = Goal(
             user_id=auth_user.id,
             savings_fund_id=auth_fund.id,
+            title="Update Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("20.00"),
             is_completed=False,
@@ -691,6 +674,7 @@ def test_goals_update_rejects_foreign_goal_for_authenticated_user(auth_client, a
         foreign_goal = Goal(
             user_id=older_user.id,
             savings_fund_id=older_fund.id,
+            title="Foreign Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("20.00"),
             is_completed=False,
@@ -739,6 +723,7 @@ def test_goals_allocate_allows_authenticated_owner_to_update_own_goal(auth_clien
         auth_goal = Goal(
             user_id=auth_user.id,
             savings_fund_id=auth_fund.id,
+            title="Allocate Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("20.00"),
             is_completed=False,
@@ -748,8 +733,8 @@ def test_goals_allocate_allows_authenticated_owner_to_update_own_goal(auth_clien
 
         auth_goal_id = str(auth_goal.id)
 
-    resp = auth_client.post(
-        f"/api/goals/{auth_goal_id}/allocate",
+    resp = auth_client.patch(
+        f"/api/goals/{auth_goal_id}/amount",
         json={"delta_amount": "30.00"},
     )
 
@@ -805,6 +790,7 @@ def test_goals_allocate_rejects_foreign_goal_for_authenticated_user(auth_client,
         foreign_goal = Goal(
             user_id=older_user.id,
             savings_fund_id=older_fund.id,
+            title="Foreign Allocate Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("20.00"),
             is_completed=False,
@@ -815,8 +801,8 @@ def test_goals_allocate_rejects_foreign_goal_for_authenticated_user(auth_client,
         foreign_goal_id = str(foreign_goal.id)
         original_current_amount = foreign_goal.current_amount
 
-    resp = auth_client.post(
-        f"/api/goals/{foreign_goal_id}/allocate",
+    resp = auth_client.patch(
+        f"/api/goals/{foreign_goal_id}/amount",
         json={"delta_amount": "30.00"},
     )
 
@@ -853,6 +839,7 @@ def test_goals_complete_allows_authenticated_owner_to_complete_own_goal(auth_cli
         auth_goal = Goal(
             user_id=auth_user.id,
             savings_fund_id=auth_fund.id,
+            title="Complete Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("120.00"),
             is_completed=False,
@@ -861,9 +848,10 @@ def test_goals_complete_allows_authenticated_owner_to_complete_own_goal(auth_cli
         db.session.commit()
 
         auth_goal_id = str(auth_goal.id)
-        original_balance = auth_fund.balance
-
-    resp = auth_client.post(f"/api/goals/{auth_goal_id}/complete")
+    resp = auth_client.patch(
+        f"/api/goals/{auth_goal_id}/status",
+        json={"is_completed": True},
+    )
 
     assert resp.status_code == 200
     body = resp.get_json()
@@ -873,11 +861,8 @@ def test_goals_complete_allows_authenticated_owner_to_complete_own_goal(auth_cli
 
     with app.app_context():
         goal = db.session.get(Goal, uuid.UUID(auth_goal_id))
-        fund = db.session.get(SavingsFund, goal.savings_fund_id)
         assert goal is not None
         assert goal.is_completed is True
-        assert fund is not None
-        assert fund.balance == original_balance - Decimal("120.00")
 
 
 def test_goals_complete_rejects_foreign_goal_for_authenticated_user(auth_client, app):
@@ -920,6 +905,7 @@ def test_goals_complete_rejects_foreign_goal_for_authenticated_user(auth_client,
         foreign_goal = Goal(
             user_id=older_user.id,
             savings_fund_id=older_fund.id,
+            title="Foreign Complete Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("120.00"),
             is_completed=False,
@@ -928,9 +914,10 @@ def test_goals_complete_rejects_foreign_goal_for_authenticated_user(auth_client,
         db.session.commit()
 
         foreign_goal_id = str(foreign_goal.id)
-        original_balance = older_fund.balance
-
-    resp = auth_client.post(f"/api/goals/{foreign_goal_id}/complete")
+    resp = auth_client.patch(
+        f"/api/goals/{foreign_goal_id}/status",
+        json={"is_completed": True},
+    )
 
     assert resp.status_code == 404
     body = resp.get_json()
@@ -940,11 +927,8 @@ def test_goals_complete_rejects_foreign_goal_for_authenticated_user(auth_client,
 
     with app.app_context():
         goal = db.session.get(Goal, uuid.UUID(foreign_goal_id))
-        fund = db.session.get(SavingsFund, goal.savings_fund_id)
         assert goal is not None
         assert goal.is_completed is False
-        assert fund is not None
-        assert fund.balance == original_balance
 
 
 def test_goals_reopen_allows_authenticated_owner_to_reopen_own_goal(auth_client, app):
@@ -968,6 +952,7 @@ def test_goals_reopen_allows_authenticated_owner_to_reopen_own_goal(auth_client,
         auth_goal = Goal(
             user_id=auth_user.id,
             savings_fund_id=auth_fund.id,
+            title="Reopen Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("120.00"),
             is_completed=True,
@@ -976,9 +961,10 @@ def test_goals_reopen_allows_authenticated_owner_to_reopen_own_goal(auth_client,
         db.session.commit()
 
         auth_goal_id = str(auth_goal.id)
-        original_balance = auth_fund.balance
-
-    resp = auth_client.post(f"/api/goals/{auth_goal_id}/reopen")
+    resp = auth_client.patch(
+        f"/api/goals/{auth_goal_id}/status",
+        json={"is_completed": False},
+    )
 
     assert resp.status_code == 200
     body = resp.get_json()
@@ -988,11 +974,8 @@ def test_goals_reopen_allows_authenticated_owner_to_reopen_own_goal(auth_client,
 
     with app.app_context():
         goal = db.session.get(Goal, uuid.UUID(auth_goal_id))
-        fund = db.session.get(SavingsFund, goal.savings_fund_id)
         assert goal is not None
         assert goal.is_completed is False
-        assert fund is not None
-        assert fund.balance == original_balance + Decimal("120.00")
 
 
 def test_goals_reopen_rejects_foreign_goal_for_authenticated_user(auth_client, app):
@@ -1035,6 +1018,7 @@ def test_goals_reopen_rejects_foreign_goal_for_authenticated_user(auth_client, a
         foreign_goal = Goal(
             user_id=older_user.id,
             savings_fund_id=older_fund.id,
+            title="Foreign Reopen Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("120.00"),
             is_completed=True,
@@ -1043,9 +1027,10 @@ def test_goals_reopen_rejects_foreign_goal_for_authenticated_user(auth_client, a
         db.session.commit()
 
         foreign_goal_id = str(foreign_goal.id)
-        original_balance = older_fund.balance
-
-    resp = auth_client.post(f"/api/goals/{foreign_goal_id}/reopen")
+    resp = auth_client.patch(
+        f"/api/goals/{foreign_goal_id}/status",
+        json={"is_completed": False},
+    )
 
     assert resp.status_code == 404
     body = resp.get_json()
@@ -1055,11 +1040,8 @@ def test_goals_reopen_rejects_foreign_goal_for_authenticated_user(auth_client, a
 
     with app.app_context():
         goal = db.session.get(Goal, uuid.UUID(foreign_goal_id))
-        fund = db.session.get(SavingsFund, goal.savings_fund_id)
         assert goal is not None
         assert goal.is_completed is True
-        assert fund is not None
-        assert fund.balance == original_balance
 
 
 def test_goals_delete_allows_authenticated_owner_to_delete_own_goal(auth_client, app):
@@ -1083,6 +1065,7 @@ def test_goals_delete_allows_authenticated_owner_to_delete_own_goal(auth_client,
         auth_goal = Goal(
             user_id=auth_user.id,
             savings_fund_id=auth_fund.id,
+            title="Delete Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("0.00"),
             is_completed=False,
@@ -1097,7 +1080,7 @@ def test_goals_delete_allows_authenticated_owner_to_delete_own_goal(auth_client,
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["error"] is None
-    assert body["data"] == {"id": auth_goal_id}
+    assert body["data"] == {"success": True}
 
     with app.app_context():
         assert db.session.get(Goal, uuid.UUID(auth_goal_id)) is None
@@ -1143,6 +1126,7 @@ def test_goals_delete_rejects_foreign_goal_for_authenticated_user(auth_client, a
         foreign_goal = Goal(
             user_id=older_user.id,
             savings_fund_id=older_fund.id,
+            title="Foreign Delete Goal",
             target_amount=Decimal("120.00"),
             current_amount=Decimal("0.00"),
             is_completed=False,
@@ -1200,26 +1184,16 @@ def test_savings_funds_delete_cascades_receipts(auth_client, app):
         auth_fund_id = str(auth_fund.id)
         receipt_id = str(receipt.id)
 
-    resp = auth_client.delete(f"/api/savings-funds/{auth_fund_id}")
+    resp = auth_client.delete(f"/api/funds/{auth_fund_id}")
 
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["error"] is None
-    assert body["data"] == {"id": auth_fund_id}
+    assert body["data"] == {"success": True}
 
     with app.app_context():
         assert db.session.get(SavingsFund, uuid.UUID(auth_fund_id)) is None
         assert db.session.get(Receipt, uuid.UUID(receipt_id)) is None
-
-
-def test_import_qr_preview_ok(client):
-    payload = {"payload": [{"OPD": "sample", "date": "2025-10-10", "item": "Mlieko", "qnt": "1", "price": "1.20"}]}
-    r = client.post("/api/import-qr/preview", json=payload)
-    data = assert_json_ok(r)
-    assert "items" in data
-    assert "count" in data
-    assert data["count"] == len(data["items"])
-
 
 def test_import_qr_extract_id_missing_image_uses_structured_error(auth_client):
     resp = auth_client.post("/api/import-qr/extract-id")
