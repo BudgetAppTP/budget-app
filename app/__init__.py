@@ -66,7 +66,6 @@ def create_app(config_object=None):
 def _register_api(flask_app: Flask):
     from app.api import bp as api_bp
     import app.api.auth          # noqa: F401
-    import app.api.transactions  # noqa: F401
     import app.api.account       # noqa: F401
     import app.api.goals         # noqa: F401
     import app.api.savings_funds # noqa: F401

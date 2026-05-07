@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.validators import is_valid_iso4217
 from app.extensions import db
 from app.models import Account, AccountMember, AccountType, User
-from app.services.errors import BadRequestError, ConflictError
+from app.services.errors import BadRequestError, ConflictError, ForbiddenError
 from app.services.responses import CreatedResult, OkResult
 from app.validators.user_validators import validate_user_create_data
 
@@ -82,8 +82,11 @@ def ensure_user_for_auth_register(email: str, password_hash: str, default_curren
     return user
 
 
-def get_all_users():
+def get_all_users(_current_user_id):
     """Get all users in the system."""
+    raise ForbiddenError("Access restricted")
+
+    # Keep the listing logic in place for a future admin-only branch.
     users = db.session.query(User).all()
     return OkResult([
         {
@@ -96,7 +99,10 @@ def get_all_users():
     ])
 
 
-def create_user(data):
+def create_user(_current_user_id, data):
+    raise ForbiddenError("Access restricted")
+
+    # Keep the creation logic in place for a future admin-only branch.
     validated = validate_user_create_data(data)
 
     existing_user = db.session.query(User).filter_by(username=validated["username"]).first()

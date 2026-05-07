@@ -19,8 +19,11 @@ Schemas:
 
 Common errors:
   400: {"data": null, "error": {"code": "bad_request", "message": str}}
+  403: {"data": null, "error": {"code": "forbidden", "message": str}}
   409: {"data": null, "error": {"code": "conflict", "message": str}}
 """
+
+from flask import g
 
 from app.api import bp
 from app.api.request_parsing import parse_json_object_body
@@ -34,8 +37,10 @@ def api_users_list():
 
     Responses:
       200: {"data": [User], "error": null}
+      403: {"data": null, "error": {"code": "forbidden", "message": str}}
     """
-    result = users_service.get_all_users()
+    user_id = g.current_user.id
+    result = users_service.get_all_users(user_id)
     return result.to_flask_response()
 
 
@@ -55,8 +60,10 @@ def api_users_create():
     Responses:
       201: {"data": {"id": uuid, "message": str}, "error": null}
       400: see module errors
+      403: see module errors
       409: see module errors
     """
     payload = parse_json_object_body(allow_empty=False)
-    result = users_service.create_user(payload)
+    user_id = g.current_user.id
+    result = users_service.create_user(user_id, payload)
     return result.to_flask_response()

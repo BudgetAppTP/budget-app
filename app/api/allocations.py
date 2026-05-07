@@ -29,7 +29,6 @@ import uuid
 from flask import g
 
 from app.api import bp
-from app.api.auth_context import get_mock_user_id
 from app.api.request_parsing import parse_json_object_body
 from app.services import allocations_service
 

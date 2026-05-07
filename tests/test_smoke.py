@@ -71,14 +71,6 @@ def test_health_ok(client):
     assert data.get("status") == "ok"
 
 
-def test_transactions_list_ok(auth_client):
-    r = auth_client.get("/api/transactions")
-    data = assert_json_ok(r)
-    assert "items" in data
-    assert "count" in data
-    assert isinstance(data["items"], list)
-
-
 def test_goals_list_ok(client):
     user_email = f"user_{uuid.uuid4().hex[:8]}@test.local"
     create = client.post(
@@ -159,6 +151,33 @@ def test_dashboard_ok(auth_client):
     assert data.get("month") == 10
     for k in ["total_incomes", "total_expenses"]:
         assert k in data
+
+
+def test_users_list_is_access_restricted(auth_client):
+    resp = auth_client.get("/api/users")
+
+    assert resp.status_code == 403
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "forbidden"
+    assert body["error"]["message"] == "Access restricted"
+
+
+def test_users_create_is_access_restricted(auth_client):
+    resp = auth_client.post(
+        "/api/users",
+        json={
+            "username": f"user_{uuid.uuid4().hex[:8]}",
+            "email": f"user_{uuid.uuid4().hex[:8]}@test.local",
+            "password_hash": "hash",
+        },
+    )
+
+    assert resp.status_code == 403
+    body = resp.get_json()
+    assert body["data"] is None
+    assert body["error"]["code"] == "forbidden"
+    assert body["error"]["message"] == "Access restricted"
 
 
 def test_goals_without_mock_header_use_fallback_user(client):
