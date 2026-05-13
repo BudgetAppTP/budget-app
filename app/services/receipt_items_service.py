@@ -32,19 +32,10 @@ def create_item(receipt_id: uuid.UUID, data: dict):
         if not receipt:
             return {"error": "Receipt not found"}, 404
 
-        category_id = data.get("category_id")
-
-        if category_id:
-            try:
-                category_id = uuid.UUID(str(category_id))
-            except ValueError:
-                return {"error": "Invalid category_id"}, 400
-
-
         item = ReceiptItem(
             receipt_id=receipt.id,
             user_id=receipt.user_id,
-            category_id=category_id,
+            category_id=data.get("category_id"),
             name=data.get("name"),
             quantity=Decimal(str(data.get("quantity", 1))),
             unit_price=Decimal(str(data.get("unit_price", 0))),
@@ -80,7 +71,7 @@ def update_item(receipt_id: uuid.UUID, item_id: uuid.UUID, data: dict):
         if "unit_price" in data:
             item.unit_price = Decimal(str(data["unit_price"]))
         if "category_id" in data:
-            item.category_id = uuid.UUID(data["category_id"]) if data["category_id"] else None
+            item.category_id = data["category_id"]
         if "extra_metadata" in data:
             item.extra_metadata = data["extra_metadata"]
 

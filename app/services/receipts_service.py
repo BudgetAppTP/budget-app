@@ -2,7 +2,6 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy.orm import joinedload
-from sqlalchemy import or_
 
 from app.extensions import db
 from app.models import Receipt, Tag, ReceiptItem
@@ -392,12 +391,7 @@ def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: 
             joinedload(Receipt.items),
             joinedload(Receipt.tag),
         )
-        .filter(
-            or_(
-                Receipt.external_uid.isnot(None),
-                Receipt.extra_metadata["manual"].as_boolean() == True
-            )
-        )
+        .filter(Receipt.external_uid.isnot(None))  # eKasa-import marker
     )
 
     # optional date filter
@@ -441,7 +435,6 @@ def get_ekasa_items(year: int | None = None, month: int | None = None, user_id: 
             "tag": r.tag.name if r.tag else None,
             "tag_id": str(r.tag_id) if r.tag_id else None,
             "user_id": str(r.user_id),
-            "extra_metadata": r.extra_metadata,
             "items": items,
         })
 
