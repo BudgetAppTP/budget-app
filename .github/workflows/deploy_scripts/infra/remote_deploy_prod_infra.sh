@@ -113,6 +113,7 @@ export EXTERNAL_NGINX_IMAGE PROD_DOCKER_NETWORK
 export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB
 export BASIC_AUTH_USER BASIC_AUTH_PASSWORD
 COMPOSE_FILE="docker-compose-prod-infra.yml"
+PROJECT_NAME="budget-infra"
 
 declare -A TARGET_HASH
 
@@ -133,8 +134,8 @@ calc_paths_hash() {
 
 get_image_name_for_service() {
   local service="$1"
-  mapfile -t _services < <(docker_cmd compose -f "${COMPOSE_FILE}" config --services)
-  mapfile -t _images < <(docker_cmd compose -f "${COMPOSE_FILE}" config --images)
+  mapfile -t _services < <(docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" config --services)
+  mapfile -t _images < <(docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" config --images)
   local i
   for i in "${!_services[@]}"; do
     if [ "${_services[$i]}" = "${service}" ]; then
@@ -159,12 +160,12 @@ need_deploy_postgres() {
   fi
 
   local cid
-  cid="$(docker_cmd compose -f "${COMPOSE_FILE}" ps -q db || true)"
+  cid="$(docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps -q db || true)"
   if [ -z "${cid}" ]; then
     reason="${reason:+${reason},}container_missing"
   fi
 
-  docker_cmd compose -f "${COMPOSE_FILE}" pull db
+  docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" pull db
 
   local desired_image_id
   desired_image_id="$(docker_cmd image inspect -f '{{.Id}}' postgres:17.5-alpine)"
@@ -200,12 +201,12 @@ need_deploy_nginx() {
   fi
 
   local cid
-  cid="$(docker_cmd compose -f "${COMPOSE_FILE}" ps -q external-nginx || true)"
+  cid="$(docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps -q external-nginx || true)"
   if [ -z "${cid}" ]; then
     reason="${reason:+${reason},}container_missing"
   fi
 
-  docker_cmd compose -f "${COMPOSE_FILE}" pull external-nginx
+  docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" pull external-nginx
 
   local image_name
   image_name="$(get_image_name_for_service external-nginx)"
@@ -265,7 +266,7 @@ if [ "${#SERVICES_TO_DEPLOY[@]}" -eq 0 ]; then
 fi
 
 echo "[infra] Deploying: ${SERVICES_TO_DEPLOY[*]}"
-PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose -f "${COMPOSE_FILE}" up -d --no-build "${SERVICES_TO_DEPLOY[@]}"
+PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" up -d --no-build "${SERVICES_TO_DEPLOY[@]}"
 
 for t in "${TARGETS[@]}"; do
   if [ "${t}" = "postgres" ] && printf '%s\n' "${SERVICES_TO_DEPLOY[@]}" | grep -qx "db"; then
@@ -276,4 +277,4 @@ for t in "${TARGETS[@]}"; do
   fi
 done
 
-PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose -f "${COMPOSE_FILE}" ps
+PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps
