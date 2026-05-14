@@ -1,0 +1,20 @@
+FROM node:20.19-alpine
+
+WORKDIR /app
+
+# Install dependencies first for better layer caching
+COPY client/package*.json ./
+RUN npm ci
+
+# Copy source code
+COPY client/ ./
+
+# Vite dev server settings for Docker
+ENV HOST=0.0.0.0
+ENV PORT=5173
+ENV VITE_PROXY_TARGET=http://backend:5000
+ENV VITE_API_URL=/api
+
+EXPOSE 5173
+
+CMD ["sh", "-c", "npm run dev -- --host ${HOST:-0.0.0.0} --port ${PORT:-5173} --strictPort"]

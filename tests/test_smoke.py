@@ -143,5 +143,5 @@ def test_app_env_is_test():
     app_env = os.getenv("APP_ENV", "").lower()
     assert app_env == "test", (
         f"APP_ENV must be set to 'test' for tests to run safely. "
-        f"Current value: '{app_env}'. Check pytest.ini configuration."
+        f"Current value: '{app_env}'. Check tests/pytest.ini or test runner env."
     )

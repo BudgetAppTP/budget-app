@@ -27,8 +27,16 @@ class TestConfig(BaseConfig):
 
 
 class ProdConfig(BaseConfig):
-    DEBUG = False
+    DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL",
-        "postgresql+psycopg2://user:password@localhost/mydb"
+        "postgresql+psycopg2://budget:budget@db:5432/budget"
+    )
+
+
+class LocalDockerConfig(BaseConfig):
+    DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "DATABASE_URL",
+        "postgresql+psycopg2://budget:budget@db:5432/budget"
     )

@@ -26,11 +26,13 @@ def create_app(config_object=None):
     else:
         app_env = os.getenv("APP_ENV", "development").lower()
         if app_env == "production":
-            from config import ProdConfig as Cfg
+            from app.config import ProdConfig as Cfg
         elif app_env == "test":
-            from config import TestConfig as Cfg
+            from app.config import TestConfig as Cfg
+        elif app_env == "docker-local":
+            from app.config import LocalDockerConfig as Cfg
         else:
-            from config import DevConfig as Cfg
+            from app.config import DevConfig as Cfg
         flask_app.config.from_object(Cfg)
 
     db.init_app(flask_app)

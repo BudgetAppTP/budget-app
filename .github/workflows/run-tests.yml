@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Run Tests
 
 on:
   push:
@@ -29,14 +29,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('app/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r app/requirements.txt
 
       # Fail fast on severe errors
       - name: Flake8 - critical errors
@@ -52,7 +52,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m pytest --verbose --tb=short
+          python -m pytest -c tests/pytest.ini --verbose --tb=short
         env:
           APP_ENV: test
 
