@@ -40,4 +40,4 @@ WTForms~=3.2.1
 pypng== 0.20220715.0
 pyzbar==0.1.9
 pillow==12.1.1
-opencv-python~=4.11.0
+opencv-python-headless~=4.11.0
