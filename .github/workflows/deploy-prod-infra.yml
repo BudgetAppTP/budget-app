@@ -1,0 +1,96 @@
+name: Deploy Prod Infra
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: What to deploy from infra compose
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - postgres
+          - nginx
+      deploy_git_remote:
+        description: Git remote name on deploy host
+        required: true
+        default: origin
+
+concurrency:
+  group: deploy-prod-infra
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST || vars.DEPLOY_SSH_HOST }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER || vars.DEPLOY_SSH_USER }}
+      DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || vars.DEPLOY_SSH_PORT || '22' }}
+      REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR || vars.REMOTE_APP_DIR }}
+      PROD_DOCKER_NETWORK: ${{ secrets.PROD_DOCKER_NETWORK || vars.PROD_DOCKER_NETWORK || 'budget-prod-network' }}
+      INFRA_TARGET: ${{ inputs.deploy_target }}
+      DEPLOY_REF: ${{ github.ref_name }}
+      DEPLOY_GIT_REMOTE: ${{ inputs.deploy_git_remote || secrets.DEPLOY_GIT_REMOTE || vars.DEPLOY_GIT_REMOTE || 'origin' }}
+      DEPLOY_REPO_URL: ${{ format('{0}/{1}.git', github.server_url, github.repository) }}
+      DEPLOY_SSH_KEY_PATH: ~/.ssh/deploy_key
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      BASIC_AUTH_USER: ${{ secrets.BASIC_AUTH_USER }}
+      BASIC_AUTH_PASSWORD: ${{ secrets.BASIC_AUTH_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Compute image metadata
+        id: meta
+        run: |
+          REPO_LC="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_TAG="$(git rev-parse --short=12 HEAD)"
+          echo "external_nginx_image=ghcr.io/${REPO_LC}/external-nginx:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR (build+push)
+        if: ${{ inputs.deploy_target == 'nginx' || inputs.deploy_target == 'both' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        if: ${{ inputs.deploy_target == 'nginx' || inputs.deploy_target == 'both' }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push external-nginx image
+        if: ${{ inputs.deploy_target == 'nginx' || inputs.deploy_target == 'both' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/external-nginx/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.external_nginx_image }}
+
+      - name: Prepare SSH key
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Deploy production infrastructure
+        env:
+          EXTERNAL_NGINX_IMAGE: ${{ steps.meta.outputs.external_nginx_image }}
+        run: |
+          bash .github/workflows/deploy_scripts/infra/deploy_prod_infra_via_ssh.sh

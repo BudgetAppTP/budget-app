@@ -7,7 +7,7 @@ import pytest
 from app import create_app
 from app.extensions import db
 from app.models import Account, AccountMember, AccountType, Income, Receipt, ReceiptItem
-from config import TestConfig
+from app.config import TestConfig
 
 
 @pytest.fixture

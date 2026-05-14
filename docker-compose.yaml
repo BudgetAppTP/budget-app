@@ -1,0 +1,109 @@
+services:
+  db:
+    image: postgres:17.5-alpine
+    container_name: budget-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-budget}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-budget}
+      POSTGRES_DB: ${POSTGRES_DB:-budget}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - budget-network
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ${POSTGRES_USER:-budget} -d ${POSTGRES_DB:-budget}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: budget-backend
+    environment:
+      - APP_ENV=docker-local
+      - POSTGRES_USER=${POSTGRES_USER:-budget}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-budget}
+      - POSTGRES_DB=${POSTGRES_DB:-budget}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DEBUG=${DEBUG:-true}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://${POSTGRES_USER:-budget}:${POSTGRES_PASSWORD:-budget}@db:5432/${POSTGRES_DB:-budget}}
+      - DEFAULT_CURRENCY=${DEFAULT_CURRENCY:-EUR}
+      - IMPORT_XLSX_PATH=${IMPORT_XLSX_PATH:-/mnt/data/BugetAppTP.xlsx}
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-5000}
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "python -c \"import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=2).getcode()==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    expose:
+      - "5000"
+    networks:
+      - budget-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: client/Dockerfile.dev
+    container_name: budget-frontend
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-/api}
+      - VITE_PROXY_TARGET=${VITE_PROXY_TARGET:-http://backend:5000}
+      - HOST=0.0.0.0
+      - PORT=5173
+    env_file:
+      - .env
+    expose:
+      - "5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, "node -e \"require('http').get('http://127.0.0.1:5173',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - budget-network
+
+  external-nginx:
+    build:
+      context: .
+      dockerfile: infra/external-nginx/Dockerfile
+    container_name: budget-external-nginx
+    environment:
+      - FRONTEND_UPSTREAM=frontend:5173
+      - BACKEND_UPSTREAM=backend:5000
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER:-admin}
+      - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD:-admin}
+    ports:
+      - ${FRONTEND_PORT:-5173}:80
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - budget-network
+
+volumes:
+  postgres_data:
+
+networks:
+  budget-network:
+    driver: bridge
