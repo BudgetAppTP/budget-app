@@ -115,6 +115,7 @@ printf '%s' "${GHCR_TOKEN}" | docker_cmd login ghcr.io -u "${GHCR_USERNAME}" --p
 export BACKEND_IMAGE FRONTEND_IMAGE PROD_DOCKER_NETWORK
 export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SECRET_KEY
 COMPOSE_FILE="docker-compose-prod-services.yml"
+PROJECT_NAME="budget-services"
 
 declare -A SERVICE_HASH
 
@@ -135,8 +136,8 @@ calc_paths_hash() {
 
 get_image_name_for_service() {
   local service="$1"
-  mapfile -t _services < <(docker_cmd compose -f "${COMPOSE_FILE}" config --services)
-  mapfile -t _images < <(docker_cmd compose -f "${COMPOSE_FILE}" config --images)
+  mapfile -t _services < <(docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" config --services)
+  mapfile -t _images < <(docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" config --images)
   local i
   for i in "${!_services[@]}"; do
     if [ "${_services[$i]}" = "${service}" ]; then
@@ -163,13 +164,13 @@ should_deploy_service() {
   fi
 
   local container_id
-  container_id="$(docker_cmd compose -f "${COMPOSE_FILE}" ps -q "${service}" || true)"
+  container_id="$(docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps -q "${service}" || true)"
   if [ -z "${container_id}" ]; then
     reason="${reason:+${reason},}container_missing"
   fi
 
   echo "[services] Pulling image for ${service}"
-  PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose -f "${COMPOSE_FILE}" pull "${service}"
+  PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" pull "${service}"
 
   local image_name
   image_name="$(get_image_name_for_service "${service}")"
@@ -222,10 +223,10 @@ if [ "${#SERVICES_TO_DEPLOY[@]}" -eq 0 ]; then
 fi
 
 echo "[services] Deploying: ${SERVICES_TO_DEPLOY[*]}"
-PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose -f "${COMPOSE_FILE}" up -d --no-build "${SERVICES_TO_DEPLOY[@]}"
+PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" up -d --no-build "${SERVICES_TO_DEPLOY[@]}"
 
 for s in "${SERVICES_TO_DEPLOY[@]}"; do
   echo "${SERVICE_HASH[$s]}" > "${STATE_DIR}/${s}.sha"
 done
 
-PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose -f "${COMPOSE_FILE}" ps
+PROD_DOCKER_NETWORK="${PROD_DOCKER_NETWORK}" docker_cmd compose --project-name "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps
