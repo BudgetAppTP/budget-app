@@ -1,0 +1,99 @@
+name: Deploy Prod Services
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_git_remote:
+        description: Git remote name on deploy host
+        required: true
+        default: origin
+
+concurrency:
+  group: deploy-prod-services
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST || vars.DEPLOY_SSH_HOST }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER || vars.DEPLOY_SSH_USER }}
+      DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || vars.DEPLOY_SSH_PORT || '22' }}
+      REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR || vars.REMOTE_APP_DIR }}
+      PROD_DOCKER_NETWORK: ${{ secrets.PROD_DOCKER_NETWORK || vars.PROD_DOCKER_NETWORK || 'budget-prod-network' }}
+      DEPLOY_REF: ${{ github.ref_name }}
+      DEPLOY_GIT_REMOTE: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_git_remote || secrets.DEPLOY_GIT_REMOTE || vars.DEPLOY_GIT_REMOTE || 'origin' }}
+      DEPLOY_REPO_URL: ${{ format('{0}/{1}.git', github.server_url, github.repository) }}
+      DEPLOY_SSH_KEY_PATH: ~/.ssh/deploy_key
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME || vars.GHCR_USERNAME }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Compute image metadata
+        id: meta
+        run: |
+          REPO_LC="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          IMAGE_TAG="$(git rev-parse --short=12 HEAD)"
+          echo "backend_image=ghcr.io/${REPO_LC}/backend:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${REPO_LC}/frontend:${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR (build+push)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: app/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.backend_image }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: client/Dockerfile.prod
+          build-args: |
+            VITE_API_URL=/api
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.frontend_image }}
+
+      - name: Prepare SSH key
+        env:
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Deploy production services
+        env:
+          BACKEND_IMAGE: ${{ steps.meta.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ steps.meta.outputs.frontend_image }}
+        run: |
+          bash .github/workflows/deploy_scripts/services/deploy_prod_services_via_ssh.sh

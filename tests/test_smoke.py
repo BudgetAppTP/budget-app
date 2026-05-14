@@ -4,6 +4,7 @@ Smoke tests for the Budget Tracker application.
 These tests verify that the application can start and basic infrastructure works.
 """
 import io
+import os
 import time
 import uuid
 from datetime import date
@@ -18,7 +19,7 @@ from app.services import ekasa_service
 from app.services.errors import BadRequestError, UpstreamServiceError
 from app.services.users_service import create_user_with_main_account
 from scripts.seed import main as seed_main
-from config import TestConfig
+from app.config import TestConfig
 
 
 @pytest.fixture
@@ -2593,6 +2594,10 @@ def test_app_context_works(app):
         assert app.extensions is not None
 
 
-def test_app_env_is_test(app):
-    """Test that the Flask app uses the test configuration."""
-    assert app.config["TESTING"] is True
+def test_app_env_is_test():
+    """Test that APP_ENV environment variable is set to 'test'."""
+    app_env = os.getenv("APP_ENV", "").lower()
+    assert app_env == "test", (
+        f"APP_ENV must be set to 'test' for tests to run safely. "
+        f"Current value: '{app_env}'. Check tests/pytest.ini or test runner env."
+    )
