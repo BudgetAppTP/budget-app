@@ -3,19 +3,25 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import DateTime, String, func, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
+    from .account import Account
+    from .account_member import AccountMember
+    from .goal import Goal
     from .income import Income
     from .receipt import Receipt
     from .financial_target import FinancialTarget
     from .category import Category
     from .receipt_item import ReceiptItem
     from .tag import Tag
+    # Imported for type checking of relationships added below
+    from .auth_token import AuthToken
+    from .email_verification import EmailVerification
 
 
 class User(Base):
@@ -46,6 +52,12 @@ class User(Base):
 
         tags (list[Tag]): One-to-Many relationship (cascade delete).
             All tags created by this user for categorizing transactions.
+
+        account_memberships (list[AccountMember]): One-to-Many relationship (cascade delete).
+            Association rows linking this user to accounts.
+
+        accounts (list[Account]): Many-to-Many relationship via AccountMember.
+            Accounts this user can access/own.
     """
     __tablename__ = 'users'
 
@@ -73,6 +85,14 @@ class User(Base):
         server_default=func.now()
     )
 
+    # Indicates whether the user has completed email verification. New
+    # accounts are initially unverified until a confirmation code is
+    # validated. In test and development environments this can be set to
+    # True automatically to simplify authentication during development.
+    is_verified: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+
     """ Relationships """
     incomes: Mapped[list["Income"]] = relationship(
         "Income", back_populates="user", cascade="all, delete-orphan"
@@ -96,6 +116,35 @@ class User(Base):
 
     tags: Mapped[list["Tag"]] = relationship(
         "Tag", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    # Authentication tokens issued to the user. Each login generates a
+    # unique token row that is tracked until it expires or is explicitly
+    # revoked. Tokens are deleted on cascade when the user is removed.
+    auth_tokens: Mapped[list["AuthToken"]] = relationship(
+        "AuthToken", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    # Email verification codes associated with this user. Multiple
+    # verification codes can exist concurrently if multiple registration
+    # attempts are made; unused or expired codes may be cleaned up.
+    email_verifications: Mapped[list["EmailVerification"]] = relationship(
+        "EmailVerification", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    goals: Mapped[list["Goal"]] = relationship(
+        "Goal", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    account_memberships: Mapped[list['AccountMember']] = relationship(
+        'AccountMember', back_populates='user', cascade='all, delete-orphan'
+    )
+
+    accounts: Mapped[list['Account']] = relationship(
+        'Account',
+        secondary='account_members',
+        back_populates='users',
+        overlaps='account,memberships,user,account_memberships'
     )
 
     def __repr__(self):

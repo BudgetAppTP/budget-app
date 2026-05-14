@@ -2,116 +2,81 @@
 Import QR / eKasa API
 
 Paths:
-  - POST /api/import-qr/preview
-  - POST /api/import-qr/confirm
+  - POST /api/import-qr/extract-id
+
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
+Schemas:
+  ExtractReceiptIdResponse:
+    {
+      "receiptId": str
+    }
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
+  401: {"data": null, "error": {"code": "unauthenticated", "message": str}}
+  429: {"data": null, "error": {"code": "rate_limit_exceeded", "message": str}}
 """
 
-import uuid
-from datetime import datetime
-from decimal import Decimal
+import time
+from functools import wraps
+
 from flask import current_app, request
-from app.api import bp, make_response
-from app.core.domain import Transaction, TransactionKind
+
+from app.api import bp
+from app.services.errors import RateLimitExceededError
+
+# Rate limiting dictionary (in production, use Redis or similar)
+rate_limit_store = {}
 
 
-def _services():
-    return current_app.extensions["services"]
+def rate_limit(limit=10, per=60):
+    """Simple rate limiter: limit requests per IP per time period"""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            ip = request.remote_addr
+            key = f"{ip}:{f.__name__}"
+            now = time.time()
+            
+            # Clean old entries
+            if key in rate_limit_store:
+                rate_limit_store[key] = [t for t in rate_limit_store[key] if now - t < per]
+            
+            # Check rate limit
+            if key in rate_limit_store and len(rate_limit_store[key]) >= limit:
+                raise RateLimitExceededError()
+            
+            # Add current request
+            if key not in rate_limit_store:
+                rate_limit_store[key] = []
+            rate_limit_store[key].append(now)
+            
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
-def _parse_date_any(s):
-    s = (s or "").strip()
-    if not s:
-        return None
-    try:
-        return datetime.fromisoformat(s).date()
-    except Exception:
-        try:
-            return datetime.strptime(s, "%Y-%m-%d").date()
-        except Exception:
-            try:
-                return datetime.strptime(s, "%d.%m.%Y").date()
-            except Exception:
-                return None
+def _qr_service():
+    """Convenience accessor for the QR extraction service."""
+    return current_app.extensions.get("qr_service")
 
-
-@bp.post("/import-qr/preview", strict_slashes=False)
-def api_importqr_preview():
+@bp.post("/import-qr/extract-id", strict_slashes=False)
+@rate_limit(limit=10, per=60)
+def api_importqr_extract_id():
     """
-    POST /api/import-qr/preview
-    Summary: Parse and validate QR/eKasa payload
+    Extract an eKasa receipt ID from an uploaded QR image.
 
     Request:
-      {
-        "payload": "<raw string>" | [ { "OPD":"...", "date":"YYYY-MM-DD", "item":"...", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks" }, ... ]
-      }
+      multipart/form-data with file field:
+        image: binary
 
     Responses:
-      200:
-        data: { "items":[{ "valid": true|false, "opd":"...", "date":"YYYY-MM-DD", "category":"...", "item":"...", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks" }], "count": n }
-        error: null
+      200: {"data": ExtractReceiptIdResponse, "error": null}
+      400: see module errors
+      401: see module errors
+      429: see module errors
     """
-    body = request.get_json(silent=True) or {}
-    payload = body.get("payload")
-    items = []
-    if isinstance(payload, list):
-        items = payload
-    elif isinstance(payload, str):
-        items = _services().qr_parser.parse(payload)
-    parsed = []
-    for it in items:
-        vd = _services().ekasa.validate(it.get("OPD", ""))
-        dt = _parse_date_any(it.get("date") or "")
-        parsed.append({
-            "valid": bool(vd.get("valid")),
-            "opd": it.get("OPD", ""),
-            "date": dt.isoformat() if dt else "",
-            "category": it.get("category", "Jedlo"),
-            "item": it.get("item", ""),
-            "qnt": str(it.get("qnt", "1")),
-            "price": str(it.get("price", "0")),
-            "vat": str(it.get("vat", "0")),
-            "seller": it.get("seller", ""),
-            "unit": it.get("unit", "ks"),
-        })
-    return make_response({"items": parsed, "count": len(parsed)})
-
-
-@bp.post("/import-qr/confirm", strict_slashes=False)
-def api_importqr_confirm():
-    """
-    POST /api/import-qr/confirm
-    Summary: Create expense transactions from previewed items
-
-    Request:
-      { "items": [ { "date":"YYYY-MM-DD", "category":"Jedlo", "item":"Mlieko", "qnt":"1", "price":"1.20", "vat":"0.20", "seller":"...", "unit":"ks", "opd":"..." }, ... ] }
-
-    Responses:
-      200:
-        data: {"created": n}
-        error: null
-    """
-    body = request.get_json(silent=True) or {}
-    items = body.get("items") or []
-    created = 0
-    for it in items:
-        try:
-            tx = Transaction(
-                id=str(uuid.uuid4()),
-                kind=TransactionKind.expense,
-                date=_parse_date_any(it.get("date")) or datetime.utcnow().date(),
-                category=it.get("category") or "Jedlo",
-                subcategory=None,
-                item=it.get("item") or None,
-                qty=Decimal(str(it.get("qnt", "1"))),
-                unit_price=Decimal(str(it.get("price", "0"))),
-                vat=Decimal(str(it.get("vat"))) if it.get("vat") else Decimal("0"),
-                seller=it.get("seller") or None,
-                unit=it.get("unit") or None,
-                note=it.get("opd") or None,
-                source="qr",
-            )
-            _services().transactions.add(tx)
-            created += 1
-        except Exception:
-            continue
-    return make_response({"created": created})
+    result = _qr_service().extract_receipt_id_from_upload(request.files.get("image"))
+    return result.to_flask_response()

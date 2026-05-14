@@ -1,99 +1,83 @@
-"""
-Monthly Budget Service
-
-Provides functionality to fetch all incomes and expenses for a given month.
-
-The service aggregates data from existing income and receipt services and
-returns a unified summary for the specified month (YYYY-MM).  When no
-month is provided it defaults to the current month.
-"""
-
-from __future__ import annotations
-
-import re
+import uuid
 from datetime import date
-from decimal import Decimal
-from typing import List, Tuple, Dict, Any
 
-from app.services import incomes_service, receipts_service
-
-
-def _current_month() -> str:
-    """Return the current month in YYYY-MM format."""
-    return date.today().strftime("%Y-%m")
+from app.extensions import db
+from app.models import Income, Receipt
+from app.services.responses import OkResult
+from app.validators.common_validators import MonthYearFilter, validate_month_year_filter
 
 
-def _validate_month(month: str) -> bool:
-    """Check if provided month is in YYYY-MM format."""
-    return bool(re.fullmatch(r"\d{4}-\d{2}", month))
-
-
-def get_monthly_summary(month: str | None = None) -> Tuple[Dict[str, Any], int]:
-    """Return all incomes and expenses for a given month.
-
-    Args:
-        month: The month in "YYYY-MM" format. Defaults to current month if None.
-
-    Returns:
-        A tuple of (payload dict, HTTP status code).
-
-    Payload example:
-        {
-            "month": "2025-10",
-            "incomes": [...],
-            "expenses": [...],
-            "total_income": 123.45,
-            "total_expense": 67.89
-        }
+def get_month_summary_budget(
+    user_id: uuid.UUID,
+    month_filter: MonthYearFilter,
+):
     """
-    target_month = (month or _current_month()).strip()
+    Return incomes and expenses for selected month/year.
 
-    if not _validate_month(target_month):
-        return {"error": "Invalid month format, expected YYYY-MM"}, 400
+    If year/month are not provided -> use current month.
+    """
+    if month_filter.year is None and month_filter.month is None:
+        today = date.today()
+        month_filter = validate_month_year_filter(today.year, today.month)
 
-    # Fetch all incomes via incomes_service
-    income_data, inc_status = incomes_service.get_all_incomes()
-    if inc_status != 200:
-        # propagate error from service
-        return income_data, inc_status
-    incomes: List[Dict[str, Any]] = income_data.get("incomes", [])
+    start, end = month_filter.range()
 
-    # Filter incomes by target month
-    filtered_incomes: List[Dict[str, Any]] = []
-    total_income = Decimal("0.00")
+    # load incomes for the month
+    incomes_q = db.session.query(Income).filter(
+        Income.income_date.isnot(None),
+        Income.income_date >= start,
+        Income.income_date < end,
+    )
+    incomes_q = incomes_q.filter(Income.user_id == user_id)
+
+    incomes = incomes_q.order_by(Income.income_date.asc()).all()
+
+    # load receipts(expenses) for the month
+    receipts_q = db.session.query(Receipt).filter(
+        Receipt.issue_date.isnot(None),
+        Receipt.issue_date >= start,
+        Receipt.issue_date < end,
+    )
+    receipts_q = receipts_q.filter(Receipt.user_id == user_id)
+
+    receipts = receipts_q.order_by(Receipt.issue_date.asc()).all()
+
+    incomes_data = []
+    total_income = 0.0
+
     for inc in incomes:
-        inc_date = inc.get("income_date")
-        if inc_date and inc_date.startswith(target_month):
-            filtered_incomes.append(inc)
-            amt = inc.get("amount")
-            if amt is not None:
-                try:
-                    total_income += Decimal(str(amt))
-                except Exception:
-                    pass
+        amount = float(inc.amount or 0)
+        total_income += amount
 
-    # Fetch all receipts via receipts_service
-    receipts: List[Dict[str, Any]] = receipts_service.get_all_receipts()
+        incomes_data.append({
+            "id": str(inc.id),
+            "income_date": inc.income_date.isoformat() if inc.income_date else None,
+            "description": inc.description,
+            "amount": amount,
+        })
 
-    # Filter receipts by target month
-    filtered_expenses: List[Dict[str, Any]] = []
-    total_expense = Decimal("0.00")
+    expenses_data = []
+    total_expense = 0.0
+
     for rec in receipts:
-        issue_date = rec.get("issue_date")
-        if issue_date and issue_date.startswith(target_month):
-            filtered_expenses.append(rec)
-            amt = rec.get("total_amount")
-            if amt is not None:
-                try:
-                    total_expense += Decimal(str(amt))
-                except Exception:
-                    pass
+        amount = float(rec.total_amount or 0)
+        total_expense += amount
 
-    payload: Dict[str, Any] = {
-        "month": target_month,
-        "incomes": filtered_incomes,
-        "expenses": filtered_expenses,
-        "total_income": float(total_income),
-        "total_expense": float(total_expense),
-    }
-    return payload, 200
+        expenses_data.append({
+            "id": str(rec.id),
+            "issue_date": rec.issue_date.isoformat() if rec.issue_date else None,
+            "category": getattr(rec, "category", None),
+            "vendor": getattr(rec, "vendor", None),
+            "store_name": getattr(rec, "store_name", None),
+            "description": getattr(rec, "description", None),
+            "total_amount": amount,
+        })
+
+    return OkResult({
+        "month": f"{month_filter.year:04d}-{month_filter.month:02d}",
+        "incomes": incomes_data,
+        "expenses": expenses_data,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "balance": total_income - total_expense,
+    })

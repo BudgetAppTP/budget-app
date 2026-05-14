@@ -1,0 +1,48 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
+    container_name: budget-backend
+    environment:
+      - APP_ENV=production
+      - POSTGRES_USER=${POSTGRES_USER:-budget}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-budget}
+      - POSTGRES_DB=${POSTGRES_DB:-budget}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DEBUG=${DEBUG:-false}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://${POSTGRES_USER:-budget}:${POSTGRES_PASSWORD:-budget}@db:5432/${POSTGRES_DB:-budget}}
+      - DEFAULT_CURRENCY=${DEFAULT_CURRENCY:-EUR}
+      - IMPORT_XLSX_PATH=${IMPORT_XLSX_PATH:-/mnt/data/BugetAppTP.xlsx}
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-5000}
+    healthcheck:
+      test: [CMD-SHELL, "python -c \"import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=2).getcode()==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    expose:
+      - "5000"
+    networks:
+      - budget-network
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
+    container_name: budget-frontend
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - budget-network
+
+networks:
+  budget-network:
+    external: true
+    name: ${PROD_DOCKER_NETWORK:-budget-prod-network}

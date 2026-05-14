@@ -1,51 +1,53 @@
 """
 Monthly Budget API
 
-Provides an endpoint to retrieve all incomes and expenses for a specific
-month. This endpoint aggregates data from the income and receipt
-services and returns both the individual records and their totals for
-the given month.
+Paths:
+  - GET /api/monthly-budget
 
-Path:
-  - GET /api/monthly-budget?month=YYYY-MM
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
 
-If the ``month`` query parameter is omitted, the current month is used.
+Schemas:
+  MonthlyBudget:
+    {
+      "month": "YYYY-MM",
+      "incomes": [object],
+      "expenses": [object],
+      "total_income": float,
+      "total_expense": float,
+      "balance": float
+    }
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
 """
 
-from __future__ import annotations
+from flask import g, request
 
-from flask import request
-from app.api import bp, make_response
+from app.api import bp
 from app.services import monthly_budget_service
+from app.validators.common_validators import parse_month_year_query_filter
 
 
 @bp.get("/monthly-budget", strict_slashes=False)
 def api_monthly_budget_get():
     """
-    GET /api/monthly-budget
-    Summary: Get all incomes and expenses for a month
+    Return monthly income and expense details for the authenticated user.
 
     Query:
-      - month: "YYYY-MM" (optional; defaults to the current month)
+      year: int | omitted
+      month: int | omitted
 
     Responses:
-      200:
-        data:
-          {
-            "month": "YYYY-MM",
-            "incomes": [...],
-            "expenses": [...],
-            "total_income": number,
-            "total_expense": number
-          }
-        error: null
-      400:
-        data: {"error": "Invalid month format, expected YYYY-MM"}
-        error: null
+      200: {"data": MonthlyBudget, "error": null}
+      400: see module errors
     """
-    month_param = request.args.get("month")
-    data, status = monthly_budget_service.get_monthly_summary(month_param)
-    # If service returns error, wrap in error envelope
-    if "error" in data:
-        return make_response(None, {"code": "bad_request", "message": data["error"]}, status)
-    return make_response(data, None, status)
+    month_filter = parse_month_year_query_filter(
+        request.args.get("year"),
+        request.args.get("month"),
+    )
+    result = monthly_budget_service.get_month_summary_budget(
+        user_id=g.current_user.id,
+        month_filter=month_filter,
+    )
+    return result.to_flask_response()

@@ -6,23 +6,16 @@ export type RegisterBody = { email: string; password: string };
 export const authApi = {
   login: (body: LoginBody) => unwrap(http.post("/auth/login", body)),
   register: (body: RegisterBody) => unwrap(http.post("/auth/register", body)),
-  logout: () => unwrap(http.post("/auth/logout"))
-};
-
-export type Transaction = {
-  id: number | string;
-  date: string;
-  kind: "income" | "expense";
-  amount: number;
-  description?: string;
-  category?: string;
-};
-
-export const transactionsApi = {
-  list: (q?: { month?: string; kind?: string; category?: string; search?: string }) =>
-    unwrap<{ items: Transaction[]; count: number }>(http.get("/transactions", { params: q })),
-  create: (body: Partial<Transaction> & { kind: "income" | "expense" }) =>
-    unwrap<Transaction>(http.post("/transactions", body))
+  logout: () => unwrap(http.post("/auth/logout")),
+  me: () =>
+    unwrap<{
+      id: string;
+      username: string;
+      email: string;
+      is_verified: boolean;
+      created_at: string | null;
+    }>(http.get("/auth/me")),
+  googleLogin: (body: { token: string }) => unwrap(http.post("/auth/google", body))
 };
 
 export type BudgetItem = {
