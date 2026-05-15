@@ -5,6 +5,7 @@ import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
 import { authApi } from "../api/endpoints";
 import { useAuth } from "../auth/AuthContext";
+import { promptGoogleSignIn } from "../auth/googleSignIn";
 
 // Google client ID for OAuth. Provided via VITE_GOOGLE_CLIENT_ID.
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -62,16 +63,6 @@ export default function Signin() {
         setError(err.message || (lang === "sk" ? "Chyba prihlásenia." : "Login error."));
       });
   }, [lang, refreshAuth, navigate]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.google || !GOOGLE_CLIENT_ID) return;
-    try {
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleCredentialResponse,
-      });
-    } catch (_) {}
-  }, [handleCredentialResponse]);
 
   const canSubmit = useMemo(() => {
     if (!form.firstName.trim()) return false;
@@ -144,11 +135,9 @@ export default function Signin() {
       return;
     }
     try {
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleCredentialResponse,
-      });
-      window.google.accounts.id.prompt();
+      if (!promptGoogleSignIn(GOOGLE_CLIENT_ID, handleCredentialResponse)) {
+        setError(lang === "sk" ? "Google prihlásenie nie je dostupné." : "Google sign-in is not available.");
+      }
     } catch (_) {
       setError(lang === "sk" ? "Google prihlásenie zlyhalo." : "Google sign-in failed.");
     }

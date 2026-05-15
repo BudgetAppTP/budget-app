@@ -53,7 +53,7 @@ export const goalsApi = {
 };
 
 export const importQrApi = {
-  preview: (payload: unknown) => unwrap<{ items: any[]; count: number }>(http.post("/import-qr/preview", { payload })),
+  preview: (payload: unknown) => unwrap<{ items: unknown[]; count: number }>(http.post("/import-qr/preview", { payload })),
   confirm: (items: unknown[]) => unwrap<{ created: number }>(http.post("/import-qr/confirm", { items }))
 };
 

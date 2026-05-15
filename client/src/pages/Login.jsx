@@ -5,6 +5,7 @@ import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
 import { authApi } from "../api/endpoints";
 import { useAuth } from "../auth/AuthContext";
+import { promptGoogleSignIn } from "../auth/googleSignIn";
 
 // Access Vite environment variables. The Google client ID must be
 // provided via VITE_GOOGLE_CLIENT_ID in the frontend environment.
@@ -45,16 +46,6 @@ export default function Login() {
       });
   }, [lang, refreshAuth, navigate]);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.google || !GOOGLE_CLIENT_ID) return;
-    try {
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleCredentialResponse,
-      });
-    } catch (_) {}
-  }, [handleCredentialResponse]);
-
   const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
   const submit = (e) => {
@@ -87,11 +78,9 @@ export default function Login() {
       return;
     }
     try {
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleCredentialResponse,
-      });
-      window.google.accounts.id.prompt();
+      if (!promptGoogleSignIn(GOOGLE_CLIENT_ID, handleCredentialResponse)) {
+        setError(lang === "sk" ? "Google prihlásenie nie je dostupné." : "Google sign-in is not available.");
+      }
     } catch (_) {
       setError(lang === "sk" ? "Google prihlásenie zlyhalo." : "Google sign-in failed.");
     }

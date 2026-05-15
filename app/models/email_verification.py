@@ -22,7 +22,7 @@ Relationships:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String, Boolean, ForeignKey
@@ -51,9 +51,10 @@ class EmailVerification(Base):
     user: Mapped["User"] = relationship("User", back_populates="email_verifications")
 
     def is_expired(self) -> bool:
-        from datetime import datetime as _dt
-        ea = self.expires_at.replace(tzinfo=None) if self.expires_at.tzinfo else self.expires_at
-        return _dt.utcnow() >= ea
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) >= expires_at
 
     def __repr__(self) -> str:
         return f"<EmailVerification id={self.id} user_id={self.user_id} code={self.code}>"
