@@ -23,18 +23,26 @@ budget-app/
     Dockerfile
     requirements.txt
     api/
+      account.py
+      allocations.py
+      analytics.py
       auth.py
-      budgets.py
+      categories.py
+      dashboard.py
+      export.py
       goals.py
       importqr.py
-      export.py
-      dashboard.py
       incomes.py
-      receipts.py
+      monthly_budget.py
       receipt_items.py
+      receipts.py
+      savings_funds.py
+      tags.py
       users.py
     core/
+    models/
     services/
+    validators/
     run.py
     config.py
 client/
@@ -55,8 +63,12 @@ client/
     pages/
       Dashboard.jsx
       Budgets.jsx
+      Ekasa.jsx
       Expenses.jsx
       Incomes.jsx
+      Login.jsx
+      Savings.jsx
+      Signin.jsx
 tests/
   pytest.ini
   test_smoke.py
@@ -131,6 +143,11 @@ make docker-up
 # or: docker compose -f docker-compose.yaml up --build
 ```
 
+The local Docker stack runs `postgres`, `backend`, `frontend`, and `external-nginx` together.
+It was added to simulate the production topology locally while still building images from the
+working tree. The backend connects to PostgreSQL through the Compose network, and nginx exposes
+the app through a single entrypoint.
+
 Frontend runs on `http://localhost:5173` by default (`FRONTEND_PORT` can override host port).
 Access is protected with HTTP Basic Auth via `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD`.
 
@@ -148,7 +165,14 @@ Before starting production compose locally, set image refs in `.env`:
 
 Frontend (nginx) runs on `http://localhost:80` by default (`FRONTEND_PORT` can override host port; for local prod set `FRONTEND_PORT=80` if needed).
 Access is protected with HTTP Basic Auth via `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD`.
-`docker-compose-prod-services.yml` expects network `${PROD_DOCKER_NETWORK}` to exist (it is created by `docker-compose-prod-infra.yml`).
+
+The production Compose setup is intentionally split:
+
+* `docker-compose-prod-infra.yml`: long-lived infrastructure (`db` and `external-nginx`) and the shared `${PROD_DOCKER_NETWORK}` network.
+* `docker-compose-prod-services.yml`: application services (`backend` and `frontend`) that attach to the existing production network.
+
+For local production simulation, start infra before services. In GitHub deploys, the services
+script can create the missing network as a fallback, but the intended flow is still infra first.
 
 ### Stop stacks
 
@@ -161,12 +185,24 @@ make docker-prod-down
 
 ## GitHub Deploy Workflows
 
-Production deploy is split into two workflows:
+Production deploys are split so stable infrastructure can be changed separately from the
+application code:
 
-* `.github/workflows/deploy-prod-infra.yml` (manual): deploys `postgres`, `nginx`, or both.
-* `.github/workflows/deploy-prod-services.yml` (push to `main` + manual): builds backend/frontend images and deploys services.
+* `.github/workflows/deploy-prod-infra.yml` is manual (`workflow_dispatch`) and deploys
+  `postgres`, `nginx`, or both. The nginx image is built and pushed only when the selected
+  target includes nginx.
+* `.github/workflows/deploy-prod-services.yml` runs automatically on pushes to `main` and
+  `master`, and can also be run manually. It builds backend/frontend images, pushes them to
+  GHCR, then deploys only the services that changed.
 
-Both workflows deploy the ref selected in **Use workflow from** (`github.ref_name`) and support custom git remote name via `deploy_git_remote` (default `origin`).
+Both workflows deploy `github.ref_name`: for manual runs this is the ref selected in
+**Use workflow from**, and for push runs this is the pushed branch. The deploy scripts sync the
+remote checkout to that ref, log in to GHCR, pull the target image(s), and run Docker Compose over
+SSH. A custom git remote name can be supplied with `deploy_git_remote` (default `origin`).
+
+Deploy scripts keep lightweight hashes in `.deploy_state` on the server. A container is recreated
+when relevant files changed, the container is missing, or the pulled image differs from the
+running image.
 
 Required GitHub Secrets:
 
@@ -179,14 +215,18 @@ Required GitHub Secrets:
 * `BASIC_AUTH_PASSWORD`
 * `SECRET_KEY`
 
-Connection and deploy settings can be configured either via Secrets or via Variables (workflow uses `secrets.* || vars.*`):
+Store sensitive runtime values as GitHub repository or environment **Secrets**. Non-sensitive
+connection and deploy settings can be configured either as Secrets or as Variables; the workflows
+read them as `secrets.* || vars.*`:
 
 * `DEPLOY_SSH_HOST`, `DEPLOY_SSH_USER`, `DEPLOY_SSH_PORT`, `REMOTE_APP_DIR`
 * `PROD_DOCKER_NETWORK`
 * `DEPLOY_GIT_REMOTE`
 * `GHCR_USERNAME`
 
-Remote host requirement: deploy user must have access to Docker daemon (either docker group membership or passwordless `sudo` for docker commands).
+`GHCR_TOKEN` is used both for authenticated git fetches on the deploy host and for pulling images
+from GHCR. Remote host requirement: deploy user must have access to Docker daemon (either docker
+group membership or passwordless `sudo` for docker commands).
 
 ---
 
@@ -259,40 +299,88 @@ npm run dev
 
 ---
 
-## API Endpoints (Minimum)
+## API Endpoints
 
 * **Auth**
 
   * `POST /api/auth/login`
   * `POST /api/auth/register`
+  * `POST /api/auth/verify`
+  * `GET /api/auth/me`
   * `POST /api/auth/logout`
+  * `POST /api/auth/google`
 
-* **Budgets**
+* **Accounts, budgets, and analytics**
 
-  * `GET /api/budgets?month=YYYY-MM`
-  * `PUT /api/budgets/:month` (bulk-upsert sections)
+  * `GET /api/account`
+  * `PATCH /api/account`
+  * `GET /api/monthly-budget?year=YYYY&month=M`
+  * `GET /api/dashboard/summary`
+  * `GET /api/analytics/donut`
 
-* **Goals**
+* **Incomes**
 
-  * `GET /api/goals`
-  * `POST /api/goals`
-  * `PUT /api/goals/:id`
+  * `GET /api/incomes`
+  * `POST /api/incomes`
+  * `GET /api/incomes/:id`
+  * `PUT /api/incomes/:id`
+  * `DELETE /api/incomes/:id`
+  * `GET /api/incomes/tags`
+
+* **Receipts and receipt items**
+
+  * `GET /api/receipts`
+  * `POST /api/receipts`
+  * `GET /api/receipts/:id`
+  * `PUT /api/receipts/:id`
+  * `DELETE /api/receipts/:id`
+  * `POST /api/receipts/import-ekasa`
+  * `GET /api/receipts/ekasa-items`
+  * `GET|POST /api/receipts/:receipt_id/items`
+  * `PUT|DELETE /api/receipts/:receipt_id/items/:item_id`
+
+* **Categories and tags**
+
+  * `GET|POST /api/categories`
+  * `GET /api/categories/monthly-limit`
+  * `PUT|DELETE /api/categories/:id`
+  * `GET /api/tags/income`
+  * `GET /api/tags/expense`
+  * `POST /api/tags`
+  * `PUT|DELETE /api/tags/:id`
+
+* **Savings funds, goals, and allocations**
+
+  * `GET /api/savings/summary`
+  * `GET|POST /api/funds`
+  * `GET|PUT|PATCH|DELETE /api/funds/:id`
+  * `PATCH /api/funds/:id/status`
+  * `PATCH /api/funds/:id/balance`
+  * `GET|POST /api/funds/:fund_id/goals`
+  * `PUT|PATCH|DELETE /api/goals/:id`
+  * `PATCH /api/goals/:id/status`
+  * `PATCH /api/goals/:id/amount`
+  * `GET|POST /api/savings-funds/:fund_id/allocations`
+  * `DELETE /api/savings-funds/:fund_id/allocations/:allocation_id`
 
 * **Import QR**
 
-  * `POST /api/import-qr/preview`
-  * `POST /api/import-qr/confirm`
+  * `POST /api/import-qr/extract-id`
 
 * **Export**
 
-  * `GET /api/export/csv?month=YYYY-MM`  *(file download)*
-  * `GET /api/export/pdf?month=YYYY-MM`  *(file download)*
+  * `GET /api/export/csv?year=YYYY&month=M`  *(file download)*
+  * `GET /api/export/pdf?year=YYYY&month=M`  *(file download)*
 
-* **Dashboard**
+* **Users and health**
 
-  * `GET /api/dashboard?month=YYYY-MM`
+  * `GET /api/users`
+  * `POST /api/users`
+  * `GET /api/health`
 
 All endpoints return `application/json` except file downloads under `/api/export/*`.
+All API routes except auth routes and `/api/health` require a valid session token, accepted either
+from the `auth_token` cookie or a `Bearer` token.
 
 > API docs UI (Swagger) can be enabled if desired. If configured, it is typically exposed under something like `/api/docs`.
 
@@ -301,7 +389,7 @@ All endpoints return `application/json` except file downloads under `/api/export
 ## Project Structure (Details)
 
 * `app/__init__.py`: Flask app factory, CORS, error handlers, and API blueprint registration.
-* `app/api/*`: JSON controllers (auth, transactions, budgets, goals, import-qr, export, dashboard, incomes, receipts, receipt_items, users).
+* `app/api/*`: JSON controllers (auth, account, analytics, categories, goals, import QR, export, dashboard, incomes, receipts, receipt items, savings funds, tags, users).
 * `app/core/*`: domain entities and DTOs.
 * `app/services/*`: business logic, repositories, and stubs.
 * `client/*`: React (Vite + TS) scaffold, router, API client, and basic pages.
@@ -314,15 +402,16 @@ All endpoints return `application/json` except file downloads under `/api/export
 Run the test suite:
 
 ```bash
-pytest -q
+make test
+# or: python -m pytest -c tests/pytest.ini
 ```
 
 Smoke tests assert:
 
 * Health: `/api/health`
-* Core lists and shapes: `/api/budgets`, `/api/goals`, `/api/dashboard`
+* Core lists and shapes: authenticated finance, savings, dashboard, and export endpoints
 * Auth flow: register → login → logout
-* Import QR preview
+* Import QR extraction
 * Export CSV/PDF (file responses)
 
 ---

@@ -21,6 +21,30 @@ dist/
 build/
 *.egg-info/
 
+# LaTeX build artifacts
+*.acn
+*.acr
+*.alg
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.glg
+*.glo
+*.gls
+*.glsdefs
+*.ist
+*.lof
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.xdy
+docs/tex/*.pdf
+
 # Database files
 *.db
 *.sqlite3

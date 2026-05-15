@@ -29,7 +29,7 @@ Hoci systém sleduje klasickú trojvrstvovú architektúru pozostávajúcu z pre
 
 Backend využíva vzor \textit{Application Factory}, ktorý oddeľuje vytváranie aplikácie od jej konfigurácie~\cite{flask_app_factories}. Počas spúšťania aplikácia dynamicky načítava konfiguračnú triedu na základe premennej prostredia \texttt{APP\_ENV}. Pre vývojové, testovacie a produkčné prostredie sú definované samostatné konfiguračné triedy. Vo vývojovom a testovacom prostredí je databáza založená na SQLite, čo umožňuje rýchle a izolované testovanie, zatiaľ čo v produkčnom prostredí je databázové pripojenie konfigurované prostredníctvom premennej prostredia \texttt{DATABASE\_URL}, pričom cieľovým databázovým systémom je PostgreSQL. Tento návrh umožňuje správanie špecifické pre jednotlivé prostredia bez duplicitného kódu a podporuje plynulé nasadzovanie v rôznych fázach vývoja.
 
-Smerovanie API je organizované pomocou jedného nadradeného Flask \textit{Blueprint}, ktorý reprezentuje verejné REST API aplikácie. V rámci tohto blueprintu sú trasy logicky rozdelené do samostatných modulov podľa doménových konceptov, ako sú autentifikácia, transakcie a rozpočty. Tento hybridný prístup zachováva jednotný API \textit{namespace} a zároveň zabezpečuje modulárnu organizáciu zdrojového kódu, čím vyvažuje jednoduchosť a udržiavateľnosť.
+Smerovanie API je organizované pomocou jedného nadradeného Flask \textit{Blueprint}, ktorý reprezentuje verejné REST API aplikácie. V rámci tohto blueprintu sú trasy logicky rozdelené do samostatných modulov podľa doménových konceptov, ako sú autentifikácia, príjmy, výdavky, kategórie, rozpočty, sporiace fondy a ciele. Tento hybridný prístup zachováva jednotný API \textit{namespace} a zároveň zabezpečuje modulárnu organizáciu zdrojového kódu, čím vyvažuje jednoduchosť a udržiavateľnosť.
 
 Obchodná logika je plne zapuzdrená v samostatnej \textit{servisnej vrstve}. Služby sú zodpovedné za vynucovanie doménových pravidiel, vykonávanie validácií a koordináciu perzistenčných operácií. HTTP obslužné rutiny slúžia iba ako body orchestrácie, ktoré prekladajú požiadavky na volania služieb a formátujú odpovede. Toto oddelenie zabraňuje hromadeniu obchodnej logiky v API vrstve a umožňuje opätovné použitie služieb naprieč viacerými koncovými bodmi.
 
@@ -73,11 +73,11 @@ Obrázok~\ref{fig:flow1-create-income} ilustruje tok dát:
     \item Používateľ vyplní inline formulár v rámci \texttt{Incomes.jsx}.
     \item Vstupy formulára sú dočasne uložené v lokálnom stave Reactu až do odoslania.
     \item Po odoslaní frontend odošle požiadavku typu \texttt{POST} na \texttt{/api/incomes}
-    s JSON \mbox{payloadom}, ktorý obsahuje polia príjmu a explicitné \texttt{user\_id}.
+    s JSON \mbox{payloadom}, ktorý obsahuje polia príjmu. Identita používateľa sa neurčuje z tela požiadavky, ale z autentifikovaného kontextu.
     \item Backendový obslužný handler v \texttt{app/api/incomes.py} prijme požiadavku.
     \item Handler deleguje spracovanie na \texttt{incomes\_service.py}.
     \item Služba validuje vstup a vytvorí novú entitu Income, ktorú prepojí
-    s poskytnutým \texttt{user\_id} (vzťah cudej väzby na model User).
+    s identifikátorom autentifikovaného používateľa (vzťah cudzej väzby na model User).
     \item Entita je uložená prostredníctvom SQLAlchemy pomocou \texttt{db.session}
     (commit/flush).
     \item Backend vráti odpoveď \texttt{201 Created} s obsahom, ktorý zahŕňa ID nového príjmu
@@ -88,16 +88,16 @@ Obrázok~\ref{fig:flow1-create-income} ilustruje tok dát:
 \begin{itemize}
     \item \textbf{Zlyhanie validácie:} Chýbajúce alebo neplatné polia vedú k odpovedi
     \texttt{400 Bad Request}.
-    \item \textbf{Neplatný odkaz na používateľa:} Ak dodané \texttt{user\_id}
-    nezodpovedá existujúcemu používateľovi, backend vráti chybu
-    (najčastejšie \texttt{404 Not Found} alebo \texttt{400 Bad Request} v závislosti od implementácie).
+    \item \textbf{Neplatná alebo chýbajúca autentifikácia:} Ak požiadavka neobsahuje platný
+    session token, backend vráti odpoveď \texttt{401 Unauthorized}.
     \item \textbf{Zlyhanie databázy:} Chyby pri perzistencii vedú k odpovedi
     \texttt{500 Internal Server Error} a k záznamu v aplikačnom logu.
 \end{itemize}
 
 \paragraph{Bezpečnostná poznámka (aktuálny stav)}
-Identita používateľa nie je v aktuálnej implementácii určovaná prostredníctvom relácie alebo JWT autentifikácie. Namiesto toho klient explicitne poskytuje \texttt{user\_id} v tele požiadavky a backend tejto hodnote dôveruje pri priraďovaní príjmu k používateľovi.
-Tento prístup je vhodný pre prototyp vo fáze vývoja, avšak v produkčnom prostredí by vyžadoval dodatočné zabezpečenie (napr. odvodenie identity používateľa z autentifikovaného kontextu namiesto vstupu od klienta).
+API používa jednotnú autentifikačnú kontrolu na úrovni Flask blueprintu. Väčšina koncových bodov vyžaduje platný session token, ktorý môže byť dodaný cez cookie alebo hlavičku \texttt{Authorization}. Po overení je používateľ uložený v \texttt{g.current\_user} a servisná vrstva používa jeho identifikátor pri vytváraní a filtrovaní používateľských zdrojov.
+
+Hodnoty \texttt{user\_id} dodané klientom v tele alebo query parametroch sa pri vlastnených zdrojoch nepoužívajú ako autoritatívny zdroj identity. Tento prístup zabraňuje tomu, aby klient vytváral alebo čítal údaje v mene iného používateľa iba zmenou vstupného payloadu.
 
 \subsubsection{Use-Case 2: Vytvorenie výdavku}
 \label{sec:uc-create-expense}

@@ -59,7 +59,7 @@ In the docs directory, create (or edit) `.vscode/settings.json`:
 }
 
 ```
-Optionally: create `build\aux` directory to keep aux data separeted from final pdf. `build\aux` is ignored so no further cleaning is required. 
+Optionally: create `build/aux` directory to keep auxiliary data separated from the final PDF. `build/aux` is ignored, so no further cleaning is required.
 
 After saving, LaTeX Workshop will compile your project using latexmk, placing all generated files in `build/`.
 
