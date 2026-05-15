@@ -21,7 +21,7 @@ Relationships:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String, ForeignKey
@@ -47,7 +47,7 @@ class AuthToken(Base):
         String(255), unique=True, nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
@@ -57,9 +57,10 @@ class AuthToken(Base):
     user: Mapped["User"] = relationship("User", back_populates="auth_tokens")
 
     def is_expired(self) -> bool:
-        """Return True if the token is expired."""
-        from datetime import datetime as _dt  # avoid name shadowing
-        return _dt.utcnow() >= self.expires_at
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) >= expires_at
 
     def __repr__(self) -> str:
         return f"<AuthToken id={self.id} user_id={self.user_id} expires_at={self.expires_at.isoformat()}>"

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 from flask import current_app
@@ -107,7 +107,7 @@ class AuthService:
         )
         # Always generate a verification code
         code = self._generate_verification_code()
-        expires = datetime.utcnow() + timedelta(minutes=self.VERIFICATION_LIFETIME)
+        expires = datetime.now(timezone.utc) + timedelta(minutes=self.VERIFICATION_LIFETIME)
         ver = EmailVerification(user_id=user.id, code=code, expires_at=expires, is_used=False)
         db.session.add(ver)
         # Auto-verify user in test/dev environments to simplify tests
@@ -157,7 +157,7 @@ class AuthService:
             )
         # Generate a unique token
         token_value = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(seconds=self.TOKEN_LIFETIME)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=self.TOKEN_LIFETIME)
         token = AuthToken(user_id=user.id, token=token_value, expires_at=expires_at)
         db.session.add(token)
         db.session.commit()
@@ -207,6 +207,8 @@ class AuthService:
         user = db.session.execute(db.select(User).filter_by(email=email_normalized)).scalar()
         if user is None:
             return False
+        if user.is_verified:
+            return True
         codes = (
             db.session.execute(
                 db.select(EmailVerification)
@@ -268,7 +270,7 @@ class AuthService:
                 user.is_verified = True
         # Issue a new session token, similar to the normal login flow
         token_value = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(seconds=self.TOKEN_LIFETIME)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=self.TOKEN_LIFETIME)
         token = AuthToken(user_id=user.id, token=token_value, expires_at=expires_at)
         db.session.add(token)
         db.session.commit()

@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "./style/login.css";
 import { Link, useNavigate } from "react-router-dom";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
 import { authApi } from "../api/endpoints";
 import { useAuth } from "../auth/AuthContext";
+import { promptGoogleSignIn } from "../auth/googleSignIn";
 
 // Access Vite environment variables. The Google client ID must be
 // provided via VITE_GOOGLE_CLIENT_ID in the frontend environment.
@@ -28,47 +29,22 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState(null);
 
-  // Initialise the Google Identity Services client when the component
-  // mounts. The library script is loaded in index.html. We register
-  // a callback that receives the ID token when the user completes the
-  // sign-in flow. Once a token is received, we forward it to the
-  // backend via the new googleLogin endpoint.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const google = window.google;
-    if (!google || !GOOGLE_CLIENT_ID) {
+  const handleCredentialResponse = useCallback((response) => {
+    const idToken = response.credential;
+    if (!idToken) {
+      setError(lang === "sk" ? "Google prihlásenie zlyhalo." : "Google sign-in failed.");
       return;
     }
-    const handleCredentialResponse = (response) => {
-      const idToken = response.credential;
-      if (!idToken) {
-        setError(
-          lang === "sk"
-            ? "Google prihlásenie zlyhalo."
-            : "Google sign-in failed."
-        );
-        return;
-      }
-      // Send the token to our backend; on success, navigate to home.
-      authApi
-        .googleLogin({ token: idToken })
-        .then(async () => {
-          await refreshAuth();
-          navigate("/");
-        })
-        .catch((err) => {
-          setError(err.message || (lang === "sk" ? "Chyba prihlásenia." : "Login error."));
-        });
-    };
-    try {
-      google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleCredentialResponse,
+    authApi
+      .googleLogin({ token: idToken })
+      .then(async () => {
+        await refreshAuth();
+        navigate("/");
+      })
+      .catch((err) => {
+        setError(err.message || (lang === "sk" ? "Chyba prihlásenia." : "Login error."));
       });
-    } catch (e) {
-      // Ignore initialization errors; user will not be able to use Google login
-    }
-  }, [navigate, lang]);
+  }, [lang, refreshAuth, navigate]);
 
   const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
@@ -96,26 +72,17 @@ export default function Login() {
       });
   };
 
-  // Trigger the Google sign-in prompt when the user clicks the button.
   const onGoogleClick = () => {
-    if (typeof window === "undefined") return;
-    const google = window.google;
-    if (!google || !GOOGLE_CLIENT_ID) {
-      setError(
-        lang === "sk"
-          ? "Google prihlásenie nie je dostupné."
-          : "Google sign-in is not available."
-      );
+    if (typeof window === "undefined" || !window.google || !GOOGLE_CLIENT_ID) {
+      setError(lang === "sk" ? "Google prihlásenie nie je dostupné." : "Google sign-in is not available.");
       return;
     }
     try {
-      google.accounts.id.prompt();
-    } catch (e) {
-      setError(
-        lang === "sk"
-          ? "Google prihlásenie zlyhalo."
-          : "Google sign-in failed."
-      );
+      if (!promptGoogleSignIn(GOOGLE_CLIENT_ID, handleCredentialResponse)) {
+        setError(lang === "sk" ? "Google prihlásenie nie je dostupné." : "Google sign-in is not available.");
+      }
+    } catch (_) {
+      setError(lang === "sk" ? "Google prihlásenie zlyhalo." : "Google sign-in failed.");
     }
   };
 

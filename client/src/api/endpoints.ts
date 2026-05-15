@@ -6,6 +6,7 @@ export type RegisterBody = { email: string; password: string };
 export const authApi = {
   login: (body: LoginBody) => unwrap(http.post("/auth/login", body)),
   register: (body: RegisterBody) => unwrap(http.post("/auth/register", body)),
+  verify: (body: { email: string; code: string }) => unwrap(http.post("/auth/verify", body)),
   logout: () => unwrap(http.post("/auth/logout")),
   me: () =>
     unwrap<{
@@ -52,7 +53,7 @@ export const goalsApi = {
 };
 
 export const importQrApi = {
-  preview: (payload: unknown) => unwrap<{ items: any[]; count: number }>(http.post("/import-qr/preview", { payload })),
+  preview: (payload: unknown) => unwrap<{ items: unknown[]; count: number }>(http.post("/import-qr/preview", { payload })),
   confirm: (items: unknown[]) => unwrap<{ created: number }>(http.post("/import-qr/confirm", { items }))
 };
 

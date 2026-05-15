@@ -141,21 +141,6 @@ def api_auth_me():
 
 @bp.post("/auth/logout", strict_slashes=False)
 def api_logout():
-    """
-    POST /api/auth/logout
-    Summary: User logout
-
-    Responses:
-      200:
-        {"data":{"ok":true},"error":null}
-    """
-    """
-    Invalidate the current session token.
-
-    The token is obtained from the ``auth_token`` cookie. If no token
-    exists, logout is a no-op. The cookie is removed from the client's
-    browser to prevent reuse.
-    """
     token = extract_auth_token()
     if token:
         _auth_service().logout(token)
