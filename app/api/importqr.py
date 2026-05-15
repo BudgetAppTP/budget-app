@@ -3,16 +3,33 @@ Import QR / eKasa API
 
 Paths:
   - POST /api/import-qr/extract-id
+
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
+Schemas:
+  ExtractReceiptIdResponse:
+    {
+      "receiptId": str
+    }
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
+  401: {"data": null, "error": {"code": "unauthenticated", "message": str}}
+  429: {"data": null, "error": {"code": "rate_limit_exceeded", "message": str}}
 """
 
-from flask import request
-from app.api import bp, make_response
 import time
 from functools import wraps
-from app.services.qr_service import QrService
+
+from flask import current_app, request
+
+from app.api import bp
+from app.services.errors import RateLimitExceededError
 
 # Rate limiting dictionary (in production, use Redis or similar)
 rate_limit_store = {}
+
 
 def rate_limit(limit=10, per=60):
     """Simple rate limiter: limit requests per IP per time period"""
@@ -29,7 +46,7 @@ def rate_limit(limit=10, per=60):
             
             # Check rate limit
             if key in rate_limit_store and len(rate_limit_store[key]) >= limit:
-                return make_response(None, f"Rate limit exceeded. Try again later.", 429)
+                raise RateLimitExceededError()
             
             # Add current request
             if key not in rate_limit_store:
@@ -40,45 +57,26 @@ def rate_limit(limit=10, per=60):
         return wrapped
     return decorator
 
-qr_service = QrService()
+
+def _qr_service():
+    """Convenience accessor for the QR extraction service."""
+    return current_app.extensions.get("qr_service")
 
 @bp.post("/import-qr/extract-id", strict_slashes=False)
 @rate_limit(limit=10, per=60)
 def api_importqr_extract_id():
     """
-    POST /api/import-qr/extract-id
-    Accept an image file, decode the QR code, and return the extracted eKasa receipt ID.
+    Extract an eKasa receipt ID from an uploaded QR image.
+
+    Request:
+      multipart/form-data with file field:
+        image: binary
+
+    Responses:
+      200: {"data": ExtractReceiptIdResponse, "error": null}
+      400: see module errors
+      401: see module errors
+      429: see module errors
     """
-    # Validate file presence
-    if "image" not in request.files:
-        return make_response(None, "Missing image file", 400)
-
-    file = request.files["image"]
-    
-    # Validate filename
-    if file.filename == "":
-        return make_response(None, "Invalid image file", 400)
-    
-    # Validate file size (max 5MB)
-    file.seek(0, 2)
-    size = file.tell()
-    file.seek(0)
-    
-    if size > 5 * 1024 * 1024:
-        return make_response(None, "File too large. Maximum size is 5MB.", 400)
-    
-    # Validate file type
-    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp'}
-    filename_lower = file.filename.lower()
-    if not any(filename_lower.endswith(ext) for ext in allowed_extensions):
-        return make_response(None, "Invalid file type. Please upload an image.", 400)
-
-    receipt_id, error = qr_service.extract_ekasa_id(file.stream)
-    if error:
-        return make_response(None, error, 400)
-    
-    # Validate extracted ID format
-    if not receipt_id or len(receipt_id) < 10:
-        return make_response(None, "Invalid receipt ID extracted", 400)
-
-    return make_response({"receiptId": receipt_id})
+    result = _qr_service().extract_receipt_id_from_upload(request.files.get("image"))
+    return result.to_flask_response()

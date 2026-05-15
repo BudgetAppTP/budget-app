@@ -2,116 +2,161 @@
 Goals API
 
 Paths:
-  - GET  /api/goals            (?section=SectionName)
-  - POST /api/goals
-  - PUT  /api/goals/{id}
+  - GET    /api/funds/{fund_id}/goals
+  - POST   /api/funds/{fund_id}/goals
+  - PATCH  /api/goals/{goal_id}
+  - PUT    /api/goals/{goal_id}
+  - DELETE /api/goals/{goal_id}
+  - PATCH  /api/goals/{goal_id}/status
+  - PATCH  /api/goals/{goal_id}/amount
+
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
+Schemas:
+  Goal:
+    {
+      "id": uuid,
+      "user_id": uuid,
+      "savings_fund_id": uuid,
+      "target_amount": float,
+      "current_amount": float,
+      "is_completed": bool
+    }
+
+  GoalStatus:
+    {"id": uuid, "is_completed": bool}
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
+  404: {"data": null, "error": {"code": "not_found", "message": str}}
 """
-
 import uuid
-from flask import current_app, request
-from app.api import bp, make_response
-from app.core.domain import Goal, Section
+
+from flask import g
+
+from app.api import bp
+from app.api.request_parsing import parse_json_object_body
+from app.services import goals_service
 
 
-def _services():
-    return current_app.extensions["services"]
-
-
-@bp.get("/goals", strict_slashes=False)
-def api_goals_list():
+@bp.get("/funds/<uuid:fund_id>/goals", strict_slashes=False)
+def api_goals_list_by_fund(fund_id: uuid.UUID):
     """
-    GET /api/goals
-    Summary: List goals (optionally by section)
-
-    Query:
-      - section: string (optional)
+    Get goals by fund.
 
     Responses:
-      200:
-        data:
-          {"items":[{...}], "count": n}
-        error: null
+      200: {"data": [Goal], "error": null}
+      404: see module errors
     """
-    section = (request.args.get("section") or "").strip()
-    if section:
-        rows = _services().goals.by_section(Section(section))
-    else:
-        rows = _services().goals.all()
-    items = []
-    for g in rows:
-        items.append({
-            "id": g.id,
-            "name": g.name,
-            "type": g.type,
-            "target_amount": float(g.target_amount),
-            "section": str(g.section) if g.section else None,
-            "month_from": g.month_from,
-            "month_to": g.month_to,
-            "is_done": bool(g.is_done),
-        })
-    return make_response({"items": items, "count": len(items)})
+    user_id = g.current_user.id
+    result = goals_service.list_goals_by_fund(user_id, fund_id)
+    return result.to_flask_response()
 
 
-@bp.post("/goals", strict_slashes=False)
-def api_goals_create():
+@bp.post("/funds/<uuid:fund_id>/goals", strict_slashes=False)
+def api_goals_create(fund_id: uuid.UUID):
     """
-    POST /api/goals
-    Summary: Create goal
+    Create goal.
 
     Request:
       {
-        "name":"...", "type":"...", "target_amount":number,
-        "section":"Food" | null, "month_from":"YYYY-MM"|null, "month_to":"YYYY-MM"|null, "is_done":bool
+        "title": str,
+        "description": str | null,
+        "target_amount": float
       }
 
     Responses:
-      201:
-        data: {"id":"<uuid>"}
-        error: null
+      201: {"data": Goal, "error": null}
+      400: see module errors
+      404: see module errors
     """
-    p = request.get_json(silent=True) or {}
-    gid = str(uuid.uuid4())
-    section_val = p.get("section") or None
-    section = Section(section_val) if section_val else None
-    g = Goal(
-        id=gid,
-        name=p.get("name", ""),
-        type=p.get("type", ""),
-        target_amount=p.get("target_amount", 0),
-        section=section,
-        month_from=p.get("month_from") or None,
-        month_to=p.get("month_to") or None,
-        is_done=bool(p.get("is_done", False)),
-    )
-    _services().goals.upsert(g)
-    return make_response({"id": gid}, None, 201)
+    user_id = g.current_user.id
+    payload_in = parse_json_object_body()
+    result = goals_service.create_goal(user_id, fund_id, payload_in)
+    return result.to_flask_response()
 
 
-@bp.put("/goals/<id>", strict_slashes=False)
-def api_goals_update(id):
+@bp.patch("/goals/<uuid:goal_id>", strict_slashes=False)
+@bp.put("/goals/<uuid:goal_id>", strict_slashes=False)
+def api_goals_update(goal_id: uuid.UUID):
     """
-    PUT /api/goals/{id}
-    Summary: Update goal
+    Update goal basic fields. Status is not updated here.
 
-    Request: same fields as create (any subset)
+    Request:
+      {
+        "title": str,
+        "description": str | null,
+        "target_amount": float
+      }
 
     Responses:
-      200:
-        data: {"ok": true}
-        error: null
+      200: {"data": Goal, "error": null}
+      400: see module errors
+      404: see module errors
     """
-    p = request.get_json(silent=True) or {}
-    section_val = p.get("section") or None
-    section = Section(section_val) if section_val else None
-    g = Goal(
-        id=id,
-        name=p.get("name", ""),
-        type=p.get("type", ""),
-        target_amount=p.get("target_amount", 0),
-        section=section,
-        month_from=p.get("month_from") or None,
-        month_to=p.get("month_to") or None,
-        is_done=bool(p.get("is_done", False)),
+    user_id = g.current_user.id
+    payload_in = parse_json_object_body()
+    result = goals_service.update_goal(user_id, goal_id, payload_in)
+    return result.to_flask_response()
+
+
+@bp.delete("/goals/<uuid:goal_id>", strict_slashes=False)
+def api_goals_delete(goal_id: uuid.UUID):
+    """
+    Delete goal.
+
+    Responses:
+      200: {"data": {"success": true}, "error": null}
+      404: see module errors
+    """
+    user_id = g.current_user.id
+    result = goals_service.delete_goal(user_id, goal_id)
+    return result.to_flask_response()
+
+
+@bp.patch("/goals/<uuid:goal_id>/status", strict_slashes=False)
+def api_goals_toggle_status(goal_id: uuid.UUID):
+    """
+    Toggle goal status.
+
+    Request:
+      {"is_completed": bool}
+
+    Responses:
+      200: {"data": {"id": uuid, "is_completed": bool}, "error": null}
+      400: see module errors
+      404: see module errors
+    """
+    user_id = g.current_user.id
+    payload_in = parse_json_object_body()
+
+    result = goals_service.update_goal_status(user_id, goal_id, payload_in)
+    return result.to_flask_response()
+
+
+@bp.patch("/goals/<uuid:goal_id>/amount", strict_slashes=False)
+def api_goals_adjust_amount(goal_id: uuid.UUID):
+    """
+    Adjust goal current amount.
+
+    Request:
+      {"delta_amount": float}
+
+    Responses:
+      200: {"data": Goal, "error": null}
+      400: see module errors
+      404: see module errors
+    """
+    user_id = g.current_user.id
+    payload_in = parse_json_object_body()
+    if "delta_amount" not in payload_in:
+        from app.services.errors import BadRequestError
+        raise BadRequestError("Missing delta_amount")
+
+    result = goals_service.adjust_goal_amount(
+        user_id,
+        goal_id,
+        payload_in.get("delta_amount"),
     )
-    _services().goals.upsert(g)
-    return make_response({"ok": True})
+    return result.to_flask_response()

@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:17.5-alpine
+    container_name: budget-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-budget}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-budget}
+      POSTGRES_DB: ${POSTGRES_DB:-budget}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - budget-network
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ${POSTGRES_USER:-budget} -d ${POSTGRES_DB:-budget}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  external-nginx:
+    image: ${EXTERNAL_NGINX_IMAGE:?EXTERNAL_NGINX_IMAGE is required}
+    container_name: budget-external-nginx
+    environment:
+      - FRONTEND_UPSTREAM=frontend:80
+      - BACKEND_UPSTREAM=backend:5000
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER:-admin}
+      - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD:-admin}
+    ports:
+      - ${FRONTEND_PORT:-80}:80
+    healthcheck:
+      test: [CMD-SHELL, wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - budget-network
+
+volumes:
+  postgres_data:
+
+networks:
+  budget-network:
+    name: ${PROD_DOCKER_NETWORK:-budget-prod-network}
+    driver: bridge

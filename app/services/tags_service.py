@@ -1,30 +1,21 @@
-# app/services/tags_service.py
-
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from app.extensions import db
-from app.models import Tag
+from app.models import Tag, User
 from app.models.tag import TagType
-from typing import List, Dict, Any, Tuple
+from app.services.errors import BadRequestError, NotFoundError
+from app.services.responses import CreatedResult, OkResult
 
+from app.validators.tag_validators import validate_tag_create_data, validate_tag_update_data
 
 
 def get_or_create_user_tag(user_id: uuid.UUID, name: str) -> Tag:
-    """
-    Find a tag for a given user by name or create a new one.
-
-    Tags are user-specific:
-      - uniqueness is enforced per user (user_id + name).
-    """
-    clean_name = (name or "").strip()
-    if not clean_name:
-        raise ValueError("Tag name cannot be empty")
-
     tag = (
         db.session.query(Tag)
-        .filter(Tag.user_id == user_id, Tag.name == clean_name)
+        .filter(Tag.user_id == user_id, Tag.name == name)
         .first()
     )
     if tag:
@@ -32,7 +23,7 @@ def get_or_create_user_tag(user_id: uuid.UUID, name: str) -> Tag:
 
     tag = Tag(
         user_id=user_id,
-        name=clean_name,
+        name=name,
         # type is initially None; it will be inferred by update_type()
         type=None,
         counter=0,
@@ -42,13 +33,15 @@ def get_or_create_user_tag(user_id: uuid.UUID, name: str) -> Tag:
     return tag
 
 
-def register_tag_assigned(tag: Tag) -> None:
-    """
-    Call this when the tag is assigned to an Income or Receipt.
+def find_or_create_tag_from_ekasa(user_id: uuid.UUID, data: dict) -> Tag | None:
+    name = data.get("name")
+    if not name:
+        return None
+    return get_or_create_user_tag(user_id, name)
 
-    - increments usage counter
-    - updates tag type based on current relationships
-    """
+
+def register_tag_assigned(tag: Tag) -> None:
+    """Update usage when a tag is assigned to an income or receipt."""
     if tag is None:
         return
 
@@ -57,12 +50,7 @@ def register_tag_assigned(tag: Tag) -> None:
 
 
 def register_tag_unassigned(tag: Tag) -> None:
-    """
-    Call this when the tag is removed from an Income or Receipt.
-
-    - decrements usage counter (but not below 0)
-    - updates tag type based on current relationships
-    """
+    """Update usage when a tag is removed from an income or receipt."""
     if tag is None:
         return
 
@@ -70,298 +58,137 @@ def register_tag_unassigned(tag: Tag) -> None:
     tag.update_type()
 
 
-# ---------------------------------------------------------------------------
-# Additional tag service operations
-#
-# These functions expose CRUD-style operations for tags, which are used by
-# corresponding API endpoints. They complement the existing helper functions
-# above without affecting legacy behavior.
-
-def get_tags_by_type(tag_type: TagType, user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
-    """
-    Retrieve all tags filtered by type.
-
-    Tags whose type matches the requested type are returned. Tags with
-    ``TagType.BOTH`` are also included in both income and expense results.
-
-    Args:
-        tag_type: The desired tag type (INCOME or EXPENSE).
-
-    Returns:
-        A tuple of (payload dict, status). The payload contains a list of
-        ``tags`` and a ``count``. Each tag dictionary includes ``id``,
-        ``user_id``, ``name``, ``type``, and ``counter``.
-    """
-    if tag_type not in (TagType.INCOME, TagType.EXPENSE):
-        return {"error": "Invalid tag type"}, 400
-    query = db.session.query(Tag)
-    if user_id is not None:
-        query = query.filter(Tag.user_id == user_id)
-    tags = query.all()
-    items: List[Dict[str, Any]] = []
-    for t in tags:
-        if t.type == tag_type or t.type == TagType.BOTH:
-            items.append({
-                "id": str(t.id),
-                "user_id": str(t.user_id),
-                "name": t.name,
-                "type": t.type.value if t.type else None,
-                "counter": t.counter,
-            })
-    return {"tags": items, "count": len(items)}, 200
+def _serialize_tag(tag: Tag, *, enum_mode: str = "value") -> dict[str, Any]:
+    return {
+        "id": str(tag.id),
+        "user_id": str(tag.user_id),
+        "name": tag.name,
+        "type": tag.type.value if tag.type is not None and enum_mode == "value"
+        else tag.type.name if tag.type is not None
+        else None,
+        "counter": int(tag.counter) if tag.counter is not None else 0,
+    }
 
 
-def create_tag(data: Dict[str, Any], user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
-    """
-    Create a new tag for a user.
-
-    The payload must include ``user_id`` and ``name``. Optionally ``type`` may
-    be provided as ``"income"``, ``"expense"`` or ``"both"``. If a tag with
-    the same name already exists for the user, the existing tag is returned.
-
-    Args:
-        data: JSON payload with keys ``user_id`` (str or UUID), ``name`` (str),
-              and optional ``type`` (str).
-
-    Returns:
-        A tuple of (payload dict, status). On success the payload contains
-        ``id`` and a success ``message``.
-    """
-    import uuid
-    try:
-        if user_id is not None:
-            user_uuid = user_id
-        else:
-            raw_user_id = data.get("user_id")
-            if not raw_user_id:
-                return {"error": "Missing user_id"}, 400
-            try:
-                user_uuid = uuid.UUID(str(raw_user_id))
-            except Exception:
-                return {"error": "Invalid user_id format"}, 400
-        name = (data.get("name") or "").strip()
-        if not name:
-            return {"error": "Tag name cannot be empty"}, 400
-        raw_type = data.get("type")
-        tag_type = None
-        if raw_type is not None:
-            try:
-                tag_type = TagType(raw_type)
-            except ValueError:
-                return {"error": "Invalid tag type"}, 400
-        tag = get_or_create_user_tag(user_uuid, name)
-        if tag_type is not None:
-            tag.type = tag_type
-        db.session.commit()
-        return {"id": str(tag.id), "message": "Tag created successfully"}, 201
-    except Exception as e:
-        db.session.rollback()
-        return {"error": str(e)}, 400
-
-
-def update_tag(tag_id: uuid.UUID, data: Dict[str, Any], user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
-    """
-    Update an existing tag.
-
-    Supported fields in payload:
-        - ``name``: new tag name (non-empty string)
-        - ``type``: ``"income"``, ``"expense"`` or ``"both"``
-
-    Args:
-        tag_id: UUID of the tag to update.
-        data: JSON payload.
-
-    Returns:
-        A tuple of (payload dict, status). On success the payload contains
-        ``id`` and a success ``message``.
-    """
-    import uuid
+def _get_tag_for_user(tag_id: uuid.UUID, user_id: uuid.UUID) -> Tag:
     tag = db.session.get(Tag, tag_id)
-    if not tag:
-        return {"error": "Tag not found"}, 404
-    if user_id is not None and tag.user_id != user_id:
-        return {"error": "Tag not found"}, 404
-    try:
-        if "name" in data:
-            new_name = (data.get("name") or "").strip()
-            if not new_name:
-                return {"error": "Tag name cannot be empty"}, 400
-            # ensure no duplicate names for the same user
-            other = (
-                db.session.query(Tag)
-                .filter(Tag.user_id == tag.user_id, Tag.name == new_name, Tag.id != tag.id)
-                .first()
-            )
-            if other:
-                return {"error": "Tag name already exists for this user"}, 400
-            tag.name = new_name
-        if "type" in data and data.get("type") is not None:
-            raw_type = data.get("type")
-            try:
-                tag.type = TagType(raw_type)
-            except ValueError:
-                return {"error": "Invalid tag type"}, 400
-        db.session.commit()
-        return {"id": str(tag.id), "message": "Tag updated successfully"}, 200
-    except Exception as e:
-        db.session.rollback()
-        return {"error": str(e)}, 400
-
-
-def delete_tag(tag_id: uuid.UUID, user_id: uuid.UUID | None = None) -> Tuple[Dict[str, Any], int]:
-    """
-    Delete a tag.
-
-    Before deletion the tag is detached from any associated incomes and receipts.
-    Counters and types are updated through ``register_tag_unassigned``.
-
-    Args:
-        tag_id: UUID of the tag to delete.
-
-    Returns:
-        A tuple of (payload dict, status). On success the payload contains
-        a success ``message``.
-    """
-    import uuid
-    tag = db.session.get(Tag, tag_id)
-    if not tag:
-        return {"error": "Tag not found"}, 404
-    if user_id is not None and tag.user_id != user_id:
-        return {"error": "Tag not found"}, 404
-    try:
-        # detach tag from incomes
-        for inc in list(tag.incomes):
-            inc.tag = None
-            register_tag_unassigned(tag)
-        # detach tag from receipts
-        for rec in list(tag.receipts):
-            rec.tag = None
-            register_tag_unassigned(tag)
-        db.session.delete(tag)
-        db.session.commit()
-        return {"message": "Tag deleted successfully"}, 200
-    except Exception as e:
-        db.session.rollback()
-        return {"error": str(e)}, 400
-
-
-def find_or_create_tag_from_ekasa(user_id: uuid.UUID, data: dict) -> Tag | None:
-    """
-    Find or create a tag for the given user based on eKasa organization data.
-
-    - uses organization name as tag name
-    - does NOT increment counter here
-      (counter and type are handled when the tag is actually assigned to a receipt)
-    """
-    name = data.get("name")
-    if not name:
-        return None
-
-    tag = (
-        db.session.query(Tag)
-        .filter(Tag.user_id == user_id, Tag.name == name)
-        .first()
-    )
-    if tag:
-        return tag
-
-    # Initially type=None; when we assign it to a Receipt,
-    # register_tag_assigned() + update_type() will set it to EXPENSE.
-    tag = Tag(
-        user_id=user_id,
-        name=name,
-        type=None,
-        counter=0,
-    )
-    db.session.add(tag)
-    db.session.flush()
+    if tag is None or tag.user_id != user_id:
+        raise NotFoundError("Tag not found")
     return tag
 
 
-def get_income_tags(user_id: uuid.UUID | None = None):
-    """
-    Get all tags that relate to incomes.
+def _find_duplicate_user_tag(
+    user_id: uuid.UUID,
+    name: str,
+    exclude_tag_id: uuid.UUID | None = None,
+) -> Tag | None:
+    query = db.session.query(Tag).filter(
+        Tag.user_id == user_id,
+        Tag.name == name,
+    )
+    if exclude_tag_id is not None:
+        query = query.filter(Tag.id != exclude_tag_id)
+    return query.first()
 
-    Includes:
-      - TagType.INCOME
-      - TagType.BOTH
 
-    Args:
-      user_id: optional UUID to filter tags for a specific user
+def _tag_has_linked_records(tag: Tag) -> bool:
+    return bool(tag.incomes) or bool(tag.receipts)
 
-    Returns:
-      tuple: (payload: dict, status_code: int)
 
-      payload example:
-        {
-          "success": True,
-          "tags": [
-            {"id":"...", "user_id":"...", "name":"Salary", "type":"INCOME", "counter": 3},
-            ...
-          ]
-        }
-    """
+def get_tags_by_type(tag_type: TagType, user_id: uuid.UUID) -> OkResult:
+    if tag_type not in (TagType.INCOME, TagType.EXPENSE):
+        raise BadRequestError("Invalid tag type")
+
+    query = db.session.query(Tag).filter(Tag.type.in_([tag_type, TagType.BOTH]))
+    query = query.filter(Tag.user_id == user_id)
+    tags = query.order_by(Tag.name.asc()).all()
+    items = [_serialize_tag(tag) for tag in tags]
+    return OkResult({"tags": items, "count": len(items)})
+
+
+def create_tag(data: dict, user_id: uuid.UUID) -> CreatedResult:
+    user = db.session.get(User, user_id)
+    if not user:
+        raise NotFoundError("User not found")
+
+    validated = validate_tag_create_data(data)
+
+    try:
+        tag = get_or_create_user_tag(user_id, validated["name"])
+        if validated["type"] is not None:
+            tag.type = validated["type"]
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+    return CreatedResult({"id": str(tag.id), "message": "Tag created successfully"})
+
+
+def update_tag(tag_id: uuid.UUID, data: dict, user_id: uuid.UUID) -> OkResult:
+    tag = _get_tag_for_user(tag_id, user_id)
+    validated = validate_tag_update_data(data)
+
+    if "name" in validated:
+        other = _find_duplicate_user_tag(
+            tag.user_id,
+            validated["name"],
+            exclude_tag_id=tag.id,
+        )
+        if other:
+            raise BadRequestError("Tag name already exists for this user")
+        tag.name = validated["name"]
+
+    if "type" in validated:
+        if _tag_has_linked_records(tag):
+            tag.update_type()
+        else:
+            tag.type = validated["type"]
+
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+    return OkResult({"id": str(tag.id), "message": "Tag updated successfully"})
+
+
+def delete_tag(tag_id: uuid.UUID, user_id: uuid.UUID) -> OkResult:
+    tag = _get_tag_for_user(tag_id, user_id)
+
+    tagged_records = [*list(tag.incomes), *list(tag.receipts)]
+    for tagged_record in tagged_records:
+        tagged_record.tag = None
+        register_tag_unassigned(tag)
+
+    try:
+        db.session.delete(tag)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+    return OkResult({"message": "Tag deleted successfully"})
+
+
+def get_income_tags(user_id: uuid.UUID) -> OkResult:
     query = db.session.query(Tag).filter(
         Tag.type.in_([TagType.INCOME, TagType.BOTH])
     )
 
-    if user_id is not None:
-        query = query.filter(Tag.user_id == user_id)
+    query = query.filter(Tag.user_id == user_id)
 
     tags = query.order_by(Tag.name.asc()).all()
+    return OkResult({"success": True, "tags": [_serialize_tag(tag, enum_mode="name") for tag in tags]})
 
-    result = []
-    for t in tags:
-        result.append({
-            "id": str(t.id),
-            "user_id": str(t.user_id),
-            "name": t.name,
-            "type": t.type.name if t.type is not None else None,
-            "counter": int(t.counter) if t.counter is not None else 0
-        })
 
-    return {"success": True, "tags": result}, 200
-
-def get_expense_tags(user_id: uuid.UUID | None = None):
-    """
-    Get all tags that relate to expenses.
-
-    Includes:
-      - TagType.EXPENSE
-      - TagType.BOTH
-
-    Args:
-      user_id: optional UUID to filter tags for a specific user
-
-    Returns:
-      tuple: (payload: dict, status_code: int)
-
-      payload example:
-        {
-          "success": True,
-          "tags": [
-            {"id":"...", "user_id":"...", "name":"Groceries", "type":"EXPENSE", "counter": 3},
-            ...
-          ]
-        }
-    """
+def get_expense_tags(user_id: uuid.UUID) -> OkResult:
     query = db.session.query(Tag).filter(
         Tag.type.in_([TagType.EXPENSE, TagType.BOTH])
     )
 
-    if user_id is not None:
-        query = query.filter(Tag.user_id == user_id)
+    query = query.filter(Tag.user_id == user_id)
 
     tags = query.order_by(Tag.name.asc()).all()
-
-    result = []
-    for t in tags:
-        result.append({
-            "id": str(t.id),
-            "user_id": str(t.user_id),
-            "name": t.name,
-            "type": t.type.name if t.type is not None else None,
-            "counter": int(t.counter) if t.counter is not None else 0
-        })
-
-    return {"success": True, "tags": result}, 200
+    return OkResult({"success": True, "tags": [_serialize_tag(tag, enum_mode="name") for tag in tags]})

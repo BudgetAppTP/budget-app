@@ -1,36 +1,26 @@
 import uuid
-import re
 from datetime import date
 
 from app.extensions import db
 from app.models import Income, Receipt
+from app.services.responses import OkResult
+from app.validators.common_validators import MonthYearFilter, validate_month_year_filter
 
 
-def get_month_summary_budget(month: str | None = None, user_id: uuid.UUID | None = None):
+def get_month_summary_budget(
+    user_id: uuid.UUID,
+    month_filter: MonthYearFilter,
+):
     """
-    Return incomes and expenses for selected month in YYYY-MM format.
+    Return incomes and expenses for selected month/year.
 
-    If month is not provided -> use current month.
+    If year/month are not provided -> use current month.
     """
+    if month_filter.year is None and month_filter.month is None:
+        today = date.today()
+        month_filter = validate_month_year_filter(today.year, today.month)
 
-    # default current month
-    if month is None or not str(month).strip():
-        month = date.today().strftime("%Y-%m")
-    else:
-        month = str(month).strip()
-
-    # validate format YYYY-MM
-    if not re.fullmatch(r"\d{4}-\d{2}", month):
-        return {"error": "Invalid month format, expected YYYY-MM"}, 400
-
-    year = int(month[:4])
-    month_num = int(month[5:7])
-
-    if month_num < 1 or month_num > 12:
-        return {"error": "Month must be between 01 and 12"}, 400
-
-    start = date(year, month_num, 1)
-    end = date(year + 1, 1, 1) if month_num == 12 else date(year, month_num + 1, 1)
+    start, end = month_filter.range()
 
     # load incomes for the month
     incomes_q = db.session.query(Income).filter(
@@ -38,8 +28,7 @@ def get_month_summary_budget(month: str | None = None, user_id: uuid.UUID | None
         Income.income_date >= start,
         Income.income_date < end,
     )
-    if user_id is not None:
-        incomes_q = incomes_q.filter(Income.user_id == user_id)
+    incomes_q = incomes_q.filter(Income.user_id == user_id)
 
     incomes = incomes_q.order_by(Income.income_date.asc()).all()
 
@@ -49,8 +38,7 @@ def get_month_summary_budget(month: str | None = None, user_id: uuid.UUID | None
         Receipt.issue_date >= start,
         Receipt.issue_date < end,
     )
-    if user_id is not None:
-        receipts_q = receipts_q.filter(Receipt.user_id == user_id)
+    receipts_q = receipts_q.filter(Receipt.user_id == user_id)
 
     receipts = receipts_q.order_by(Receipt.issue_date.asc()).all()
 
@@ -85,11 +73,11 @@ def get_month_summary_budget(month: str | None = None, user_id: uuid.UUID | None
             "total_amount": amount,
         })
 
-    return {
-        "month": month,
+    return OkResult({
+        "month": f"{month_filter.year:04d}-{month_filter.month:02d}",
         "incomes": incomes_data,
         "expenses": expenses_data,
         "total_income": total_income,
         "total_expense": total_expense,
         "balance": total_income - total_expense,
-    }, 200
+    })

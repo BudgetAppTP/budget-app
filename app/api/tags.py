@@ -1,138 +1,122 @@
 """
 Tags API
 
-Provides endpoints to manage tags and fetch tags filtered by type. These
-endpoints follow the unified response contract of the API and wrap their
-payloads in a common envelope via ``make_response``.
-
 Paths:
-  - GET    /api/tags/income    (list all income tags)
-  - GET    /api/tags/expense   (list all expense tags)
-  - POST   /api/tags           (create a new tag)
-  - PUT    /api/tags/{id}      (update tag)
-  - DELETE /api/tags/{id}      (delete tag)
+  - GET    /api/tags/income
+  - GET    /api/tags/expense
+  - POST   /api/tags
+  - PUT    /api/tags/{tag_id}
+  - DELETE /api/tags/{tag_id}
 
-Request/Response examples are documented inline with each view function.
+Response envelope:
+  {"data": <payload> | null, "error": {"code": str, "message": str} | null}
+
+Schemas:
+  Tag:
+    {
+      "id": uuid,
+      "user_id": uuid,
+      "name": str,
+      "type": "income | expense | both | null",
+      "counter": int
+    }
+
+Common errors:
+  400: {"data": null, "error": {"code": "bad_request", "message": str}}
+  404: {"data": null, "error": {"code": "not_found", "message": str}}
 """
 
-from __future__ import annotations
-
 import uuid
-from flask import request, g
-from app.api import bp, make_response
-from app.services import tags_service
+
+from flask import g
+
+from app.api import bp
+from app.api.request_parsing import parse_json_object_body
 from app.models.tag import TagType
+from app.services import tags_service
 
 
 @bp.get("/tags/income", strict_slashes=False)
 def api_tags_income_list():
     """
-    GET /api/tags/income
-    Summary: List all income tags
+    List income-related tags for the authenticated user.
 
     Responses:
-      200:
-        data: {"tags":[{...}], "count": number}
-        error: null
-      400:
-        data: {"error": "Invalid tag type"}
-        error: null
+      200: {"data": {"tags": [Tag], "count": int}, "error": null}
     """
-    data, status = tags_service.get_tags_by_type(TagType.INCOME, user_id=g.current_user.id)
-    if "error" in data:
-        return make_response(data, None, status)
-    return make_response(data, None, status)
+    result = tags_service.get_tags_by_type(TagType.INCOME, user_id=g.current_user.id)
+    return result.to_flask_response()
 
 
 @bp.get("/tags/expense", strict_slashes=False)
 def api_tags_expense_list():
     """
-    GET /api/tags/expense
-    Summary: List all expense tags
+    List expense-related tags for the authenticated user.
 
-    Responses are similar to /api/tags/income.
+    Responses:
+      200: {"data": {"tags": [Tag], "count": int}, "error": null}
     """
-    data, status = tags_service.get_tags_by_type(TagType.EXPENSE, user_id=g.current_user.id)
-    if "error" in data:
-        return make_response(data, None, status)
-    return make_response(data, None, status)
+    result = tags_service.get_tags_by_type(TagType.EXPENSE, user_id=g.current_user.id)
+    return result.to_flask_response()
 
 
 @bp.post("/tags", strict_slashes=False)
 def api_tags_create():
     """
-    POST /api/tags
-    Summary: Create a new tag
+    Create one tag for the authenticated user.
 
-    Request (JSON example):
+    Request:
       {
-        "user_id": "<uuid>",      # required
-        "name": "Salary",        # required
-        "type": "income"         # optional, one of income|expense|both
+        "user_id": "uuid | omitted | ignored",
+        "name": str,
+        "type": "income | expense | both | null | omitted; defaults to both"
       }
 
     Responses:
-      201:
-        data: {"id": "<uuid>", "message": "Tag created successfully"}
-        error: null
-      400:
-        data: {"error": "..."}
-        error: null
+      201: {"data": {"id": uuid, "message": str}, "error": null}
+      400: see module errors
+      404: see module errors
     """
-    payload = request.get_json(force=True) or {}
-    data, status = tags_service.create_tag(payload, user_id=g.current_user.id)
-    return make_response(data if "error" not in data else None, None if "error" not in data else data, status)
+    payload = parse_json_object_body(allow_empty=False)
+    result = tags_service.create_tag(payload, user_id=g.current_user.id)
+    return result.to_flask_response()
 
 
 @bp.put("/tags/<uuid:tag_id>", strict_slashes=False)
 def api_tags_update(tag_id: uuid.UUID):
     """
-    PUT /api/tags/{tag_id}
-    Summary: Update an existing tag
+    Update one tag owned by the authenticated user.
 
     Path:
       tag_id: uuid
 
-    Request (JSON example):
+    Request:
       {
-        "name": "Freelance",     # optional, if present must be non-empty
-        "type": "expense"        # optional, one of income|expense|both
+        "name": "str | omitted",
+        "type": "income | expense | both | null | omitted; linked tags keep relationship-derived type"
       }
 
     Responses:
-      200:
-        data: {"id": "<uuid>", "message": "Tag updated successfully"}
-        error: null
-      400/404:
-        data: {"error": "..."}
-        error: null
+      200: {"data": {"id": uuid, "message": str}, "error": null}
+      400: see module errors
+      404: see module errors
     """
-    payload = request.get_json() or {}
-    data, status = tags_service.update_tag(tag_id, payload, user_id=g.current_user.id)
-    # errors come in data['error']; unify envelope accordingly
-    if "error" in data:
-        return make_response(None, {"code": "bad_request" if status == 400 else str(status), "message": data["error"]}, status)
-    return make_response(data, None, status)
+    payload = parse_json_object_body(allow_empty=False)
+    result = tags_service.update_tag(tag_id, payload, user_id=g.current_user.id)
+    return result.to_flask_response()
 
 
 @bp.delete("/tags/<uuid:tag_id>", strict_slashes=False)
 def api_tags_delete(tag_id: uuid.UUID):
     """
-    DELETE /api/tags/{tag_id}
-    Summary: Delete a tag
+    Delete one tag owned by the authenticated user.
 
     Path:
       tag_id: uuid
 
     Responses:
-      200:
-        data: {"message": "Tag deleted successfully"}
-        error: null
-      400/404:
-        data: {"error": "..."}
-        error: null
+      200: {"data": {"message": str}, "error": null}
+      404: see module errors
     """
-    data, status = tags_service.delete_tag(tag_id, user_id=g.current_user.id)
-    if "error" in data:
-        return make_response(None, {"code": "bad_request" if status == 400 else str(status), "message": data["error"]}, status)
-    return make_response(data, None, status)
+    result = tags_service.delete_tag(tag_id, user_id=g.current_user.id)
+    return result.to_flask_response()

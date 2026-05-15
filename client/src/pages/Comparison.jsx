@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./style/comparison.css";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
+import { getApiErrorMessage } from "../api/errors";
 
 import { Chart, ArcElement, Tooltip, Legend } from "chart.js";
 Chart.register(ArcElement, Tooltip, Legend);
@@ -117,8 +118,7 @@ async function fetchMonthData(activeTab, year, month) {
   const json = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const msg = json?.data?.error || json?.error || json?.message || "Request failed";
-    throw new Error(msg);
+    throw new Error(getApiErrorMessage(json, "Request failed"));
   }
   return json;
 }

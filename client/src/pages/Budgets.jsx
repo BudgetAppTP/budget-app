@@ -3,6 +3,7 @@ import "./style/budget.css";
 import { Link } from "react-router-dom";
 import T from "../i18n/T";
 import { useLang } from "../i18n/LanguageContext";
+import { getApiErrorMessage, hasApiError } from "../api/errors";
 
 const USER_ID = "1be32073-0b12-4a59-b9a1-77e0d3586a4c";
 
@@ -25,16 +26,28 @@ export default function Budgets() {
       year: "numeric",
     });
 
-  const monthKeyFromDate = (d) => d.toISOString().slice(0, 7);
+  const getYearMonthFromDate = (d) => ({
+    year: String(d.getFullYear()),
+    month: String(d.getMonth() + 1),
+  });
 
 
   const [currentDate, setCurrentDate] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    const m = params.get("month");
-    return m ? new Date(m + "-01") : new Date();
+    const year = params.get("year");
+    const month = params.get("month");
+
+    if (year && month) {
+      return new Date(Number(year), Number(month) - 1, 1);
+    }
+
+    return new Date();
   });
 
-  const monthKey = useMemo(() => monthKeyFromDate(currentDate), [currentDate]);
+  const queryMonth = useMemo(
+    () => getYearMonthFromDate(currentDate),
+    [currentDate]
+  );
 
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState(null);
@@ -73,7 +86,11 @@ export default function Budgets() {
       setApiError(null);
 
       try {
-        const url = `/api/monthly-budget?month=${encodeURIComponent(monthKey)}`;
+        const params = new URLSearchParams({
+          year: queryMonth.year,
+          month: queryMonth.month,
+        });
+        const url = `/api/monthly-budget?${params.toString()}`;
 
         const res = await fetch(url, {
           method: "GET",
@@ -88,11 +105,9 @@ export default function Budgets() {
         if (!alive) return;
 
         if (!res.ok) {
-          const msg =
-            json?.error?.message ||
-            json?.data?.error ||
-            `Request failed (${res.status})`;
-          setApiError(msg);
+          setApiError(
+            getApiErrorMessage(json, `Request failed (${res.status})`)
+          );
           setMonthData((prev) => ({
             ...prev,
             incomes: [],
@@ -101,8 +116,8 @@ export default function Budgets() {
           return;
         }
 
-        if (json?.error) {
-          setApiError(json.error.message || "Unknown error");
+        if (hasApiError(json)) {
+          setApiError(getApiErrorMessage(json, "Unknown error"));
           setMonthData((prev) => ({
             ...prev,
             incomes: [],
@@ -165,14 +180,18 @@ export default function Budgets() {
     return () => {
       alive = false;
     };
-  }, [monthKey]);
+  }, [queryMonth]);
 
   const changeMonth = (offset) => {
     const newDate = new Date(currentDate);
     newDate.setMonth(currentDate.getMonth() + offset);
-    const newKey = monthKeyFromDate(newDate);
+    const nextMonth = getYearMonthFromDate(newDate);
     setCurrentDate(newDate);
-    window.history.replaceState({}, "", `?month=${newKey}`);
+    window.history.replaceState(
+      {},
+      "",
+      `?year=${encodeURIComponent(nextMonth.year)}&month=${encodeURIComponent(nextMonth.month)}`
+    );
   };
 
   const handlePercentChange = (index, value) => {
